@@ -2,6 +2,16 @@
 let currentTranslations = {};
 let currentLanguage = 'en';
 
+function isSafeAvatarUrl(url) {
+  if (typeof url !== "string") return false;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (e) {
+    return false;
+  }
+}
+
 async function loadTranslations(language) {
   try {
     const response = await fetch(`/locales/${language}.json`);
@@ -2118,12 +2128,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       option.dataset.email = user.email || "";
       option.dataset.avatar = user.avatar || "";
 
-      const avatarHtml = user.avatar
-        ? `<img src="${user.avatar}" alt="${escapeHtml(user.displayName)}">`
-        : `<div style="width: 36px; height: 36px; border-radius: 50%; background: var(--surface1); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--mauve);">${escapeHtml(user.displayName)
-            .charAt(0)
-            .toUpperCase()}</div>`;
-
       // Check if this user is already in active mappings
       const isInMapping = currentMappings.some(
         (mapping) => String(mapping.jellyseerrUserId) === String(user.id)
@@ -2133,7 +2137,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         : "";
 
       option.innerHTML = `
-        ${avatarHtml}
         <div class="custom-select-option-text">
           <div class="custom-select-option-name">${escapeHtml(user.displayName)}</div>
           ${
@@ -2144,6 +2147,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
         ${checkmarkHtml}
       `;
+      // Safely insert avatar using DOM API (no string interpolation)
+      if (user.avatar && isSafeAvatarUrl(user.avatar)) {
+        const img = document.createElement("img");
+        img.src = user.avatar;
+        img.alt = user.displayName || "";
+        option.insertBefore(img, option.firstChild);
+      } else {
+        const fallback = document.createElement("div");
+        fallback.style.cssText = "width:36px;height:36px;border-radius:50%;background:var(--surface1);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--mauve);flex-shrink:0";
+        fallback.textContent = user.displayName ? user.displayName.charAt(0).toUpperCase() : "?";
+        option.insertBefore(fallback, option.firstChild);
+      }
 
       option.addEventListener("click", () => {
         selectJellyseerrUser(user);
@@ -2177,16 +2192,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
     }
 
-    const avatarHtml = user.avatar
-      ? `<img src="${user.avatar}" alt="${escapeHtml(user.displayName)}">`
-      : `<div style="width: 32px; height: 32px; border-radius: 50%; background: var(--surface1); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--mauve); flex-shrink: 0;">${escapeHtml(user.displayName)
-          .charAt(0)
-          .toUpperCase()}</div>`;
-
-    display.innerHTML = `
-      ${avatarHtml}
-      <span>${escapeHtml(user.displayName)}${user.email ? ` (${escapeHtml(user.email)})` : ""}</span>
-    `;
+    // Safely build selected display using DOM API (no string interpolation for URLs)
+    while (display.firstChild) {
+      display.removeChild(display.firstChild);
+    }
+    if (user.avatar && isSafeAvatarUrl(user.avatar)) {
+      const img = document.createElement("img");
+      img.src = user.avatar;
+      img.alt = user.displayName || "";
+      img.style.cssText = "width:32px;height:32px;border-radius:50%;margin-right:0.75rem;flex-shrink:0";
+      display.appendChild(img);
+    } else {
+      const fallback = document.createElement("div");
+      fallback.style.cssText = "width:32px;height:32px;border-radius:50%;background:var(--surface1);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--mauve);flex-shrink:0;margin-right:0.75rem";
+      fallback.textContent = user.displayName ? user.displayName.charAt(0).toUpperCase() : "?";
+      display.appendChild(fallback);
+    }
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = user.email
+      ? `${user.displayName} (${user.email})`
+      : (user.displayName || "");
+    display.appendChild(nameSpan);
 
     // Force display to be visible immediately
     display.style.display = "flex";
