@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.2] - 2026-03-15
+
+### 🔒 Security
+
+This release addresses two stored XSS vulnerabilities reported by [@AdrianMendez01](https://github.com/AdrianMendez01).
+
+**GHSA-6mg4-788h-7g9g — Stored XSS via Discord member display names**
+The Discord member dropdown was built using `innerHTML` with unsanitized display names fetched from the Discord API. A Discord user whose display name contained HTML or JavaScript could inject scripts that executed in the dashboard context, targeting any admin viewing the user-mapping page.
+
+**GHSA-qpmq-6wjc-w28q — Stored XSS via Jellyseerr usernames**
+Jellyseerr usernames retrieved from the API were injected into the dashboard via `innerHTML` without sanitization. A Jellyseerr account with a crafted username could inject scripts that executed when an admin loaded the user-mapping page.
+
+- **DOM API rewrite for member dropdown**: The Discord member selector now builds list items using `createElement` / `textContent` instead of `innerHTML`. Display names and avatar URLs are treated as data, not markup
+- **Avatar URL validation**: Avatar URLs are validated against a strict pattern (`cdn.discordapp.com`) before being set as `img.src`, preventing javascript: URI injection via crafted avatar payloads
+- **i18n translation sanitization**: `sanitizeTranslationHtml()` strips `<script>` tags, event-handler attributes (`on*`), and `javascript:` URLs from locale strings before they are injected via `innerHTML`, while preserving safe markup (`<strong>`, `<code>`, etc.)
+- **Config sanitization**: Sensitive fields (`DISCORD_TOKEN`, API keys, secrets) are masked before the config object is sent to the browser. The server detects masked placeholders on save and substitutes the real stored values, preventing credential loss
+- **JWT token revocation**: Issued tokens now carry a `jti` (JWT ID) claim. Logout registers the JTI in an in-memory revocation set with auto-cleanup after expiry, so stolen session cookies are invalidated immediately on logout
+- **Security response headers**: Added `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `X-XSS-Protection: 1; mode=block`, and `Referrer-Policy: strict-origin-when-cross-origin` to all responses
+- **Auth endpoint rate limiting**: Login and register routes are now rate-limited to 20 requests per 15 minutes per IP, mitigating brute-force attacks
+
+### 🚀 Improvements
+
+- **Dynamic version display**: The dashboard footer and About section now show the live application version fetched from the server, keeping the displayed version in sync with each release without manual HTML edits
+
+---
+
 ## [1.4.1] - 2026-03-14
 
 ### ℹ️ Important
