@@ -122,7 +122,7 @@ function migrateConfigIfNeeded() {
 
     // Write to new location
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), {
-      mode: 0o666,
+      mode: 0o600,
       encoding: "utf-8",
     });
 
@@ -179,7 +179,7 @@ export function writeConfig(config) {
 
     // Write with explicit permissions (sensitive fields are base64-encoded)
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(encodeConfig(config), null, 2), {
-      mode: 0o666,
+      mode: 0o600,
       encoding: "utf-8",
     });
 

@@ -2357,9 +2357,18 @@ function configureWebServer() {
     legacyHeaders: false,
   });
 
-  // --- AUTH ENDPOINTS (no rate limiting for auth) ---
-  app.post("/api/auth/login", login);
-  app.post("/api/auth/register", register);
+  // Strict rate limiter for auth endpoints
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20,
+    message: { success: false, error: "Too many attempts, please try again later." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // --- AUTH ENDPOINTS ---
+  app.post("/api/auth/login", authLimiter, login);
+  app.post("/api/auth/register", authLimiter, register);
   app.post("/api/auth/logout", logout);
   app.get("/api/auth/check", checkAuth);
 

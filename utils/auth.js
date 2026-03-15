@@ -165,7 +165,7 @@ export const login = async (req, res) => {
     httpOnly: true,
     secure: req.secure || req.headers["x-forwarded-proto"] === "https",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
   });
 
   res.json({
@@ -194,7 +194,7 @@ export const register = async (req, res) => {
     });
   }
 
-  const salt = await bcrypt.genSalt(10);
+  const salt = await bcrypt.genSalt(12);
   const hashedPassword = await bcrypt.hash(password, salt);
 
   try {
@@ -204,13 +204,14 @@ export const register = async (req, res) => {
     const token = jwt.sign(
       { id: newUser.id, username: newUser.username, jti: crypto.randomUUID() },
       JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "24h" }
     );
 
     res.cookie("auth_token", token, {
       httpOnly: true,
       secure: req.secure || req.headers["x-forwarded-proto"] === "https",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
     res.json({
