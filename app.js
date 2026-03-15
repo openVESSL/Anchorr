@@ -266,6 +266,36 @@ let jellyfinWebSocketClient = null;
 // Map to track user requests: key = "tmdbId-mediaType", value = Set of Discord user IDs
 const pendingRequests = new Map();
 
+const PENDING_REQUESTS_PATH = path.join(path.dirname(CONFIG_PATH), "pending-requests.json");
+
+function savePendingRequests() {
+  try {
+    const serialized = {};
+    for (const [key, userSet] of pendingRequests) {
+      serialized[key] = Array.from(userSet);
+    }
+    fs.writeFileSync(PENDING_REQUESTS_PATH, JSON.stringify(serialized, null, 2), { encoding: "utf-8", mode: 0o600 });
+  } catch (err) {
+    logger.warn(`⚠️ Failed to persist pending requests to disk: ${err.message}`);
+  }
+}
+
+function loadPendingRequests() {
+  if (!fs.existsSync(PENDING_REQUESTS_PATH)) return;
+  try {
+    const raw = fs.readFileSync(PENDING_REQUESTS_PATH, "utf-8");
+    const parsed = JSON.parse(raw);
+    for (const [key, userArray] of Object.entries(parsed)) {
+      if (Array.isArray(userArray) && userArray.length > 0) {
+        pendingRequests.set(key, new Set(userArray));
+      }
+    }
+    logger.info(`✅ Loaded ${pendingRequests.size} pending request(s) from disk`);
+  } catch (err) {
+    logger.warn(`⚠️ Failed to load pending requests from disk: ${err.message}`);
+  }
+}
+
 // --- DAILY RANDOM PICK SCHEDULING ---
 let dailyRandomPickTimer = null;
 
@@ -440,6 +470,9 @@ async function startBot() {
     logger.info("Bot is already running.");
     return { success: true, message: "Bot is already running." };
   }
+
+  // Restore any pending requests that survived a previous restart
+  loadPendingRequests();
 
   // Load the latest config from file
   const configLoaded = loadConfig();
@@ -1116,6 +1149,7 @@ async function startBot() {
             pendingRequests.set(requestKey, new Set());
           }
           pendingRequests.get(requestKey).add(interaction.user.id);
+          savePendingRequests();
         }
       }
 
@@ -1845,6 +1879,7 @@ async function startBot() {
               pendingRequests.set(requestKey, new Set());
             }
             pendingRequests.get(requestKey).add(interaction.user.id);
+            savePendingRequests();
           }
 
           const imdbId = await tmdbApi.tmdbGetExternalImdb(
@@ -2174,6 +2209,7 @@ async function startBot() {
               pendingRequests.set(requestKey, new Set());
             }
             pendingRequests.get(requestKey).add(interaction.user.id);
+            savePendingRequests();
           }
 
           await interaction.followUp({
@@ -2994,14 +3030,14 @@ function configureWebServer() {
       // Process webhook asynchronously
       if (discordClient && isBotRunning) {
         // Don't pass res since we already responded
-        await handleJellyfinWebhook(req, null, discordClient, pendingRequests);
+        await handleJellyfinWebhook(req, null, discordClient, pendingRequests, savePendingRequests);
       } else {
         logger.warn(
-          "⚠️ Jellyfin webhook received but Discord bot is not running"
+          `⚠️ Jellyfin webhook received but Discord bot is not running — notification dropped (ItemType: ${req.body?.ItemType}, Name: ${req.body?.Name})`
         );
       }
     } catch (error) {
-      logger.error("❌ Error processing Jellyfin webhook:", error);
+      logger.error(`❌ Error processing Jellyfin webhook (ItemType: ${req.body?.ItemType}, Name: ${req.body?.Name}):`, error);
       // Don't send error response since we already sent 200
     }
   });
@@ -3542,8 +3578,8 @@ function configureWebServer() {
         const fakeReq1 = { body: season1Data };
         const fakeReq2 = { body: season2Data };
 
-        await handleJellyfinWebhook(fakeReq1, null, discordClient, pendingRequests);
-        await handleJellyfinWebhook(fakeReq2, null, discordClient, pendingRequests);
+        await handleJellyfinWebhook(fakeReq1, null, discordClient, pendingRequests, savePendingRequests);
+        await handleJellyfinWebhook(fakeReq2, null, discordClient, pendingRequests, savePendingRequests);
 
         return res.json({
           success: true,
@@ -3585,7 +3621,7 @@ function configureWebServer() {
           };
 
           const fakeReq = { body: episodeData };
-          await handleJellyfinWebhook(fakeReq, null, discordClient, pendingRequests);
+          await handleJellyfinWebhook(fakeReq, null, discordClient, pendingRequests, savePendingRequests);
           // Small delay between episodes to simulate realistic webhook timing
           await new Promise(resolve => setTimeout(resolve, 50));
         }
@@ -3605,7 +3641,7 @@ function configureWebServer() {
       };
 
       // Send the test notification (pass null for res since we don't need response handling)
-      await handleJellyfinWebhook(fakeReq, null, discordClient, pendingRequests);
+      await handleJellyfinWebhook(fakeReq, null, discordClient, pendingRequests, savePendingRequests);
 
       res.json({
         success: true,

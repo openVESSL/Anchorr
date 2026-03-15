@@ -217,6 +217,7 @@ async function processAndSendNotification(
     if (ItemType === "Movie" && pendingRequests.has(movieKey)) {
       usersToNotify = Array.from(pendingRequests.get(movieKey));
       pendingRequests.delete(movieKey);
+      if (onPendingRequestsChanged) onPendingRequestsChanged();
       logger.info(
         `Found ${usersToNotify.length} users to notify for movie ${tmdbId}`
       );
@@ -228,6 +229,7 @@ async function processAndSendNotification(
     ) {
       usersToNotify = Array.from(pendingRequests.get(tvKey));
       pendingRequests.delete(tvKey);
+      if (onPendingRequestsChanged) onPendingRequestsChanged();
       logger.info(
         `Found ${usersToNotify.length} users to notify for TV show ${tmdbId}`
       );
@@ -619,11 +621,16 @@ async function processAndSendNotification(
     channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
   }
 
+  if (!channelId) {
+    logger.error(`❌ No Discord channel configured for ${ItemType} "${data.Name}" — set JELLYFIN_CHANNEL_ID or configure a library channel in the dashboard`);
+    return;
+  }
+
   let channel;
   try {
     channel = await client.channels.fetch(channelId);
   } catch (error) {
-    logger.error(`Failed to fetch Discord channel ${channelId}:`, error);
+    logger.error(`❌ Failed to fetch Discord channel ${channelId} for "${data.Name}" (${ItemType}): ${error.message}`);
     throw new Error(`Discord channel ${channelId} not accessible`);
   }
 
@@ -754,7 +761,7 @@ async function processAndSendNotification(
 
 export { processAndSendNotification, libraryCache };
 
-export async function handleJellyfinWebhook(req, res, client, pendingRequests) {
+export async function handleJellyfinWebhook(req, res, client, pendingRequests, onPendingRequestsChanged) {
   try {
     const data = req.body;
     if (!data || !data.ItemId) {
@@ -1210,9 +1217,15 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests) {
                 `Error in debounced notification for series ${SeriesId}:`,
                 error
               );
-              // Still cleanup both maps on error
+              // Cleanup all maps on error so future webhooks for this series are not blocked
               debouncedSenders.delete(SeriesId);
               creatingDebouncers.delete(SeriesId);
+              // Clear temp marker (-1) so the series is not blocked for 24h after a failed notification
+              if (sentNotifications.has(SeriesId)) {
+                const existing = sentNotifications.get(SeriesId);
+                if (existing.cleanupTimer) clearTimeout(existing.cleanupTimer);
+                if (existing.level === -1) sentNotifications.delete(SeriesId);
+              }
             }
           },
           debounceMs
@@ -1250,7 +1263,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests) {
               );
             }
           }
-        }, 24 * 60 * 60 * 1000); // 24 hours
+        }, 5 * 60 * 1000); // 5 minutes — short enough that a failed debounce doesn't block the series for long
 
         sentNotifications.set(SeriesId, {
           level: -1, // Temporary marker indicating processing is in progress
