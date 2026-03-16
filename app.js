@@ -3019,13 +3019,18 @@ function configureWebServer() {
   }
 
   // --- JELLYFIN WEBHOOK ENDPOINT ---
-  app.post("/jellyfin-webhook", webhookLimiter, verifyWebhookSecret, express.json(), async (req, res) => {
+  app.post("/jellyfin-webhook", webhookLimiter, verifyWebhookSecret, express.json({ type: "*/*" }), async (req, res) => {
     try {
       logger.info("📥 Received Jellyfin webhook");
       logger.debug("Webhook payload:", JSON.stringify(req.body, null, 2));
 
       // Acknowledge receipt immediately
       res.status(200).json({ success: true, message: "Webhook received" });
+
+      if (!req.body || Object.keys(req.body).length === 0) {
+        logger.warn("⚠️ Webhook body is empty — check that 'Send All Properties' is enabled in Jellyfin and the webhook is correctly configured");
+        return;
+      }
 
       // Process webhook asynchronously
       if (discordClient && isBotRunning) {

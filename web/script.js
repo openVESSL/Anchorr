@@ -885,6 +885,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Initialize webhook URL on page load with actual server port
   updateWebhookUrl();
 
+  // Populate webhook secret input on page load
+  (async () => {
+    try {
+      const response = await fetch("/api/webhook-secret");
+      if (response.ok) {
+        const data = await response.json();
+        const input = document.getElementById("WEBHOOK_SECRET");
+        if (input && data.secret) input.value = data.secret;
+      }
+    } catch (_) {}
+  })();
+
   // Copy webhook secret (fetched from dedicated endpoint, not from form input)
   document.getElementById("copy-webhook-secret-btn").addEventListener("click", async () => {
     try {
