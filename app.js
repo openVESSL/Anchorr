@@ -33,25 +33,16 @@ import * as tmdbApi from "./api/tmdb.js";
 import * as seerrApi from "./api/seerr.js";
 import { registerCommands } from "./discord/commands.js";
 import logger from "./utils/logger.js";
-import {
-  validateBody,
-  configSchema,
-  userMappingSchema,
-} from "./utils/validation.js";
+import { validateBody, configSchema } from "./utils/validation.js";
 import cache from "./utils/cache.js";
 import { COLORS, TIMEOUTS } from "./lib/constants.js";
-import {
-  login,
-  register,
-  logout,
-  checkAuth,
-  authenticateToken,
-  WEBHOOK_SECRET,
-} from "./utils/auth.js";
+import { authenticateToken, WEBHOOK_SECRET } from "./utils/auth.js";
 import { jellyfinPoller } from "./jellyfinPoller.js";
 import JellyfinWebSocketClient from "./jellyfinWebSocket.js";
 import { minutesToHhMm } from "./utils/time.js";
 import logRouter from "./routes/logRoutes.js";
+import authRouter from "./routes/authRoutes.js";
+import userMappingRouter from "./routes/userMappingRoutes.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import {
   CONFIG_PATH,
@@ -2403,26 +2394,17 @@ function configureWebServer() {
     legacyHeaders: false,
   });
 
-  // Strict rate limiter for auth endpoints
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20,
-    message: { success: false, error: "Too many attempts, please try again later." },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-
-  // --- AUTH ENDPOINTS ---
-  app.post("/api/auth/login", authLimiter, login);
-  app.post("/api/auth/register", authLimiter, register);
-  app.post("/api/auth/logout", logout);
-  app.get("/api/auth/check", checkAuth);
+  // Auth routes (before general rate limiter so authLimiter applies)
+  app.use("/api", authRouter);
 
   // Apply rate limiting to all API endpoints (except auth and webhooks)
   app.use("/api/", apiLimiter);
 
   // Log routes
   app.use("/api", logRouter);
+
+  // User mapping routes
+  app.use("/api", userMappingRouter);
 
   // Endpoint for Discord servers list (guilds)
   app.get("/api/discord/guilds", authenticateToken, async (req, res) => {
@@ -2839,89 +2821,6 @@ function configureWebServer() {
       res.json({ success: false, message: err.message });
     }
   });
-
-  // Endpoint for user mappings
-  app.get("/api/user-mappings", authenticateToken, (req, res) => {
-    // Load from config.json using centralized helper
-    const mappings = getUserMappings();
-    res.json(mappings);
-  });
-
-  app.post(
-    "/api/user-mappings",
-    authenticateToken,
-    validateBody(userMappingSchema),
-    (req, res) => {
-      const {
-        discordUserId,
-        seerrUserId,
-        discordUsername,
-        discordDisplayName,
-        seerrDisplayName,
-      } = req.body;
-
-      if (!discordUserId || !seerrUserId) {
-        return res.status(400).json({
-          success: false,
-          message: "Discord user ID and Seerr user ID are required.",
-        });
-      }
-
-      try {
-        const mapping = {
-          discordUserId,
-          seerrUserId,
-          discordUsername: discordUsername || null,
-          discordDisplayName: discordDisplayName || null,
-          seerrDisplayName: seerrDisplayName || null,
-        };
-
-        // Use centralized saveUserMapping helper
-        saveUserMapping(mapping);
-
-        // Reload config into process.env to ensure mapping is immediately active
-        loadConfig();
-
-        res.json({ success: true, message: "Mapping saved successfully." });
-      } catch (error) {
-        logger.error("Error saving user mapping:", error);
-        res.status(500).json({
-          success: false,
-          message: "Failed to save mapping - check server logs.",
-        });
-      }
-    }
-  );
-
-  app.delete(
-    "/api/user-mappings/:discordUserId",
-    authenticateToken,
-    (req, res) => {
-      const { discordUserId } = req.params;
-
-      try {
-        // Use centralized deleteUserMapping helper
-        const deleted = deleteUserMapping(discordUserId);
-
-        if (!deleted) {
-          return res
-            .status(404)
-            .json({ success: false, message: "Mapping not found." });
-        }
-
-        // Reload config into process.env to ensure mapping is immediately removed
-        loadConfig();
-
-        res.json({ success: true, message: "Mapping deleted successfully." });
-      } catch (error) {
-        logger.error("Error deleting user mapping:", error);
-        res.status(500).json({
-          success: false,
-          message: "Failed to delete mapping - check server logs.",
-        });
-      }
-    }
-  );
 
   // Endpoint for Jellyfin libraries
   app.post("/api/jellyfin-libraries", authenticateToken, async (req, res) => {
