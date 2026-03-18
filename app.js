@@ -6,9 +6,8 @@ import { createRequire } from "module";
 import express from "express";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
-import { handleJellyfinWebhook, libraryCache } from "./jellyfinWebhook.js";
+import { handleJellyfinWebhook } from "./jellyfinWebhook.js";
 import { configTemplate } from "./lib/config.js";
-import axios from "axios";
 
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -35,7 +34,7 @@ import { registerCommands } from "./discord/commands.js";
 import logger from "./utils/logger.js";
 import { validateBody, configSchema } from "./utils/validation.js";
 import cache from "./utils/cache.js";
-import { COLORS, TIMEOUTS } from "./lib/constants.js";
+import { COLORS } from "./lib/constants.js";
 import { authenticateToken, WEBHOOK_SECRET } from "./utils/auth.js";
 import { jellyfinPoller } from "./jellyfinPoller.js";
 import JellyfinWebSocketClient from "./jellyfinWebSocket.js";
@@ -44,6 +43,8 @@ import logRouter from "./routes/logRoutes.js";
 import authRouter from "./routes/authRoutes.js";
 import userMappingRouter from "./routes/userMappingRoutes.js";
 import configRouter from "./routes/configRoutes.js";
+import seerrRouter from "./routes/seerrRoutes.js";
+import jellyfinRouter from "./routes/jellyfinRoutes.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import {
   CONFIG_PATH,
@@ -2368,6 +2369,12 @@ function configureWebServer() {
   // Config/language routes
   app.use("/api", configRouter);
 
+  // Seerr routes
+  app.use("/api", seerrRouter);
+
+  // Jellyfin test/library routes
+  app.use("/api", jellyfinRouter);
+
   // Endpoint for Discord servers list (guilds)
   app.get("/api/discord/guilds", authenticateToken, async (req, res) => {
     try {
@@ -2668,167 +2675,6 @@ function configureWebServer() {
     }
   });
 
-  // Endpoint for Seerr users
-  app.get("/api/seerr-users", authenticateToken, async (req, res) => {
-    try {
-      logger.debug("[SEERR USERS API] Request received");
-      const seerrUrl = process.env.SEERR_URL;
-      const apiKey = process.env.SEERR_API_KEY;
-
-      logger.debug("[SEERR USERS API] SEERR_URL:", seerrUrl);
-      logger.debug("[SEERR USERS API] API_KEY present:", !!apiKey);
-
-      if (!seerrUrl || !apiKey) {
-        logger.debug("[SEERR USERS API] Missing configuration");
-        return res.json({
-          success: false,
-          message: "Seerr configuration missing",
-        });
-      }
-
-      let baseUrl = seerrUrl.replace(/\/$/, "");
-      if (!baseUrl.endsWith("/api/v1")) {
-        baseUrl += "/api/v1";
-      }
-
-      logger.debug(
-        "[SEERR USERS API] Making request to:",
-        `${baseUrl}/user`
-      );
-
-      let response;
-      try {
-        logger.info(
-          "[SEERR USERS API] Fetching users from Seerr (real-time)..."
-        );
-        response = await axios.get(`${baseUrl}/user?take=` + Number.MAX_SAFE_INTEGER, {
-          headers: { "X-Api-Key": apiKey },
-          timeout: TIMEOUTS.SEERR_API,
-        });
-
-        logger.info(
-          "[SEERR USERS API] ✅ Users fetched successfully (real-time)"
-        );
-      } catch (fetchErr) {
-        logger.error(
-          "[SEERR USERS API] Failed to fetch users:",
-          fetchErr.message
-        );
-        throw fetchErr;
-      }
-
-      logger.debug(
-        "[SEERR USERS API] Response received, status:",
-        response.status
-      );
-      logger.debug(
-        "[SEERR USERS API] Response data type:",
-        typeof response.data
-      );
-      logger.debug(
-        "[SEERR USERS API] Response data is array:",
-        Array.isArray(response.data)
-      );
-      if (!Array.isArray(response.data)) {
-        logger.debug(
-          "[SEERR USERS API] Response data keys:",
-          Object.keys(response.data)
-        );
-      }
-      logger.debug(
-        "[SEERR USERS API] Response data length:",
-        Array.isArray(response.data)
-          ? response.data.length
-          : response.data.results?.length || "N/A"
-      );
-
-      // Seerr API returns { pageInfo, results: [] }
-      const userData = response.data.results || [];
-
-      const users = userData
-        .map((user) => {
-          let avatar = user.avatar || null;
-          // If avatar is relative, make it absolute
-          if (avatar && !avatar.startsWith("http")) {
-            avatar = `${seerrUrl.replace(/\/api\/v1$/, "")}${avatar}`;
-          }
-          return {
-            id: user.id,
-            displayName: user.displayName || user.username || `User ${user.id}`,
-            username: user.username || "",
-            email: user.email || "",
-            avatar: avatar,
-          };
-        })
-        .sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || "")
-        ); // Sort alphabetically
-
-      logger.info(
-        `[SEERR USERS API] ✅ Returning ${users.length} users (real-time)`
-      );
-      res.json({ success: true, users, fetchedRealtime: true });
-    } catch (err) {
-      logger.error("[SEERR USERS API] Error:", err.message);
-      if (err.response) {
-        logger.error(
-          "[SEERR USERS API] Response status:",
-          err.response.status
-        );
-        logger.error(
-          "[SEERR USERS API] Response data:",
-          err.response.data
-        );
-      }
-      res.json({ success: false, message: err.message });
-    }
-  });
-
-  // Endpoint for Jellyfin libraries
-  app.post("/api/jellyfin-libraries", authenticateToken, async (req, res) => {
-    try {
-      const { url } = req.body;
-      let { apiKey } = req.body;
-      // If the frontend sends back a masked placeholder, use the real key from config
-      if (isMaskedValue(apiKey)) {
-        apiKey = process.env.JELLYFIN_API_KEY;
-      }
-
-      if (!url || !apiKey) {
-        return res
-          .status(400)
-          .json({ success: false, message: "URL and API Key are required." });
-      }
-
-      const response = await axios.get(
-        `${url.replace(/\/$/, "")}/Library/MediaFolders`,
-        {
-          headers: { "X-MediaBrowser-Token": apiKey },
-          timeout: TIMEOUTS.JELLYFIN_API,
-        }
-      );
-
-      const libraries = response.data.Items.map((item) => ({
-        id: item.Id,
-        name: item.Name,
-        type: item.CollectionType || "unknown",
-      }));
-
-      // Update library cache with fresh data for webhook usage
-      if (response.data.Items && response.data.Items.length > 0) {
-        libraryCache.set(response.data.Items);
-        logger.info(
-          `[LIBRARY CACHE] Updated cache with ${response.data.Items.length} libraries`
-        );
-      }
-
-      res.json({ success: true, libraries });
-    } catch (err) {
-      logger.error("[JELLYFIN LIBRARIES API] Error:", err);
-      res.json({ success: false, message: err.message });
-    }
-  });
-
   // Global error handler middleware - must be last
   app.use((err, req, res, next) => {
     logger.error("Express error handler:", {
@@ -3064,164 +2910,6 @@ function configureWebServer() {
       discordCredsChanged,
       isBotRunning
     });
-  });
-
-  app.post("/api/test-seerr", authenticateToken, async (req, res) => {
-    const { url, apiKey } = req.body;
-    const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
-    if (!url || !effectiveApiKey) {
-      return res
-        .status(400)
-        .json({ success: false, message: "URL and API Key are required." });
-    }
-
-    try {
-      let baseUrl = url.replace(/\/$/, "");
-      if (!baseUrl.endsWith("/api/v1")) {
-        baseUrl += "/api/v1";
-      }
-
-      const response = await axios.get(`${baseUrl}/settings/about`, {
-        headers: { "X-Api-Key": effectiveApiKey },
-        timeout: TIMEOUTS.SEERR_API,
-      });
-      const version = response.data?.version;
-      res.json({
-        success: true,
-        message: `Connection successful! (v${version})`,
-      });
-    } catch (error) {
-      logger.error("Seerr test failed:", error.message);
-      // Check if the error is due to an invalid API key (401/403)
-      if (error.response && [401, 403].includes(error.response.status)) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Invalid API Key." });
-      }
-      res.status(500).json({
-        success: false,
-        message: "Connection failed. Check URL and API Key.",
-      });
-    }
-  });
-
-  // Fetch quality profiles
-  app.post("/api/seerr/quality-profiles", authenticateToken, async (req, res) => {
-    const { url, apiKey } = req.body;
-    const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
-    if (!url || !effectiveApiKey) {
-      return res
-        .status(400)
-        .json({ success: false, message: "URL and API Key are required." });
-    }
-
-    try {
-      let baseUrl = url.replace(/\/$/, "");
-      if (!baseUrl.endsWith("/api/v1")) {
-        baseUrl += "/api/v1";
-      }
-
-      const profiles = await seerrApi.fetchQualityProfiles(baseUrl, effectiveApiKey);
-      res.json({ success: true, profiles });
-    } catch (error) {
-      logger.error("Failed to fetch quality profiles:", error.message);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch quality profiles.",
-      });
-    }
-  });
-
-  // Fetch servers
-  app.post("/api/seerr/servers", authenticateToken, async (req, res) => {
-    const { url, apiKey } = req.body;
-    const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
-    if (!url || !effectiveApiKey) {
-      return res
-        .status(400)
-        .json({ success: false, message: "URL and API Key are required." });
-    }
-
-    try {
-      let baseUrl = url.replace(/\/$/, "");
-      if (!baseUrl.endsWith("/api/v1")) {
-        baseUrl += "/api/v1";
-      }
-
-      const servers = await seerrApi.fetchServers(baseUrl, effectiveApiKey);
-      res.json({ success: true, servers });
-    } catch (error) {
-      logger.error("Failed to fetch servers:", error.message);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch servers.",
-      });
-    }
-  });
-
-  app.post("/api/test-jellyfin", authenticateToken, async (req, res) => {
-    const { url } = req.body;
-    if (!url) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Jellyfin URL is required." });
-    }
-
-    try {
-      const testUrl = `${url.replace(/\/$/, "")}/System/Info/Public`;
-      const response = await axios.get(testUrl, {
-        timeout: TIMEOUTS.JELLYFIN_API,
-      });
-
-      if (response.data?.ServerName && response.data?.Version) {
-        return res.json({
-          success: true,
-          message: `Connected to ${response.data.ServerName} (v${response.data.Version})`,
-          serverId: response.data.Id,
-        });
-      }
-      throw new Error("Invalid response from Jellyfin server.");
-    } catch (error) {
-      logger.error("Jellyfin test failed:", error.message);
-      res.status(500).json({
-        success: false,
-        message: "Connection failed. Check URL and network.",
-      });
-    }
-  });
-
-  app.get("/api/jellyfin/libraries", authenticateToken, async (req, res) => {
-    try {
-      const apiKey = process.env.JELLYFIN_API_KEY;
-      const baseUrl = process.env.JELLYFIN_URL;
-
-      if (!apiKey || !baseUrl) {
-        return res.status(400).json({
-          success: false,
-          message: "Jellyfin API key and URL are required in configuration.",
-        });
-      }
-
-      // Import fetchLibraries dynamically
-      const { fetchLibraries } = await import("./api/jellyfin.js");
-      const libraries = await fetchLibraries(apiKey, baseUrl);
-
-      res.json({
-        success: true,
-        libraries: libraries.map((lib) => ({
-          id: lib.ItemId,
-          collectionId: lib.CollectionId,
-          name: lib.Name,
-          type: lib.CollectionType,
-        })),
-      });
-    } catch (error) {
-      logger.error("Failed to fetch Jellyfin libraries:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch libraries. Check Jellyfin configuration.",
-      });
-    }
   });
 
   // Test notification endpoint - sends sample notifications with random data
