@@ -2,7 +2,6 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import { createRequire } from "module";
 import express from "express";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
@@ -12,8 +11,6 @@ import { configTemplate } from "./lib/config.js";
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
-const { version: APP_VERSION } = require("./package.json");
 
 import {
   Client,
@@ -33,11 +30,9 @@ import * as seerrApi from "./api/seerr.js";
 import { registerCommands } from "./discord/commands.js";
 import logger from "./utils/logger.js";
 import { validateBody, configSchema } from "./utils/validation.js";
-import cache from "./utils/cache.js";
 import { COLORS } from "./lib/constants.js";
 import { authenticateToken, WEBHOOK_SECRET } from "./utils/auth.js";
 import { jellyfinPoller } from "./jellyfinPoller.js";
-import JellyfinWebSocketClient from "./jellyfinWebSocket.js";
 import { minutesToHhMm } from "./utils/time.js";
 import logRouter from "./routes/logRoutes.js";
 import authRouter from "./routes/authRoutes.js";
@@ -45,6 +40,8 @@ import userMappingRouter from "./routes/userMappingRoutes.js";
 import configRouter from "./routes/configRoutes.js";
 import seerrRouter from "./routes/seerrRoutes.js";
 import jellyfinRouter from "./routes/jellyfinRoutes.js";
+import { botState } from "./bot/botState.js";
+import { createBotRoutes } from "./routes/botRoutes.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import {
   CONFIG_PATH,
@@ -208,11 +205,6 @@ function verifyVolumeConfiguration() {
 
 const app = express();
 let port = process.env.WEBHOOK_PORT || 8282;
-
-// --- BOT STATE MANAGEMENT ---
-let discordClient = null;
-let isBotRunning = false;
-let jellyfinWebSocketClient = null;
 
 // --- PENDING REQUESTS TRACKING ---
 // Map to track user requests: key = "tmdbId-mediaType", value = Set of Discord user IDs
@@ -418,7 +410,7 @@ async function sendDailyRandomPick(client) {
 }
 
 async function startBot() {
-  if (isBotRunning && discordClient) {
+  if (botState.isBotRunning && botState.discordClient) {
     logger.info("Bot is already running.");
     return { success: true, message: "Bot is already running." };
   }
@@ -450,7 +442,7 @@ async function startBot() {
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
     partials: [Partials.Channel],
   });
-  discordClient = client; // Store client instance globally
+  botState.discordClient = client; // Store client instance globally
 
   // ----------------- CONFIG HELPERS (DYNAMIC) -----------------
   const getSeerrUrl = () => {
@@ -2289,7 +2281,7 @@ async function startBot() {
   return new Promise((resolve, reject) => {
     client.once("clientReady", async () => {
       logger.info(`✅ Bot logged in as ${client.user.tag}`);
-      isBotRunning = true;
+      botState.isBotRunning = true;
 
       logger.info("ℹ️ Jellyfin notifications will be received via webhooks.");
 
@@ -2310,8 +2302,8 @@ async function startBot() {
       if (err && err.stack) {
         logger.error("[DISCORD LOGIN ERROR] Stack:", err.stack);
       }
-      isBotRunning = false;
-      discordClient = null;
+      botState.isBotRunning = false;
+      botState.discordClient = null;
       reject(err);
     });
   });
@@ -2375,20 +2367,23 @@ function configureWebServer() {
   // Jellyfin test/library routes
   app.use("/api", jellyfinRouter);
 
+  // Bot management routes (health, status, start-bot, stop-bot)
+  app.use("/api", createBotRoutes({ startBot, jellyfinPoller }));
+
   // Endpoint for Discord servers list (guilds)
   app.get("/api/discord/guilds", authenticateToken, async (req, res) => {
     try {
-      if (!discordClient || !discordClient.user) {
+      if (!botState.discordClient || !botState.discordClient.user) {
         logger.debug("[GUILDS API] Bot not running or not logged in.");
         return res.json({ success: false, message: "Bot not running" });
       }
       // Debug: log all guilds
       logger.debug(
-        "[GUILDS API] discordClient.guilds.cache:",
-        discordClient.guilds.cache.map((g) => ({ id: g.id, name: g.name }))
+        "[GUILDS API] botState.discordClient.guilds.cache:",
+        botState.discordClient.guilds.cache.map((g) => ({ id: g.id, name: g.name }))
       );
       // Fetch guilds the bot is in
-      const guilds = discordClient.guilds.cache.map((g) => ({
+      const guilds = botState.discordClient.guilds.cache.map((g) => ({
         id: g.id,
         name: g.name,
       }));
@@ -2406,12 +2401,12 @@ function configureWebServer() {
     async (req, res) => {
       try {
         const { guildId } = req.params;
-        if (!discordClient || !discordClient.user) {
+        if (!botState.discordClient || !botState.discordClient.user) {
           logger.debug("[CHANNELS API] Bot not running or not logged in.");
           return res.json({ success: false, message: "Bot not running" });
         }
 
-        const guild = discordClient.guilds.cache.get(guildId);
+        const guild = botState.discordClient.guilds.cache.get(guildId);
         if (!guild) {
           return res.json({ success: false, message: "Guild not found" });
         }
@@ -2423,7 +2418,7 @@ function configureWebServer() {
           .filter(
             (channel) =>
               channel.type === 0 && // GUILD_TEXT
-              channel.permissionsFor(discordClient.user).has("SendMessages")
+              channel.permissionsFor(botState.discordClient.user).has("SendMessages")
           )
           .forEach((channel) => {
             channels.push({
@@ -2445,7 +2440,7 @@ function configureWebServer() {
 
             // Add each thread as a selectable channel
             activeThreads.threads.forEach((thread) => {
-              if (thread.permissionsFor(discordClient.user)?.has("SendMessages")) {
+              if (thread.permissionsFor(botState.discordClient.user)?.has("SendMessages")) {
                 channels.push({
                   id: thread.id,
                   name: `${forumChannel.name} > ${thread.name}`,
@@ -2468,7 +2463,7 @@ function configureWebServer() {
           activeThreads.threads.forEach((thread) => {
             // Filter for thread types: PUBLIC_THREAD (10), PRIVATE_THREAD (11), ANNOUNCEMENT_THREAD (12)
             if ([10, 11, 12].includes(thread.type)) {
-              if (thread.permissionsFor(discordClient.user)?.has("SendMessages")) {
+              if (thread.permissionsFor(botState.discordClient.user)?.has("SendMessages")) {
                 const parentChannel = guild.channels.cache.get(thread.parentId);
                 const threadTypeLabel =
                   thread.type === 10 ? "Thread" :
@@ -2510,7 +2505,7 @@ function configureWebServer() {
   app.get("/api/discord-members", authenticateToken, async (req, res) => {
     try {
       logger.debug("[MEMBERS API] Request received");
-      if (!discordClient || !discordClient.user) {
+      if (!botState.discordClient || !botState.discordClient.user) {
         logger.debug("[MEMBERS API] Bot not running");
         return res.json({ success: false, message: "Bot not running" });
       }
@@ -2522,7 +2517,7 @@ function configureWebServer() {
         return res.json({ success: false, message: "No guild selected" });
       }
 
-      const guild = discordClient.guilds.cache.get(guildId);
+      const guild = botState.discordClient.guilds.cache.get(guildId);
       if (!guild) {
         logger.debug("[MEMBERS API] Guild not found in cache");
         return res.json({ success: false, message: "Guild not found" });
@@ -2536,7 +2531,7 @@ function configureWebServer() {
       );
 
       // Check if bot has permission to view members
-      const botMember = guild.members.cache.get(discordClient.user.id);
+      const botMember = guild.members.cache.get(botState.discordClient.user.id);
       if (!botMember) {
         logger.debug("[MEMBERS API] Bot member not found in guild");
         return res.json({ success: false, message: "Bot not in guild" });
@@ -2636,7 +2631,7 @@ function configureWebServer() {
   app.get("/api/discord-roles", authenticateToken, async (req, res) => {
     try {
       logger.debug("[ROLES API] Request received");
-      if (!discordClient || !discordClient.user) {
+      if (!botState.discordClient || !botState.discordClient.user) {
         logger.debug("[ROLES API] Bot not running");
         return res.json({ success: false, message: "Bot not running" });
       }
@@ -2648,7 +2643,7 @@ function configureWebServer() {
         return res.json({ success: false, message: "No guild selected" });
       }
 
-      const guild = discordClient.guilds.cache.get(guildId);
+      const guild = botState.discordClient.guilds.cache.get(guildId);
       if (!guild) {
         logger.debug("[ROLES API] Guild not found in cache");
         return res.json({ success: false, message: "Guild not found" });
@@ -2744,9 +2739,9 @@ function configureWebServer() {
       }
 
       // Process webhook asynchronously
-      if (discordClient && isBotRunning) {
+      if (botState.discordClient && botState.isBotRunning) {
         // Don't pass res since we already responded
-        await handleJellyfinWebhook(req, null, discordClient, pendingRequests, savePendingRequests);
+        await handleJellyfinWebhook(req, null, botState.discordClient, pendingRequests, savePendingRequests);
       } else {
         logger.warn(
           `⚠️ Jellyfin webhook received but Discord bot is not running — notification dropped (ItemType: ${req.body?.ItemType}, Name: ${req.body?.Name})`
@@ -2841,14 +2836,14 @@ function configureWebServer() {
         oldGuildId !== process.env.GUILD_ID ||
         jellyfinApiKeyChanged;
 
-      if (isBotRunning && needsRestart) {
+      if (botState.isBotRunning && needsRestart) {
         logger.warn(
           "Critical Discord settings changed. Restarting bot logic..."
         );
 
-        await discordClient.destroy();
-        isBotRunning = false;
-        discordClient = null;
+        await botState.discordClient.destroy();
+        botState.isBotRunning = false;
+        botState.discordClient = null;
         try {
           await startBot();
           res
@@ -2859,7 +2854,7 @@ function configureWebServer() {
             message: `Config saved, but bot failed to restart: ${error.message}`,
           });
         }
-      } else if (!isBotRunning && hasDiscordCreds && discordCredsChanged) {
+      } else if (!botState.isBotRunning && hasDiscordCreds && discordCredsChanged) {
         // Check if user wants to auto-start the bot (default: true for backward compatibility)
         const shouldStartBot = configData.startBot !== false; // Default to true if not specified
 
@@ -2902,13 +2897,13 @@ function configureWebServer() {
     // Check if Discord credentials are complete and changed
     const hasDiscordCreds = effectiveToken && configData.BOT_ID;
     const discordCredsChanged = oldToken !== effectiveToken;
-    const wouldAutoStart = !isBotRunning && hasDiscordCreds && discordCredsChanged;
+    const wouldAutoStart = !botState.isBotRunning && hasDiscordCreds && discordCredsChanged;
 
     res.json({
       wouldAutoStart,
       hasDiscordCreds,
       discordCredsChanged,
-      isBotRunning
+      isBotRunning: botState.isBotRunning,
     });
   });
 
@@ -2925,7 +2920,7 @@ function configureWebServer() {
       }
 
       // Check if Discord bot is running and configured
-      if (!discordClient || !discordClient.isReady()) {
+      if (!botState.discordClient || !botState.discordClient.isReady()) {
         return res.status(400).json({
           success: false,
           message: "Discord bot is not running. Please start the bot first.",
@@ -3072,8 +3067,8 @@ function configureWebServer() {
         const fakeReq1 = { body: season1Data };
         const fakeReq2 = { body: season2Data };
 
-        await handleJellyfinWebhook(fakeReq1, null, discordClient, pendingRequests, savePendingRequests);
-        await handleJellyfinWebhook(fakeReq2, null, discordClient, pendingRequests, savePendingRequests);
+        await handleJellyfinWebhook(fakeReq1, null, botState.discordClient, pendingRequests, savePendingRequests);
+        await handleJellyfinWebhook(fakeReq2, null, botState.discordClient, pendingRequests, savePendingRequests);
 
         return res.json({
           success: true,
@@ -3115,7 +3110,7 @@ function configureWebServer() {
           };
 
           const fakeReq = { body: episodeData };
-          await handleJellyfinWebhook(fakeReq, null, discordClient, pendingRequests, savePendingRequests);
+          await handleJellyfinWebhook(fakeReq, null, botState.discordClient, pendingRequests, savePendingRequests);
           // Small delay between episodes to simulate realistic webhook timing
           await new Promise(resolve => setTimeout(resolve, 50));
         }
@@ -3135,7 +3130,7 @@ function configureWebServer() {
       };
 
       // Send the test notification (pass null for res since we don't need response handling)
-      await handleJellyfinWebhook(fakeReq, null, discordClient, pendingRequests, savePendingRequests);
+      await handleJellyfinWebhook(fakeReq, null, botState.discordClient, pendingRequests, savePendingRequests);
 
       res.json({
         success: true,
@@ -3154,7 +3149,7 @@ function configureWebServer() {
   app.post("/api/test-random-pick", authenticateToken, async (req, res) => {
     try {
       // Check if Discord bot is running and configured
-      if (!discordClient || !discordClient.isReady()) {
+      if (!botState.discordClient || !botState.discordClient.isReady()) {
         return res.status(400).json({
           success: false,
           message: "Discord bot is not running. Please start the bot first.",
@@ -3178,7 +3173,7 @@ function configureWebServer() {
       }
 
       // Get random media and send it
-      await sendDailyRandomPick(discordClient);
+      await sendDailyRandomPick(botState.discordClient);
 
       res.json({
         success: true,
@@ -3194,97 +3189,6 @@ function configureWebServer() {
   });
 
   // Health check endpoint for monitoring
-  app.get("/api/health", (req, res) => {
-    const uptime = process.uptime();
-    const cacheStats = cache.getStats();
-
-    res.json({
-      status: "healthy",
-      version: APP_VERSION,
-      uptime: Math.floor(uptime),
-      uptimeFormatted: `${Math.floor(uptime / 3600)}h ${Math.floor(
-        (uptime % 3600) / 60
-      )}m ${Math.floor(uptime % 60)}s`,
-      bot: {
-        running: isBotRunning,
-        username:
-          isBotRunning && discordClient?.user ? discordClient.user.tag : null,
-        connected: discordClient?.ws?.status === 0, // 0 = READY
-      },
-      cache: {
-        hits: cacheStats.hits,
-        misses: cacheStats.misses,
-        keys: cacheStats.keys,
-        hitRate:
-          cacheStats.hits + cacheStats.misses > 0
-            ? (
-              (cacheStats.hits / (cacheStats.hits + cacheStats.misses)) *
-              100
-            ).toFixed(2) + "%"
-            : "0%",
-      },
-      memory: {
-        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",
-        total:
-          Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + " MB",
-      },
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  app.get("/api/status", authenticateToken, (req, res) => {
-    res.json({
-      isBotRunning,
-      botUsername:
-        isBotRunning && discordClient?.user ? discordClient.user.tag : null,
-    });
-  });
-
-  app.post("/api/start-bot", authenticateToken, async (req, res) => {
-    if (isBotRunning) {
-      return res.status(400).json({ message: "Bot is already running." });
-    }
-    try {
-      const result = await startBot();
-      res
-        .status(200)
-        .json({ message: `Bot started successfully! ${result.message}` });
-    } catch (error) {
-      res.status(500).json({
-        message: `Failed to start bot: ${error.message}`,
-      });
-    }
-  });
-
-  app.post("/api/stop-bot", authenticateToken, async (req, res) => {
-    if (!isBotRunning || !discordClient) {
-      return res.status(400).json({ message: "Bot is not running." });
-    }
-
-    // Stop Jellyfin notification services
-    try {
-      if (jellyfinWebSocketClient) {
-        jellyfinWebSocketClient.stop();
-        jellyfinWebSocketClient = null;
-        logger.info("Jellyfin WebSocket client stopped");
-      }
-    } catch (error) {
-      logger.error("Error stopping Jellyfin WebSocket client:", error);
-    }
-
-    try {
-      jellyfinPoller.stop();
-      logger.info("Jellyfin poller stopped");
-    } catch (error) {
-      logger.error("Error stopping Jellyfin poller:", error);
-    }
-
-    await discordClient.destroy();
-    isBotRunning = false;
-    discordClient = null;
-    logger.info("Bot has been stopped.");
-    res.status(200).json({ message: "Bot stopped successfully." });
-  });
 }
 
 // --- INITIALIZE AND START SERVER ---
@@ -3340,7 +3244,7 @@ function startServer() {
         (k) => process.env[k] && String(process.env[k]).trim() !== ""
       );
 
-      if (!isBotRunning && hasConfigFile && hasDiscordCreds) {
+      if (!botState.isBotRunning && hasConfigFile && hasDiscordCreds) {
         logger.info(
           "🚀 Detected existing config.json with Discord credentials. Auto-starting bot..."
         );
