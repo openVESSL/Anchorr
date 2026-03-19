@@ -9,6 +9,15 @@ import logger from "../utils/logger.js";
 
 const router = Router();
 
+function isAllowedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
 router.get("/seerr-users", authenticateToken, async (req, res) => {
   try {
     logger.debug("[SEERR USERS API] Request received");
@@ -92,6 +101,9 @@ router.post("/test-seerr", authenticateToken, async (req, res) => {
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
   }
+  if (!isAllowedUrl(url)) {
+    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
+  }
 
   try {
     const baseUrl = getSeerrApiUrl(url);
@@ -117,6 +129,9 @@ router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
   }
+  if (!isAllowedUrl(url)) {
+    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
+  }
 
   try {
     const baseUrl = getSeerrApiUrl(url);
@@ -134,6 +149,9 @@ router.post("/seerr/servers", authenticateToken, async (req, res) => {
   const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
+  }
+  if (!isAllowedUrl(url)) {
+    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
   }
 
   try {

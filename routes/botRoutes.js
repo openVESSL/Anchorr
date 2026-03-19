@@ -11,6 +11,9 @@ const router = Router();
 router.get("/health", (req, res) => {
   const uptime = process.uptime();
   const cacheStats = cache.getStats();
+  const totalHits = cacheStats.tmdb.hits + cacheStats.seerr.hits;
+  const totalMisses = cacheStats.tmdb.misses + cacheStats.seerr.misses;
+  const totalKeys = cacheStats.tmdb.keys + cacheStats.seerr.keys;
 
   res.json({
     status: "healthy",
@@ -28,16 +31,15 @@ router.get("/health", (req, res) => {
       connected: botState.discordClient?.ws?.status === 0,
     },
     cache: {
-      hits: cacheStats.hits,
-      misses: cacheStats.misses,
-      keys: cacheStats.keys,
+      hits: totalHits,
+      misses: totalMisses,
+      keys: totalKeys,
       hitRate:
-        cacheStats.hits + cacheStats.misses > 0
-          ? (
-              (cacheStats.hits / (cacheStats.hits + cacheStats.misses)) *
-              100
-            ).toFixed(2) + "%"
+        totalHits + totalMisses > 0
+          ? ((totalHits / (totalHits + totalMisses)) * 100).toFixed(2) + "%"
           : "0%",
+      tmdb: cacheStats.tmdb,
+      seerr: cacheStats.seerr,
     },
     memory: {
       used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",

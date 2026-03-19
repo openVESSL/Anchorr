@@ -42,24 +42,7 @@ export async function startBot() {
   botState.discordClient = client;
 
   // ----------------- REGISTER COMMANDS -----------------
-  logger.debug(
-    `[REGISTER COMMANDS] DISCORD_TOKEN available: ${!!process.env.DISCORD_TOKEN}`
-  );
-  logger.debug(
-    `[REGISTER COMMANDS] DISCORD_TOKEN value: ${
-      process.env.DISCORD_TOKEN
-        ? process.env.DISCORD_TOKEN.slice(0, 10) + "..."
-        : "UNDEFINED"
-    }`
-  );
-
   const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-  logger.debug(`[REGISTER COMMANDS] REST token set: ${!!rest.token}`);
-  logger.debug(
-    `[REGISTER COMMANDS] REST token value: ${
-      rest.token ? rest.token.slice(0, 10) + "..." : "UNDEFINED"
-    }`
-  );
 
   try {
     await registerCommands(

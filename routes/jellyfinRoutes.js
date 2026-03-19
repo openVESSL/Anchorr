@@ -8,6 +8,15 @@ import logger from "../utils/logger.js";
 
 const router = Router();
 
+function isAllowedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
 // Fetch Jellyfin libraries given a URL + API key (used by config UI before saving)
 router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
   try {
@@ -19,6 +28,9 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
 
     if (!url || !apiKey) {
       return res.status(400).json({ success: false, message: "URL and API Key are required." });
+    }
+    if (!isAllowedUrl(url)) {
+      return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
     }
 
     const response = await axios.get(
@@ -52,6 +64,9 @@ router.post("/test-jellyfin", authenticateToken, async (req, res) => {
   const { url } = req.body;
   if (!url) {
     return res.status(400).json({ success: false, message: "Jellyfin URL is required." });
+  }
+  if (!isAllowedUrl(url)) {
+    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
   }
 
   try {

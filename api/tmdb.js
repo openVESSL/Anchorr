@@ -23,15 +23,18 @@ export async function tmdbSearch(query, apiKey) {
 
   // Fetch from API
   const url = "https://api.themoviedb.org/3/search/multi";
-  const res = await axios.get(url, {
-    params: { api_key: apiKey, query, include_adult: false, page: 1 },
-    timeout: TIMEOUTS.TMDB_API,
-  });
-  const results = res.data.results || [];
-
-  // Store in cache
-  cache.tmdbSearch(query, results);
-  return results;
+  try {
+    const res = await axios.get(url, {
+      params: { api_key: apiKey, query, include_adult: false, page: 1 },
+      timeout: TIMEOUTS.TMDB_API,
+    });
+    const results = res.data.results || [];
+    cache.tmdbSearch(query, results);
+    return results;
+  } catch (err) {
+    logger.error(`TMDB search failed for query "${query}": ${err.message}`);
+    throw err;
+  }
 }
 
 /**
@@ -48,15 +51,18 @@ export async function tmdbGetTrending(apiKey) {
 
   // Fetch from API
   const url = "https://api.themoviedb.org/3/trending/all/week";
-  const res = await axios.get(url, {
-    params: { api_key: apiKey },
-    timeout: TIMEOUTS.TMDB_API,
-  });
-  const results = res.data.results || [];
-
-  // Store in cache
-  cache.tmdbTrending(results);
-  return results;
+  try {
+    const res = await axios.get(url, {
+      params: { api_key: apiKey },
+      timeout: TIMEOUTS.TMDB_API,
+    });
+    const results = res.data.results || [];
+    cache.tmdbTrending(results);
+    return results;
+  } catch (err) {
+    logger.error(`TMDB trending fetch failed: ${err.message}`);
+    throw err;
+  }
 }
 
 /**
@@ -78,19 +84,22 @@ export async function tmdbGetDetails(id, mediaType, apiKey) {
     mediaType === "movie"
       ? `https://api.themoviedb.org/3/movie/${id}`
       : `https://api.themoviedb.org/3/tv/${id}`;
-  const res = await axios.get(url, {
-    params: {
-      api_key: apiKey,
-      language: "en-US",
-      append_to_response: "images,credits,external_ids",
-    },
-    timeout: TIMEOUTS.TMDB_API,
-  });
-  const details = res.data;
-
-  // Store in cache
-  cache.tmdbDetails(id, mediaType, details);
-  return details;
+  try {
+    const res = await axios.get(url, {
+      params: {
+        api_key: apiKey,
+        language: "en-US",
+        append_to_response: "images,credits,external_ids",
+      },
+      timeout: TIMEOUTS.TMDB_API,
+    });
+    const details = res.data;
+    cache.tmdbDetails(id, mediaType, details);
+    return details;
+  } catch (err) {
+    logger.error(`TMDB details fetch failed for ${mediaType} ${id}: ${err.message}`);
+    throw err;
+  }
 }
 
 /**
@@ -112,15 +121,18 @@ export async function tmdbGetExternalImdb(id, mediaType, apiKey) {
     mediaType === "movie"
       ? `https://api.themoviedb.org/3/movie/${id}/external_ids`
       : `https://api.themoviedb.org/3/tv/${id}/external_ids`;
-  const res = await axios.get(url, {
-    params: { api_key: apiKey },
-    timeout: TIMEOUTS.TMDB_API,
-  });
-  const imdbId = res.data.imdb_id || null;
-
-  // Store in cache
-  cache.tmdbExternalIds(id, mediaType, imdbId);
-  return imdbId;
+  try {
+    const res = await axios.get(url, {
+      params: { api_key: apiKey },
+      timeout: TIMEOUTS.TMDB_API,
+    });
+    const imdbId = res.data.imdb_id || null;
+    cache.tmdbExternalIds(id, mediaType, imdbId);
+    return imdbId;
+  } catch (err) {
+    logger.error(`TMDB external IDs fetch failed for ${mediaType} ${id}: ${err.message}`);
+    throw err;
+  }
 }
 
 /**

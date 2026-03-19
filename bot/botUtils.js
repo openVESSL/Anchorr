@@ -131,12 +131,18 @@ export function parseQualityAndServerOptions(options, mediaType) {
 export function checkRolePermission(member) {
   if (!member || !member.roles) return true;
 
-  const allowlist = process.env.ROLE_ALLOWLIST
-    ? JSON.parse(process.env.ROLE_ALLOWLIST)
-    : [];
-  const blocklist = process.env.ROLE_BLOCKLIST
-    ? JSON.parse(process.env.ROLE_BLOCKLIST)
-    : [];
+  let allowlist = [];
+  let blocklist = [];
+  try {
+    allowlist = process.env.ROLE_ALLOWLIST ? JSON.parse(process.env.ROLE_ALLOWLIST) : [];
+  } catch (e) {
+    logger.warn("Invalid JSON in ROLE_ALLOWLIST, defaulting to empty list");
+  }
+  try {
+    blocklist = process.env.ROLE_BLOCKLIST ? JSON.parse(process.env.ROLE_BLOCKLIST) : [];
+  } catch (e) {
+    logger.warn("Invalid JSON in ROLE_BLOCKLIST, defaulting to empty list");
+  }
 
   const userRoles = member.roles.cache.map((r) => r.id);
 
