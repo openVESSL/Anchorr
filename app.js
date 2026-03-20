@@ -177,10 +177,13 @@ function verifyVolumeConfiguration() {
 const app = express();
 let port = process.env.WEBHOOK_PORT || 8282;
 
+if (process.env.TRUST_PROXY === "true") {
+  app.set("trust proxy", true);
+}
 
 function configureWebServer() {
   // Security headers
-  app.use((req, res, next) => {
+  app.use((_req, res, next) => {
     res.setHeader("X-Frame-Options", "SAMEORIGIN");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-XSS-Protection", "1; mode=block");
@@ -240,7 +243,7 @@ function configureWebServer() {
   app.use("/api", createBotRoutes({ startBot, jellyfinPoller }));
 
   // Endpoint for Discord servers list (guilds)
-  app.get("/api/discord/guilds", authenticateToken, async (req, res) => {
+  app.get("/api/discord/guilds", authenticateToken, async (_req, res) => {
     try {
       if (!botState.discordClient || !botState.discordClient.user) {
         logger.debug("[GUILDS API] Bot not running or not logged in.");
@@ -371,7 +374,7 @@ function configureWebServer() {
   );
 
   // Endpoint for Discord members from a server
-  app.get("/api/discord-members", authenticateToken, async (req, res) => {
+  app.get("/api/discord-members", authenticateToken, async (_req, res) => {
     try {
       logger.debug("[MEMBERS API] Request received");
       if (!botState.discordClient || !botState.discordClient.user) {
@@ -413,7 +416,6 @@ function configureWebServer() {
 
       // Fetch members with proper error handling and intent detection
       let fetchSuccess = false;
-      let fetchError = null;
 
       try {
         logger.debug(
@@ -426,7 +428,6 @@ function configureWebServer() {
         );
         fetchSuccess = true;
       } catch (fetchErr) {
-        fetchError = fetchErr.message;
         const errorCode = fetchErr.code;
         const errorStatus = fetchErr.status;
 
@@ -497,7 +498,7 @@ function configureWebServer() {
   });
 
   // Endpoint for Discord roles from a server
-  app.get("/api/discord-roles", authenticateToken, async (req, res) => {
+  app.get("/api/discord-roles", authenticateToken, async (_req, res) => {
     try {
       logger.debug("[ROLES API] Request received");
       if (!botState.discordClient || !botState.discordClient.user) {
@@ -540,7 +541,7 @@ function configureWebServer() {
   });
 
   // Global error handler middleware - must be last
-  app.use((err, req, res, next) => {
+  app.use((err, req, res, _next) => {
     logger.error("Express error handler:", {
       error: err.message,
       stack: err.stack,
@@ -562,7 +563,7 @@ function configureWebServer() {
   app.use("/locales", express.static(path.join(__dirname, "locales")));
   app.use(express.static(path.join(__dirname, "web")));
 
-  app.get("/", (req, res) => {
+  app.get("/", (_req, res) => {
     res.sendFile(path.join(__dirname, "web", "index.html"));
   });
 
@@ -808,7 +809,6 @@ function configureWebServer() {
 
       // Fetch real data from TMDB/OMDB for realistic test notifications
       const { tmdbGetDetails, tmdbGetExternalImdb } = await import("./api/tmdb.js");
-      const { fetchOMDbData } = await import("./api/omdb.js");
 
       const TMDB_API_KEY = process.env.TMDB_API_KEY;
       if (!TMDB_API_KEY) {
@@ -1015,7 +1015,7 @@ function configureWebServer() {
   });
 
   // Test random pick endpoint - sends a sample random pick
-  app.post("/api/test-random-pick", authenticateToken, async (req, res) => {
+  app.post("/api/test-random-pick", authenticateToken, async (_req, res) => {
     try {
       // Check if Discord bot is running and configured
       if (!botState.discordClient || !botState.discordClient.isReady()) {
