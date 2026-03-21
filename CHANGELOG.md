@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.5] - 2026-03-21
+
+### 🐛 Fixed
+
+- **Trust proxy validation error**: `TRUST_PROXY=true` now sets `trust proxy` to `1` (hop count) instead of `true` (boolean), resolving `ERR_ERL_PERMISSIVE_TRUST_PROXY` from express-rate-limit v7+ when running behind a reverse proxy like Traefik
+- **Docker healthcheck**: Default `docker-compose.yml` healthcheck was hitting `/api/config` (auth-gated, always 401) instead of `/api/health` (public). Fixed to use the correct endpoint
+
+### 🏗️ Code Quality
+
+- **SRP refactor**: `app.js` split into focused modules under `routes/`, `bot/`, `jellyfin/`, and `utils/` — no behavior changes, improves maintainability and testability
+
+---
+
 ## [1.4.3] - 2026-03-16
 
 ### 🔒 Security

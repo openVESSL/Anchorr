@@ -2,120 +2,40 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import { createRequire } from "module";
 import express from "express";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
-import { handleJellyfinWebhook, libraryCache } from "./jellyfinWebhook.js";
+import { handleJellyfinWebhook } from "./jellyfinWebhook.js";
 import { configTemplate } from "./lib/config.js";
-import axios from "axios";
+import { sendDailyRandomPick } from "./bot/dailyPick.js";
 
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
-const { version: APP_VERSION } = require("./package.json");
-
-import {
-  Client,
-  GatewayIntentBits,
-  Partials,
-  REST,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-} from "discord.js";
 
 // --- MODULE IMPORTS ---
-import * as tmdbApi from "./api/tmdb.js";
-import * as seerrApi from "./api/seerr.js";
-import { registerCommands } from "./discord/commands.js";
 import logger from "./utils/logger.js";
-import {
-  validateBody,
-  configSchema,
-  userMappingSchema,
-} from "./utils/validation.js";
-import cache from "./utils/cache.js";
-import { COLORS, TIMEOUTS } from "./lib/constants.js";
-import {
-  login,
-  register,
-  logout,
-  checkAuth,
-  authenticateToken,
-  WEBHOOK_SECRET,
-} from "./utils/auth.js";
+import { validateBody, configSchema } from "./utils/validation.js";
+import { authenticateToken, WEBHOOK_SECRET } from "./utils/auth.js";
 import { jellyfinPoller } from "./jellyfinPoller.js";
-import JellyfinWebSocketClient from "./jellyfinWebSocket.js";
-import { minutesToHhMm } from "./utils/time.js";
-import { fetchOMDbData } from "./api/omdb.js";
+import logRouter from "./routes/logRoutes.js";
+import authRouter from "./routes/authRoutes.js";
+import userMappingRouter from "./routes/userMappingRoutes.js";
+import configRouter from "./routes/configRoutes.js";
+import seerrRouter from "./routes/seerrRoutes.js";
+import jellyfinRouter from "./routes/jellyfinRoutes.js";
+import { botState, pendingRequests, savePendingRequests } from "./bot/botState.js";
+import { createBotRoutes } from "./routes/botRoutes.js";
+import { startBot } from "./bot/botManager.js";
 import {
   CONFIG_PATH,
   readConfig,
   writeConfig,
   loadConfigToEnv,
-  getUserMappings,
-  saveUserMapping,
-  deleteUserMapping,
 } from "./utils/configFile.js";
+import { SENSITIVE_FIELDS, isMaskedValue } from "./utils/configSanitize.js";
 
 // --- Helper Functions ---
-function isValidUrl(string) {
-  if (!string || typeof string !== "string") return false;
-  try {
-    new URL(string);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-// --- Config Sanitization (Defense-in-depth) ---
-const MASKED_PREFIX = "••••••••";
-const SENSITIVE_FIELDS = [
-  "DISCORD_TOKEN",
-  "SEERR_API_KEY",
-  "JELLYFIN_API_KEY",
-  "TMDB_API_KEY",
-  "OMDB_API_KEY",
-];
-const STRIPPED_FIELDS = ["JWT_SECRET", "WEBHOOK_SECRET"];
-
-function maskSecret(value) {
-  if (!value || typeof value !== "string") return "";
-  return value.length > 4
-    ? MASKED_PREFIX + value.slice(-4)
-    : MASKED_PREFIX;
-}
-
-function isMaskedValue(value) {
-  return typeof value === "string" && value.startsWith(MASKED_PREFIX);
-}
-
-function sanitizeConfigForClient(config) {
-  if (!config) return config;
-  const sanitized = { ...config };
-
-  for (const field of SENSITIVE_FIELDS) {
-    if (sanitized[field]) {
-      sanitized[field] = maskSecret(sanitized[field]);
-    }
-  }
-  for (const field of STRIPPED_FIELDS) {
-    delete sanitized[field];
-  }
-
-  // Strip password hashes from USERS array
-  if (Array.isArray(sanitized.USERS)) {
-    sanitized.USERS = sanitized.USERS.map(({ password, ...user }) => user);
-  }
-
-  return sanitized;
-}
-
 // --- CONFIGURATION ---
 const ENV_PATH = path.join(process.cwd(), ".env");
 
@@ -257,2117 +177,13 @@ function verifyVolumeConfiguration() {
 const app = express();
 let port = process.env.WEBHOOK_PORT || 8282;
 
-// --- BOT STATE MANAGEMENT ---
-let discordClient = null;
-let isBotRunning = false;
-let jellyfinWebSocketClient = null;
-
-// --- PENDING REQUESTS TRACKING ---
-// Map to track user requests: key = "tmdbId-mediaType", value = Set of Discord user IDs
-const pendingRequests = new Map();
-
-const PENDING_REQUESTS_PATH = path.join(path.dirname(CONFIG_PATH), "pending-requests.json");
-
-function savePendingRequests() {
-  try {
-    const serialized = {};
-    for (const [key, userSet] of pendingRequests) {
-      serialized[key] = Array.from(userSet);
-    }
-    fs.writeFileSync(PENDING_REQUESTS_PATH, JSON.stringify(serialized, null, 2), { encoding: "utf-8", mode: 0o600 });
-  } catch (err) {
-    logger.warn(`⚠️ Failed to persist pending requests to disk: ${err.message}`);
-  }
-}
-
-function loadPendingRequests() {
-  if (!fs.existsSync(PENDING_REQUESTS_PATH)) return;
-  try {
-    const raw = fs.readFileSync(PENDING_REQUESTS_PATH, "utf-8");
-    const parsed = JSON.parse(raw);
-    for (const [key, userArray] of Object.entries(parsed)) {
-      if (Array.isArray(userArray) && userArray.length > 0) {
-        pendingRequests.set(key, new Set(userArray));
-      }
-    }
-    logger.info(`✅ Loaded ${pendingRequests.size} pending request(s) from disk`);
-  } catch (err) {
-    logger.warn(`⚠️ Failed to load pending requests from disk: ${err.message}`);
-  }
-}
-
-// --- DAILY RANDOM PICK SCHEDULING ---
-let dailyRandomPickTimer = null;
-
-function scheduleDailyRandomPick(client) {
-  if (dailyRandomPickTimer) {
-    clearInterval(dailyRandomPickTimer);
-  }
-
-  const enabled = process.env.DAILY_RANDOM_PICK_ENABLED === "true";
-  if (!enabled) {
-    return;
-  }
-
-  const channelId = process.env.DAILY_RANDOM_PICK_CHANNEL_ID;
-  const intervalMinutes = parseInt(process.env.DAILY_RANDOM_PICK_INTERVAL || "1440");
-
-  if (!channelId) {
-    logger.warn(
-      "Daily Random Pick is enabled but no channel is configured. Skipping."
-    );
-    return;
-  }
-
-  if (intervalMinutes < 1) {
-    logger.warn("Daily Random Pick interval must be at least 1 minute. Skipping.");
-    return;
-  }
-
-  const intervalMs = intervalMinutes * 60 * 1000;
-
-  logger.info(
-    `📅 Daily Random Pick scheduled every ${intervalMinutes} minute${intervalMinutes !== 1 ? 's' : ''}`
-  );
-
-  // Send the first pick immediately
-  sendDailyRandomPick(client).catch((err) =>
-    logger.error("Error sending initial random pick:", err)
-  );
-
-  // Schedule it to repeat at the specified interval
-  dailyRandomPickTimer = setInterval(async () => {
-    await sendDailyRandomPick(client);
-  }, intervalMs);
-}
-
-async function sendDailyRandomPick(client) {
-  try {
-    const TMDB_API_KEY = process.env.TMDB_API_KEY;
-    const channelId = process.env.DAILY_RANDOM_PICK_CHANNEL_ID;
-
-    if (!TMDB_API_KEY || !channelId) {
-      return;
-    }
-
-    // Get random media
-    const randomMedia = await tmdbApi.tmdbGetRandomMedia(TMDB_API_KEY);
-    if (!randomMedia) {
-      logger.warn("Could not fetch random media for daily pick");
-      return;
-    }
-
-    const channel = await client.channels.fetch(channelId).catch(() => null);
-    if (!channel) {
-      logger.warn(`Daily Random Pick channel not found: ${channelId}`);
-      return;
-    }
-
-    // Build embed
-    const mediaType = randomMedia.media_type;
-    const isMovie = mediaType === "movie";
-    const title = isMovie ? randomMedia.title : randomMedia.name;
-    const year = isMovie
-      ? randomMedia.release_date?.slice(0, 4)
-      : randomMedia.first_air_date?.slice(0, 4);
-    const details = randomMedia.details || randomMedia;
-
-    const emoji = isMovie ? "🎬" : "📺";
-    const backdrop = randomMedia.backdrop_path
-      ? `https://image.tmdb.org/t/p/w1280${randomMedia.backdrop_path}`
-      : null;
-
-    let overview = randomMedia.overview || "No description available.";
-    if (overview.length > 300) {
-      overview = overview.substring(0, 297) + "...";
-    }
-
-    const embed = new EmbedBuilder()
-      .setAuthor({ name: `${emoji} Today's Random Pick` })
-      .setTitle(`${title}${year ? ` (${year})` : ""}`)
-      .setDescription(overview)
-      .setColor("#f5a962")
-      .addFields({
-        name: "Rating",
-        value: randomMedia.vote_average
-          ? `⭐ ${randomMedia.vote_average.toFixed(1)}/10`
-          : "N/A",
-        inline: true,
-      });
-
-    if (details.genres && Array.isArray(details.genres)) {
-      const genreNames = details.genres.map((g) => g.name).join(", ");
-      if (genreNames) {
-        embed.addFields({
-          name: "Genres",
-          value: genreNames,
-          inline: true,
-        });
-      }
-    }
-
-    if (backdrop && isValidUrl(backdrop)) {
-      embed.setImage(backdrop);
-    }
-
-    const buttonComponents = [];
-
-    // Letterboxd button
-    if (isMovie) {
-      const letterboxdUrl = `https://letterboxd.com/search/${encodeURIComponent(title)}/`;
-      if (isValidUrl(letterboxdUrl)) {
-        buttonComponents.push(
-          new ButtonBuilder()
-            .setStyle(ButtonStyle.Link)
-            .setLabel("Letterboxd")
-            .setURL(letterboxdUrl)
-        );
-      }
-    }
-
-    // IMDb button if available
-    let imdbId = null;
-    if (details.external_ids?.imdb_id) {
-      imdbId = details.external_ids.imdb_id;
-    }
-    if (imdbId) {
-      const imdbUrl = `https://www.imdb.com/title/${imdbId}/`;
-      if (isValidUrl(imdbUrl)) {
-        buttonComponents.push(
-          new ButtonBuilder()
-            .setStyle(ButtonStyle.Link)
-            .setLabel("IMDb")
-            .setURL(imdbUrl)
-        );
-      }
-    }
-
-    // Request button
-    buttonComponents.push(
-      new ButtonBuilder()
-        .setStyle(ButtonStyle.Primary)
-        .setLabel("Request")
-        .setCustomId(`request_random_${randomMedia.id}_${mediaType}`)
-    );
-
-    const button = new ActionRowBuilder().addComponents(buttonComponents);
-
-    await channel.send({
-      embeds: [embed],
-      components: [button],
-    });
-
-    logger.info(
-      `Sent daily random pick: ${title} (${randomMedia.id} - ${mediaType})`
-    );
-  } catch (error) {
-    logger.error(`Failed to send daily random pick: ${error.message}`);
-  }
-}
-
-async function startBot() {
-  if (isBotRunning && discordClient) {
-    logger.info("Bot is already running.");
-    return { success: true, message: "Bot is already running." };
-  }
-
-  // Restore any pending requests that survived a previous restart
-  loadPendingRequests();
-
-  // Load the latest config from file
-  const configLoaded = loadConfig();
-  port = process.env.WEBHOOK_PORT || 8282; // Recalculate port in case it changed
-  if (!configLoaded) {
-    throw new Error(
-      "Configuration file (config.json) not found or is invalid."
-    );
-  }
-
-  // ----------------- VALIDATE ENV -----------------
-  const REQUIRED_DISCORD = ["DISCORD_TOKEN", "BOT_ID"];
-  const missing = REQUIRED_DISCORD.filter((k) => !process.env[k]);
-  if (missing.length) {
-    throw new Error(
-      `Bot cannot start. Missing required Discord variables: ${missing.join(
-        ", "
-      )}`
-    );
-  }
-
-  const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
-    partials: [Partials.Channel],
-  });
-  discordClient = client; // Store client instance globally
-
-  // ----------------- CONFIG HELPERS (DYNAMIC) -----------------
-  const getSeerrUrl = () => {
-    let url = (process.env.SEERR_URL || "").replace(/\/$/, "");
-    if (url && !url.endsWith("/api/v1")) url += "/api/v1";
-    return url;
-  };
-  const getSeerrApiKey = () => process.env.SEERR_API_KEY;
-  const getTmdbApiKey = () => process.env.TMDB_API_KEY;
-  const getSeerrAutoApprove = () => {
-    const val = process.env.SEERR_AUTO_APPROVE;
-    const isAuto = val === "true";
-    logger.info(`[CONFIG CHECK] SEERR_AUTO_APPROVE is currently: ${val} (Evaluated to: ${isAuto})`);
-    return isAuto;
-  };
-
-  const BOT_ID = process.env.BOT_ID;
-  const GUILD_ID = process.env.GUILD_ID;
-  const SEERR_URL = getSeerrUrl();
-  const SEERR_API_KEY = getSeerrApiKey();
-  const TMDB_API_KEY = getTmdbApiKey();
-
-  // ----------------- HELPERS -----------------
-
-  // ----------------- HELPERS -----------------
-  function pad2(n) {
-    return String(n).padStart(2, "0");
-  }
-
-  function getOptionStringRobust(
-    interaction,
-    possibleNames = ["title", "query", "name"]
-  ) {
-    for (const n of possibleNames) {
-      try {
-        const v = interaction.options.getString(n);
-        if (typeof v === "string" && v.length > 0) return v;
-      } catch (e) { }
-    }
-    try {
-      const data = (interaction.options && interaction.options.data) || [];
-      if (Array.isArray(data) && data.length > 0) {
-        for (const opt of data) {
-          if (typeof opt.value !== "undefined" && opt.value !== null)
-            return String(opt.value);
-        }
-      }
-    } catch (e) { }
-    return null;
-  }
-
-  function parseQualityAndServerOptions(options, mediaType) {
-    let profileId = null;
-    let serverId = null;
-
-    // Parse quality option (format: profileId|serverId|type)
-    if (options.quality) {
-      const [qProfileId, qServerId, qType] = options.quality.split("|");
-      // Only use if matching media type (radarr for movies, sonarr for TV)
-      if ((mediaType === "movie" && qType === "radarr") || (mediaType === "tv" && qType === "sonarr")) {
-        const parsedProfileId = parseInt(qProfileId, 10);
-        const parsedServerId = parseInt(qServerId, 10);
-
-        if (!isNaN(parsedProfileId) && !isNaN(parsedServerId)) {
-          profileId = parsedProfileId;
-          serverId = parsedServerId;
-          logger.debug(`Using quality profile ID: ${profileId} from server ID: ${serverId}`);
-        } else {
-          logger.warn(`Invalid quality option format - non-numeric values: profileId=${qProfileId}, serverId=${qServerId}`);
-        }
-      } else {
-        logger.debug(`Ignoring quality option - type mismatch (${qType} vs ${mediaType})`);
-      }
-    }
-
-    // Parse server option (format: serverId|type) - only if not already set from quality
-    if (options.server && serverId === null) {
-      const [sServerId, sType] = options.server.split("|");
-      // Only use if matching media type
-      if ((mediaType === "movie" && sType === "radarr") || (mediaType === "tv" && sType === "sonarr")) {
-        const parsedServerId = parseInt(sServerId, 10);
-
-        if (!isNaN(parsedServerId)) {
-          serverId = parsedServerId;
-          logger.debug(`Using server ID: ${serverId} from server option`);
-        } else {
-          logger.warn(`Invalid server option format - non-numeric serverId: ${sServerId}`);
-        }
-      } else {
-        logger.debug(`Ignoring server option - type mismatch (${sType} vs ${mediaType})`);
-      }
-    }
-
-    // Apply defaults from config if not specified
-    if (profileId === null && serverId === null) {
-      // Check for default quality profile
-      const defaultQualityConfig = mediaType === "movie"
-        ? process.env.DEFAULT_QUALITY_PROFILE_MOVIE
-        : process.env.DEFAULT_QUALITY_PROFILE_TV;
-
-      if (defaultQualityConfig) {
-        const [dProfileId, dServerId] = defaultQualityConfig.split("|");
-        if (dProfileId && dServerId) {
-          const parsedProfileId = parseInt(dProfileId, 10);
-          const parsedServerId = parseInt(dServerId, 10);
-
-          if (!isNaN(parsedProfileId) && !isNaN(parsedServerId)) {
-            profileId = parsedProfileId;
-            serverId = parsedServerId;
-            logger.debug(`Using default quality profile ID: ${profileId} from config`);
-          } else {
-            logger.warn(`Invalid default quality config format - non-numeric values: profileId=${dProfileId}, serverId=${dServerId}`);
-          }
-        }
-      }
-    }
-
-    if (serverId === null) {
-      // Default to configured default server if not set
-      const defaultServerConfig = mediaType === "movie"
-        ? process.env.DEFAULT_SERVER_MOVIE
-        : process.env.DEFAULT_SERVER_TV;
-
-      if (defaultServerConfig) {
-        const [dServerId] = defaultServerConfig.split("|");
-        if (dServerId) {
-          const parsedServerId = parseInt(dServerId, 10);
-
-          if (!isNaN(parsedServerId)) {
-            serverId = parsedServerId;
-            logger.debug(`Using default server ID: ${serverId} from config`);
-          } else {
-            logger.warn(`Invalid default server config format - non-numeric serverId: ${dServerId}`);
-          }
-        }
-      }
-    }
-
-    return { profileId, serverId };
-  }
-
-  // ----------------- EMBED BUILDER -----------------
-  function buildNotificationEmbed(
-    details,
-    mediaType,
-    imdbId,
-    status = "search",
-    omdb = null,
-    tmdbId = null
-  ) {
-    const titleName = details.title || details.name || "Unknown";
-    const releaseDate = details.release_date || details.first_air_date || "";
-    const year = releaseDate ? releaseDate.slice(0, 4) : "";
-    const titleWithYear = year ? `${titleName} (${year})` : titleName;
-
-    const authorName =
-      status === "success"
-        ? "✅ Successfully requested!"
-        : mediaType === "movie"
-          ? "🎬 Movie found:"
-          : "📺 TV show found:";
-
-    // Generate Seerr URL for the author link
-    // Remove /api/v1 from getSeerrUrl() to get the base domain
-    // Add ?manage=1 only for success status
-    let seerrMediaUrl;
-    const currentSeerrUrl = getSeerrUrl();
-    if (tmdbId && currentSeerrUrl) {
-      const seerrDomain = currentSeerrUrl.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
-      const baseUrl = `${seerrDomain}/${mediaType}/${tmdbId}`;
-      seerrMediaUrl =
-        status === "success" ? `${baseUrl}?manage=1` : baseUrl;
-    }
-
-    const genres =
-      (details.genres || []).map((g) => g.name).join(", ") || "Unknown";
-
-    let runtime = "Unknown";
-    if (omdb?.Runtime && omdb.Runtime !== "N/A") {
-      const match = String(omdb.Runtime).match(/(\d+)/);
-      if (match) runtime = minutesToHhMm(parseInt(match[1], 10));
-    } else if (mediaType === "movie" && details.runtime > 0) {
-      runtime = minutesToHhMm(details.runtime);
-    } else if (
-      mediaType === "tv" &&
-      Array.isArray(details.episode_run_time) &&
-      details.episode_run_time.length > 0
-    ) {
-      runtime = minutesToHhMm(details.episode_run_time[0]);
-    }
-
-    const rating = omdb?.imdbRating
-      ? `${omdb.imdbRating}/10`
-      : typeof details.vote_average === "number" && details.vote_average > 0
-        ? `${details.vote_average.toFixed(1)}/10`
-        : "N/A";
-
-    let overview =
-      (details.overview && details.overview.trim() !== ""
-        ? details.overview
-        : null) ||
-      (omdb?.Plot && omdb.Plot !== "N/A"
-        ? omdb.Plot
-        : "No description available.");
-
-    let headerLine = "Summary";
-    if (omdb) {
-      if (mediaType === "movie" && omdb.Director && omdb.Director !== "N/A") {
-        headerLine = `Directed by ${omdb.Director}`;
-      } else if (mediaType === "tv" && omdb.Writer && omdb.Writer !== "N/A") {
-        // OMDb often lists creators under "Writer"
-        const creator = omdb.Writer.split(",")[0].trim();
-        headerLine = `Created by ${creator}`;
-      }
-    }
-
-    const embed = new EmbedBuilder()
-      .setAuthor({
-        name: authorName,
-        url: isValidUrl(seerrMediaUrl) ? seerrMediaUrl : undefined,
-      })
-      .setTitle(titleWithYear)
-      .setURL(imdbId ? `https://www.imdb.com/title/${imdbId}/` : undefined)
-      .setColor(
-        status === "success"
-          ? COLORS.SUCCESS
-          : status === "search"
-            ? COLORS.SEARCH
-            : COLORS.DEFAULT
-      );
-
-    const backdropPath = tmdbApi.findBestBackdrop(details);
-    const backdrop = backdropPath
-      ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
-      : null;
-    const poster = details.poster_path
-      ? `https://image.tmdb.org/t/p/w342${details.poster_path}`
-      : null;
-
-    if (backdrop && isValidUrl(backdrop)) {
-      embed.setImage(backdrop);
-    } else if (poster && isValidUrl(poster)) {
-      embed.setThumbnail(poster);
-    }
-
-    embed.addFields(
-      {
-        name: headerLine,
-        value: overview.length ? overview : "No description available.",
-      },
-      { name: "Genre", value: genres, inline: true },
-      { name: "Runtime", value: runtime, inline: true },
-      { name: "Rating", value: rating, inline: true }
-    );
-
-    return embed;
-  }
-
-  // ----------------- BUTTONS BUILDER -----------------
-  function buildButtons(
-    tmdbId,
-    imdbId,
-    requested = false,
-    mediaType = "movie",
-    details = null,
-    requestedSeasons = [],
-    requestedTags = [],
-    selectedSeasons = [],
-    selectedTags = []
-  ) {
-    const rows = [];
-    const buttons = [];
-
-    // Always add IMDB and Letterboxd buttons if available
-    if (imdbId) {
-      const letterboxdUrl = `https://letterboxd.com/imdb/${imdbId}`;
-      const imdbUrl = `https://www.imdb.com/title/${imdbId}/`;
-
-      if (isValidUrl(letterboxdUrl)) {
-        buttons.push(
-          new ButtonBuilder()
-            .setStyle(ButtonStyle.Link)
-            .setLabel("Letterboxd")
-            .setURL(letterboxdUrl)
-        );
-      }
-
-      if (isValidUrl(imdbUrl)) {
-        buttons.push(
-          new ButtonBuilder()
-            .setStyle(ButtonStyle.Link)
-            .setLabel("IMDb")
-            .setURL(imdbUrl)
-        );
-      }
-    }
-
-    // Add Request button (dynamic label based on selections)
-    if (requested) {
-      // Show success state with full info
-      let successLabel = "Requested";
-
-      // Only show seasons info for TV shows, not for movies
-      if (mediaType === "tv" && requestedSeasons.length > 0) {
-        if (requestedSeasons.includes("all")) {
-          successLabel = "Requested all seasons";
-        } else if (requestedSeasons.length === 1) {
-          successLabel = `Requested season ${requestedSeasons[0]}`;
-        } else {
-          const seasons = [...requestedSeasons];
-          const lastSeason = seasons.pop();
-          successLabel = `Requested seasons ${seasons.join(
-            ", "
-          )} and ${lastSeason}`;
-        }
-      }
-      if (requestedTags.length > 0) {
-        // requestedTags contains tag names when coming from request_btn handler
-        const tagLabel =
-          requestedTags.length === 1
-            ? requestedTags[0]
-            : requestedTags.join(", ");
-        successLabel += ` with ${tagLabel} tag${requestedTags.length > 1 ? "s" : ""
-          }`;
-      }
-
-      // Always add "stay tuned!" for all requests
-      successLabel += ", stay tuned!";
-
-      buttons.push(
-        new ButtonBuilder()
-          .setCustomId(`requested|${tmdbId}|${mediaType}`)
-          .setLabel(successLabel)
-          .setStyle(ButtonStyle.Success)
-          .setDisabled(true)
-      );
-    } else {
-      // Show Request button with dynamic label
-      let requestLabel = "Request";
-
-      if (mediaType === "tv" && selectedSeasons.length > 0) {
-        if (selectedSeasons.includes("all")) {
-          requestLabel = "Request all seasons";
-        } else if (selectedSeasons.length === 1) {
-          requestLabel = `Request season ${selectedSeasons[0]}`;
-        } else {
-          const seasons = [...selectedSeasons];
-          const lastSeason = seasons.pop();
-          requestLabel = `Request seasons ${seasons.join(
-            ", "
-          )} and ${lastSeason}`;
-        }
-      }
-
-      if (selectedTags.length > 0) {
-        // selectedTags contains tag names (not IDs) when coming from select_tags handler
-        const tagLabel =
-          selectedTags.length === 1 ? selectedTags[0] : selectedTags.join(", ");
-        requestLabel += ` with ${tagLabel} tag${selectedTags.length > 1 ? "s" : ""
-          }`;
-      }
-
-      const seasonsParam =
-        selectedSeasons.length > 0 ? selectedSeasons.join(",") : "";
-      const tagsParam = selectedTags.length > 0 ? selectedTags.join(",") : "";
-
-      buttons.push(
-        new ButtonBuilder()
-          .setCustomId(
-            `request_btn|${tmdbId}|${mediaType}|${seasonsParam}|${tagsParam}`
-          )
-          .setLabel(requestLabel)
-          .setStyle(ButtonStyle.Primary)
-          .setDisabled(mediaType === "tv" && selectedSeasons.length === 0)
-      );
-    }
-
-    // Add first row with all buttons (IMDB + Letterboxd + Request)
-    if (buttons.length > 0) {
-      rows.push(new ActionRowBuilder().addComponents(...buttons.slice(0, 5)));
-    }
-
-    // Add season selector for TV shows (if not requested, has seasons, and seasons not yet selected)
-    if (
-      mediaType === "tv" &&
-      details?.seasons?.length > 0 &&
-      !requested &&
-      selectedSeasons.length === 0
-    ) {
-      const seenSeasons = new Set();
-      const uniqueSeasons = details.seasons.filter((s) => {
-        if (s.season_number <= 0) return false;
-        if (seenSeasons.has(s.season_number)) return false;
-        seenSeasons.add(s.season_number);
-        return true;
-      });
-
-      const tagsParam = selectedTags.length > 0 ? selectedTags.join(",") : "";
-
-      // If we have 24 or fewer seasons, use single dropdown with "All Seasons"
-      if (uniqueSeasons.length <= 24) {
-        const seasonOptions = [
-          { label: "All Seasons", value: "all" },
-          ...uniqueSeasons.map((s) => ({
-            label: `Season ${s.season_number} (${s.episode_count} episodes)`,
-            value: String(s.season_number),
-          })),
-        ];
-
-        const selectMenu = new StringSelectMenuBuilder()
-          .setCustomId(`select_seasons|${tmdbId}|${tagsParam}`)
-          .setPlaceholder("Select seasons to request...")
-          .setMinValues(1)
-          .setMaxValues(Math.min(25, seasonOptions.length))
-          .addOptions(seasonOptions);
-
-        rows.push(new ActionRowBuilder().addComponents(selectMenu));
-      } else {
-        // For shows with more than 24 seasons, split into multiple dropdowns
-        // We can use up to 4 rows for seasons (leaving 1 for buttons)
-        const SEASONS_PER_MENU = 24;
-        const MAX_SEASON_MENUS = 4; // Maximum number of season selector rows
-
-        // Add "All Seasons" option to first menu
-        const firstBatchSeasons = uniqueSeasons.slice(0, SEASONS_PER_MENU);
-        const firstMenuOptions = [
-          { label: "All Seasons", value: "all" },
-          ...firstBatchSeasons.map((s) => ({
-            label: `Season ${s.season_number} (${s.episode_count} episodes)`,
-            value: String(s.season_number),
-          })),
-        ];
-
-        const firstMenu = new StringSelectMenuBuilder()
-          .setCustomId(`select_seasons|${tmdbId}|${tagsParam}|0`)
-          .setPlaceholder(`Seasons 1-${firstBatchSeasons[firstBatchSeasons.length - 1].season_number}`)
-          .setMinValues(0)
-          .setMaxValues(firstMenuOptions.length)
-          .addOptions(firstMenuOptions);
-
-        rows.push(new ActionRowBuilder().addComponents(firstMenu));
-
-        // Add additional menus for remaining seasons
-        let menuIndex = 1;
-        let offset = SEASONS_PER_MENU;
-
-        while (offset < uniqueSeasons.length && menuIndex < MAX_SEASON_MENUS) {
-          const batchSeasons = uniqueSeasons.slice(offset, offset + SEASONS_PER_MENU);
-
-          if (batchSeasons.length > 0) {
-            const batchOptions = batchSeasons.map((s) => ({
-              label: `Season ${s.season_number} (${s.episode_count} episodes)`,
-              value: String(s.season_number),
-            }));
-
-            const batchMenu = new StringSelectMenuBuilder()
-              .setCustomId(`select_seasons|${tmdbId}|${tagsParam}|${menuIndex}`)
-              .setPlaceholder(
-                `Seasons ${batchSeasons[0].season_number}-${batchSeasons[batchSeasons.length - 1].season_number}`
-              )
-              .setMinValues(0)
-              .setMaxValues(batchOptions.length)
-              .addOptions(batchOptions);
-
-            rows.push(new ActionRowBuilder().addComponents(batchMenu));
-          }
-
-          offset += SEASONS_PER_MENU;
-          menuIndex++;
-        }
-
-        // Log if we had to truncate seasons
-        if (offset < uniqueSeasons.length) {
-          logger.warn(
-            `[SEASON SELECTOR] Show has ${uniqueSeasons.length} seasons, but Discord limit allows only ${offset} to be shown in ${MAX_SEASON_MENUS} menus`
-          );
-        }
-      }
-    }
-
-    // Add tag selector for movies (if not requested and has available tags)
-    // For movies, show tags row directly (no season selection needed)
-    if (mediaType === "movie" && !requested && selectedTags.length === 0) {
-      // Note: Tags are fetched and added dynamically when building components
-      // This is a placeholder row that will be populated by the calling code
-      // The actual tag options need to be fetched from Seerr
-      // This is handled in the search/request handlers
-    }
-
-    return rows;
-  }
-
-  // ----------------- COMMON SEARCH LOGIC -----------------
-  async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], options = {}) {
-    // IMPORTANT: Defer reply FIRST to prevent timeout
-    const isPrivateMode = process.env.PRIVATE_MESSAGE_MODE === "true";
-
-    try {
-      await interaction.deferReply({ ephemeral: isPrivateMode });
-    } catch (err) {
-      logger.error(`Failed to defer reply: ${err.message}`);
-      return;
-    }
-
-    let tmdbId, mediaType;
-
-    // Check if input is direct ID (format: "12345|movie")
-    if (rawInput.includes("|")) {
-      [tmdbId, mediaType] = rawInput.split("|");
-    } else {
-      // Fallback search if raw text was passed
-      const results = await tmdbApi.tmdbSearch(rawInput, getTmdbApiKey());
-      const found = results.filter(
-        (r) => r.media_type === "movie" || r.media_type === "tv"
-      );
-      if (found.length) {
-        tmdbId = found[0].id;
-        mediaType = found[0].media_type;
-      }
-    }
-
-    if (!tmdbId || !mediaType) {
-      if (isPrivateMode) {
-        return interaction.editReply({
-          content: "⚠️ The title seems to be invalid.",
-        });
-      } else {
-        await interaction.deleteReply();
-        return interaction.followUp({
-          content: "⚠️ The title seems to be invalid.",
-          flags: 64,
-        });
-      }
-    }
-
-    try {
-      const details = await tmdbApi.tmdbGetDetails(
-        tmdbId,
-        mediaType,
-        getTmdbApiKey()
-      );
-
-      if (mode === "request") {
-        // Check if media already exists in Seerr
-        const status = await seerrApi.checkMediaStatus(
-          tmdbId,
-          mediaType,
-          ["all"],
-          getSeerrUrl(),
-          getSeerrApiKey()
-        );
-
-        if (status.exists && status.available) {
-          // Media already available - always ephemeral for info messages
-          await interaction.editReply({
-            content: "✅ This content is already available in your library!",
-            components: [],
-            embeds: [],
-          });
-          if (isPrivateMode) {
-            await interaction.editReply({
-              content: "✅ This content is already available in your library!",
-              components: [],
-              embeds: [],
-            });
-          } else {
-            // Delete public message and send ephemeral info
-            await interaction.deleteReply();
-            await interaction.followUp({
-              content: "✅ This content is already available in your library!",
-              flags: 64,
-            });
-          }
-          return;
-        }
-
-        // Convert tag labels to IDs if tags were provided
-        let tagIds = [];
-        if (tags && tags.length > 0) {
-          try {
-            const allTags = await seerrApi.fetchTags(
-              getSeerrUrl(),
-              getSeerrApiKey()
-            );
-            // Filter to appropriate type (Sonarr for TV, Radarr for movies)
-            // Add defensive check to ensure allTags is an array
-            const relevantTags = Array.isArray(allTags)
-              ? allTags.filter((tag) =>
-                mediaType === "tv" ? tag.type === "sonarr" : tag.type === "radarr"
-              )
-              : [];
-
-            // Map tag labels to IDs
-            tagIds = tags
-              .map((tagLabel) => {
-                const tag = relevantTags.find(
-                  (t) => (t.label || t.name) === tagLabel
-                );
-                return tag ? tag.id : null;
-              })
-              .filter((id) => id !== null);
-
-            logger.debug(
-              `Converted tag labels ${tags.join(", ")} to IDs: ${tagIds.join(
-                ", "
-              )}`
-            );
-          } catch (err) {
-            logger.warn("Failed to convert tag labels to IDs:", err?.message);
-          }
-        }
-
-        // Parse quality and server
-        const { profileId, serverId } = parseQualityAndServerOptions(options, mediaType);
-
-        // Resolve "all" seasons to explicit list of season numbers (workaround for empty array issue)
-        let seasonsToRequest = ["all"];
-        if (mediaType === "tv" && details.seasons) {
-          const seasonNumbers = details.seasons
-            .filter((s) => s.season_number > 0)
-            .map((s) => s.season_number);
-
-          if (seasonNumbers.length > 0) {
-            seasonsToRequest = seasonNumbers;
-            logger.info(`[REQUEST] Resolved 'all' seasons to explicit list: ${seasonsToRequest.join(", ")}`);
-          }
-        }
-
-        await seerrApi.sendRequest({
-          tmdbId,
-          mediaType,
-          seasons: seasonsToRequest,
-          tags: tagIds,
-          profileId,
-          serverId,
-          seerrUrl: getSeerrUrl(),
-          apiKey: getSeerrApiKey(),
-          discordUserId: interaction.user.id,
-          userMappings: getUserMappings(),
-          isAutoApproved: getSeerrAutoApprove(),
-        });
-        logger.info(`[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}`);
-
-        // Track request for notifications if enabled
-        if (process.env.NOTIFY_ON_AVAILABLE === "true") {
-          const requestKey = `${tmdbId}-${mediaType}`;
-          if (!pendingRequests.has(requestKey)) {
-            pendingRequests.set(requestKey, new Set());
-          }
-          pendingRequests.get(requestKey).add(interaction.user.id);
-          savePendingRequests();
-        }
-      }
-
-      const imdbId = await tmdbApi.tmdbGetExternalImdb(
-        tmdbId,
-        mediaType,
-        getTmdbApiKey()
-      );
-
-      const omdb = imdbId ? await fetchOMDbData(imdbId) : null;
-
-      const embed = buildNotificationEmbed(
-        details,
-        mediaType,
-        imdbId,
-        mode === "request" ? "success" : "search",
-        omdb,
-        tmdbId
-      );
-
-      const components = buildButtons(
-        tmdbId,
-        imdbId,
-        mode === "request",
-        mediaType,
-        details
-      );
-
-      // Add tag selector for movies (if in search mode and not already requested)
-      if (mediaType === "movie" && mode === "search") {
-        try {
-          const allTags = await seerrApi.fetchTags(
-            getSeerrUrl(),
-            getSeerrApiKey()
-          );
-
-          // Filter to only Radarr tags for movies
-          // Add defensive check to ensure allTags is an array
-          const radarrTags = Array.isArray(allTags)
-            ? allTags.filter((tag) => tag.type === "radarr")
-            : [];
-
-          if (radarrTags && radarrTags.length > 0) {
-            // Deduplicate tags by ID
-            const uniqueTags = [];
-            const seenIds = new Set();
-
-            for (const tag of radarrTags) {
-              if (!seenIds.has(tag.id)) {
-                seenIds.add(tag.id);
-                uniqueTags.push(tag);
-              }
-            }
-
-            const tagOptions = uniqueTags.slice(0, 25).map((tag) => ({
-              label: tag.label || tag.name || `Tag ${tag.id}`,
-              value: tag.id.toString(),
-            }));
-
-            const tagMenu = new StringSelectMenuBuilder()
-              .setCustomId(`select_tags|${tmdbId}|`)
-              .setPlaceholder("Select tags (optional)")
-              .addOptions(tagOptions)
-              .setMinValues(0)
-              .setMaxValues(Math.min(5, tagOptions.length));
-
-            const tagRow = new ActionRowBuilder().addComponents(tagMenu);
-            components.push(tagRow);
-          }
-        } catch (err) {
-          logger.debug(
-            "Failed to fetch tags for movie tag selector:",
-            err?.message
-          );
-          // Continue without tag selector if fetch fails
-        }
-      }
-
-      // Success - just edit the original reply directly (already public or ephemeral based on mode)
-      await interaction.editReply({ embeds: [embed], components });
-    } catch (err) {
-      logger.error("Error in handleSearchOrRequest:", err);
-
-      // Extract a user-friendly error message if possible
-      let errorMessage = "⚠️ An error occurred.";
-      if (err.response && err.response.data && err.response.data.message) {
-        errorMessage = `⚠️ Seerr error: ${err.response.data.message}`;
-      } else if (err.message) {
-        // Special handling for quota errors or other common ones
-        if (err.message.includes("403")) {
-          errorMessage = "⚠️ Request failed: You might have exceeded your quota or don't have permission.";
-        } else {
-          errorMessage = `⚠️ Error: ${err.message}`;
-        }
-      }
-
-      // Error messages should always be ephemeral
-      if (isPrivateMode) {
-        // Already ephemeral, just edit
-        await interaction.editReply({
-          content: errorMessage,
-          components: [],
-          embeds: [],
-        });
-      } else {
-        // Was public, delete and send ephemeral error
-        try {
-          await interaction.deleteReply();
-        } catch (e) {
-          // Ignore delete errors if it was already deleted
-        }
-        await interaction.followUp({
-          content: errorMessage,
-          flags: 64,
-        });
-      }
-    }
-  }
-
-  // ----------------- REGISTER COMMANDS -----------------
-  // Înregistrează comenzile global sau guild-specific
-  logger.debug(
-    `[REGISTER COMMANDS] Attempting to register commands for BOT_ID: ${BOT_ID}`
-  );
-  logger.debug(
-    `[REGISTER COMMANDS] DISCORD_TOKEN available: ${!!process.env
-      .DISCORD_TOKEN}`
-  );
-  logger.debug(
-    `[REGISTER COMMANDS] DISCORD_TOKEN value: ${process.env.DISCORD_TOKEN
-      ? process.env.DISCORD_TOKEN.slice(0, 10) + "..."
-      : "UNDEFINED"
-    }`
-  );
-
-  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-  logger.debug(`[REGISTER COMMANDS] REST token set: ${!!rest.token}`);
-  logger.debug(
-    `[REGISTER COMMANDS] REST token value: ${rest.token ? rest.token.slice(0, 10) + "..." : "UNDEFINED"
-    }`
-  );
-
-  try {
-    await registerCommands(rest, BOT_ID, GUILD_ID, logger);
-  } catch (err) {
-    logger.error(
-      `[REGISTER COMMANDS] Failed to register Discord commands:`,
-      err
-    );
-    throw new Error(`Failed to register Discord commands: ${err.message}`);
-  }
-
-  // ----------------- EVENTS -----------------
-
-  // Helper function to check if user has permission based on role allowlist/blocklist
-  function checkRolePermission(member) {
-    if (!member || !member.roles) return true; // No member info, allow
-
-    const allowlist = process.env.ROLE_ALLOWLIST
-      ? JSON.parse(process.env.ROLE_ALLOWLIST)
-      : [];
-    const blocklist = process.env.ROLE_BLOCKLIST
-      ? JSON.parse(process.env.ROLE_BLOCKLIST)
-      : [];
-
-    const userRoles = member.roles.cache.map((r) => r.id);
-
-    // If allowlist exists and user doesn't have any of those roles, deny
-    if (allowlist.length > 0 && !userRoles.some((r) => allowlist.includes(r))) {
-      return false;
-    }
-
-    // If user has any blocklisted role, deny
-    if (blocklist.length > 0 && userRoles.some((r) => blocklist.includes(r))) {
-      return false;
-    }
-
-    return true;
-  }
-
-  client.on("interactionCreate", async (interaction) => {
-    try {
-      // Check role permissions for all commands
-      if (
-        interaction.isCommand() ||
-        (interaction.isStringSelectMenu() &&
-          !interaction.customId.startsWith("request_seasons|") &&
-          !interaction.customId.startsWith("request_with_tags|"))
-      ) {
-        if (!checkRolePermission(interaction.member)) {
-          return interaction.reply({
-            content: "❌ You don't have permission to use this command.",
-            flags: 64,
-          });
-        }
-      }
-
-      // Autocomplete
-      if (interaction.isAutocomplete()) {
-        const focusedOption = interaction.options.getFocused(true);
-        const focusedValue = focusedOption.value;
-
-        // Handle Tag Autocomplete
-        if (focusedOption.name === "tag") {
-          try {
-            const allTags = await seerrApi.fetchTags(
-              getSeerrUrl(),
-              getSeerrApiKey()
-            );
-
-            // Filter tags based on user input
-            // Add defensive check to ensure allTags is an array
-            const filteredTags = Array.isArray(allTags)
-              ? allTags.filter((tag) => {
-                const label = tag.label || tag.name || "";
-                return label.toLowerCase().includes(focusedValue.toLowerCase());
-              })
-              : [];
-
-            // Deduplicate by label/name
-            const uniqueTags = [];
-            const seenLabels = new Set();
-
-            for (const tag of filteredTags) {
-              const label = tag.label || tag.name;
-              if (label && !seenLabels.has(label)) {
-                seenLabels.add(label);
-                uniqueTags.push({
-                  name: label,
-                  value: label, // Pass the label as value, we'll map it to ID later
-                });
-              }
-            }
-
-            // Limit to 25 choices (Discord limit)
-            return await interaction.respond(uniqueTags.slice(0, 25));
-          } catch (e) {
-            logger.error("Tag autocomplete error:", e);
-            return await interaction.respond([]);
-          }
-        }
-
-        // Handle Quality Profile Autocomplete
-        if (focusedOption.name === "quality") {
-          try {
-            // Determine media type from title
-            const titleOption = interaction.options.getString("title");
-            let mediaType = null;
-
-            if (titleOption && titleOption.includes("|")) {
-              const parts = titleOption.split("|");
-              mediaType = parts[1]; // "movie" or "tv"
-            }
-
-            // Get selected server to filter by specific server
-            const serverOption = interaction.options.getString("server");
-            let selectedServerId = null;
-
-            if (serverOption && serverOption.includes("|")) {
-              const parts = serverOption.split("|");
-              const parsedServerId = parseInt(parts[0], 10); // serverId
-
-              if (!isNaN(parsedServerId)) {
-                selectedServerId = parsedServerId;
-              } else {
-                logger.warn(`Invalid server option in autocomplete - non-numeric serverId: ${parts[0]}`);
-              }
-            }
-
-            const allProfiles = await seerrApi.fetchQualityProfiles(
-              getSeerrUrl(),
-              getSeerrApiKey()
-            );
-
-            // Filter profiles based on user input, media type, AND selected server
-            const filteredProfiles = allProfiles.filter((profile) => {
-              const name = profile.name || "";
-              const matchesSearch = name.toLowerCase().includes(focusedValue.toLowerCase());
-
-              // Filter by media type if title is selected
-              let matchesType = true;
-              if (mediaType) {
-                matchesType =
-                  (mediaType === "movie" && profile.type === "radarr") ||
-                  (mediaType === "tv" && profile.type === "sonarr");
-              }
-
-              // Filter by server if server is selected
-              let matchesServer = true;
-              if (selectedServerId !== null) {
-                matchesServer = profile.serverId === selectedServerId;
-              }
-
-              return matchesSearch && matchesType && matchesServer;
-            });
-
-            // Deduplicate by name + server
-            const uniqueProfiles = [];
-            const seenNames = new Set();
-
-            for (const profile of filteredProfiles) {
-              const displayName = `${profile.name} (${profile.serverName})`;
-              const key = `${profile.id}-${profile.serverId}`;
-              if (!seenNames.has(key)) {
-                seenNames.add(key);
-                uniqueProfiles.push({
-                  name: displayName.length > 100 ? displayName.substring(0, 97) + "..." : displayName,
-                  value: `${profile.id}|${profile.serverId}|${profile.type}`, // profileId|serverId|type
-                });
-              }
-            }
-
-            // Limit to 25
-            return await interaction.respond(uniqueProfiles.slice(0, 25));
-          } catch (e) {
-            logger.error("Quality profile autocomplete error:", e);
-            return await interaction.respond([]);
-          }
-        }
-
-        // Server Autocomplete
-        if (focusedOption.name === "server") {
-          try {
-            // Determine media type from title
-            const titleOption = interaction.options.getString("title");
-            let mediaType = null;
-
-            if (titleOption && titleOption.includes("|")) {
-              const parts = titleOption.split("|");
-              mediaType = parts[1]; // "movie" or "tv"
-            }
-
-            const allServers = await seerrApi.fetchServers(
-              getSeerrUrl(),
-              getSeerrApiKey()
-            );
-
-            // Filter servers based on input AND media type
-            const filteredServers = allServers.filter((server) => {
-              const name = server.name || "";
-              const matchesSearch = name.toLowerCase().includes(focusedValue.toLowerCase());
-
-              // If media type known, filter
-              if (mediaType) {
-                const matchesType =
-                  (mediaType === "movie" && server.type === "radarr") ||
-                  (mediaType === "tv" && server.type === "sonarr");
-                return matchesSearch && matchesType;
-              }
-
-              return matchesSearch;
-            });
-
-            // Response with server type
-            const serverChoices = filteredServers.map((server) => {
-              const typeEmoji = server.type === "radarr" ? "🎬" : "📺";
-              const displayName = `${typeEmoji} ${server.name}${server.isDefault ? " (default)" : ""}`;
-              return {
-                name: displayName.length > 100 ? displayName.substring(0, 97) + "..." : displayName,
-                value: `${server.id}|${server.type}`, // serverId|type
-              };
-            });
-
-            // Limit to 25
-            return await interaction.respond(serverChoices.slice(0, 25));
-          } catch (e) {
-            logger.error("Server autocomplete error:", e);
-            return await interaction.respond([]);
-          }
-        }
-
-        // Handle Title Autocomplete
-        // For trending command, show trending content instead of search results
-        if (interaction.commandName === "trending") {
-          try {
-            const trendingResults = await tmdbApi.tmdbGetTrending(getTmdbApiKey());
-            const filtered = trendingResults
-              .filter((r) => r.media_type === "movie" || r.media_type === "tv")
-              .filter((r) => {
-                const title = r.title || r.name || "";
-                return title.toLowerCase().includes(focusedValue.toLowerCase());
-              })
-              .slice(0, 25);
-
-            const trendingChoices = await Promise.all(
-              filtered.map(async (item) => {
-                try {
-                  const details = await tmdbApi.tmdbGetDetails(
-                    item.id,
-                    item.media_type,
-                    getTmdbApiKey()
-                  );
-
-                  const emoji = item.media_type === "movie" ? "🎬" : "📺";
-                  const date = item.release_date || item.first_air_date || "";
-                  const year = date ? ` (${date.slice(0, 4)})` : "";
-
-                  let extraInfo = "";
-                  if (item.media_type === "movie") {
-                    const director = details.credits?.crew?.find(
-                      (c) => c.job === "Director"
-                    );
-                    const directorName = director ? director.name : null;
-                    const runtime = details.runtime;
-                    const hours = runtime ? Math.floor(runtime / 60) : 0;
-                    const minutes = runtime ? runtime % 60 : 0;
-                    const runtimeStr = runtime ? `${hours}h ${minutes}m` : null;
-
-                    if (directorName && runtimeStr) {
-                      extraInfo = ` — directed by ${directorName} — runtime: ${runtimeStr}`;
-                    } else if (directorName) {
-                      extraInfo = ` — directed by ${directorName}`;
-                    } else if (runtimeStr) {
-                      extraInfo = ` — runtime: ${runtimeStr}`;
-                    }
-                  } else {
-                    const creator = details.created_by?.[0]?.name;
-                    const seasonCount = details.number_of_seasons;
-                    const seasonStr = seasonCount
-                      ? `${seasonCount} season${seasonCount > 1 ? "s" : ""}`
-                      : null;
-
-                    if (creator && seasonStr) {
-                      extraInfo = ` — created by ${creator} — ${seasonStr}`;
-                    } else if (creator) {
-                      extraInfo = ` — created by ${creator}`;
-                    } else if (seasonStr) {
-                      extraInfo = ` — ${seasonStr}`;
-                    }
-                  }
-
-                  let fullName = `${emoji} ${item.title || item.name
-                    }${year}${extraInfo}`;
-
-                  if (fullName.length > 98) {
-                    fullName = fullName.substring(0, 95) + "...";
-                  }
-
-                  return {
-                    name: fullName,
-                    value: `${item.id}|${item.media_type}`,
-                  };
-                } catch (err) {
-                  const emoji = item.media_type === "movie" ? "🎬" : "📺";
-                  const date = item.release_date || item.first_air_date || "";
-                  const year = date ? ` (${date.slice(0, 4)})` : "";
-                  let basicName = `${emoji} ${item.title || item.name}${year}`;
-                  if (basicName.length > 98) {
-                    basicName = basicName.substring(0, 95) + "...";
-                  }
-                  return {
-                    name: basicName,
-                    value: `${item.id}|${item.media_type}`,
-                  };
-                }
-              })
-            );
-
-            await interaction.respond(trendingChoices);
-            return;
-          } catch (e) {
-            logger.error("Trending autocomplete error:", e);
-            return interaction.respond([]);
-          }
-        }
-
-        // Handle regular search autocomplete (existing logic)
-        if (!focusedValue) return interaction.respond([]);
-
-        try {
-          const results = await tmdbApi.tmdbSearch(focusedValue, getTmdbApiKey());
-          const filtered = results
-            .filter((r) => r.media_type === "movie" || r.media_type === "tv")
-            .slice(0, 25);
-
-          // Fetch details for each result to get director/creator and runtime/seasons
-          const detailedChoices = await Promise.all(
-            filtered.map(async (item) => {
-              try {
-                const details = await tmdbApi.tmdbGetDetails(
-                  item.id,
-                  item.media_type,
-                  getTmdbApiKey()
-                );
-
-                const emoji = item.media_type === "movie" ? "🎬" : "📺";
-                const date = item.release_date || item.first_air_date || "";
-                const year = date ? ` (${date.slice(0, 4)})` : "";
-
-                let extraInfo = "";
-                if (item.media_type === "movie") {
-                  // Get director from credits
-                  const director = details.credits?.crew?.find(
-                    (c) => c.job === "Director"
-                  );
-                  const directorName = director ? director.name : null;
-
-                  // Get runtime
-                  const runtime = details.runtime;
-                  const hours = runtime ? Math.floor(runtime / 60) : 0;
-                  const minutes = runtime ? runtime % 60 : 0;
-                  const runtimeStr = runtime ? `${hours}h ${minutes}m` : null;
-
-                  if (directorName && runtimeStr) {
-                    extraInfo = ` — directed by ${directorName} — runtime: ${runtimeStr}`;
-                  } else if (directorName) {
-                    extraInfo = ` — directed by ${directorName}`;
-                  } else if (runtimeStr) {
-                    extraInfo = ` — runtime: ${runtimeStr}`;
-                  }
-                } else {
-                  // TV show - get creator and season count
-                  const creator = details.created_by?.[0]?.name;
-                  const seasonCount = details.number_of_seasons;
-                  const seasonStr = seasonCount
-                    ? `${seasonCount} season${seasonCount > 1 ? "s" : ""}`
-                    : null;
-
-                  if (creator && seasonStr) {
-                    extraInfo = ` — created by ${creator} — ${seasonStr}`;
-                  } else if (creator) {
-                    extraInfo = ` — created by ${creator}`;
-                  } else if (seasonStr) {
-                    extraInfo = ` — ${seasonStr}`;
-                  }
-                }
-
-                let fullName = `${emoji} ${item.title || item.name
-                  }${year}${extraInfo}`;
-
-                // Truncate if too long (Discord limit is 100 chars)
-                if (fullName.length > 98) {
-                  fullName = fullName.substring(0, 95) + "...";
-                }
-
-                return {
-                  name: fullName,
-                  value: `${item.id}|${item.media_type}`,
-                };
-              } catch (err) {
-                // Fallback to basic info if details fetch fails
-                logger.debug(
-                  `Failed to fetch details for ${item.id}:`,
-                  err?.message
-                );
-                const emoji = item.media_type === "movie" ? "🎬" : "📺";
-                const date = item.release_date || item.first_air_date || "";
-                const year = date ? ` (${date.slice(0, 4)})` : "";
-                let basicName = `${emoji} ${item.title || item.name}${year}`;
-                if (basicName.length > 98) {
-                  basicName = basicName.substring(0, 95) + "...";
-                }
-                return {
-                  name: basicName,
-                  value: `${item.id}|${item.media_type}`,
-                };
-              }
-            })
-          );
-
-          await interaction.respond(detailedChoices);
-        } catch (e) {
-          logger.error("Autocomplete error:", e);
-          return await interaction.respond([]);
-        }
-      }
-
-      // Commands
-      if (interaction.isCommand()) {
-        // Check if the required configs for commands are present
-        if (!getSeerrUrl() || !getSeerrApiKey() || !getTmdbApiKey()) {
-          return interaction.reply({
-            content:
-              "⚠️ This command is disabled because Seerr or TMDB configuration is missing.",
-            flags: 64,
-          });
-        }
-        const raw = getOptionStringRobust(interaction);
-        if (interaction.commandName === "search")
-          return handleSearchOrRequest(interaction, raw, "search");
-        if (interaction.commandName === "request") {
-          const tag = interaction.options.getString("tag");
-          const quality = interaction.options.getString("quality");
-          const server = interaction.options.getString("server");
-          // Pass tag as an array if present, and quality/server options
-          return handleSearchOrRequest(
-            interaction,
-            raw,
-            "request",
-            tag ? [tag] : [],
-            { quality, server }
-          );
-        }
-        if (interaction.commandName === "trending") {
-          return handleSearchOrRequest(interaction, raw, "search");
-        }
-      }
-
-      // ===== REQUEST BUTTON HANDLER (NEW FLOW) =====
-      // customId format: request_btn|tmdbId|mediaType|seasonsParam|tagsParam
-      if (
-        interaction.isButton() &&
-        interaction.customId.startsWith("request_btn|")
-      ) {
-        const parts = interaction.customId.split("|");
-        const tmdbId = parseInt(parts[1], 10);
-        const mediaType = parts[2] || "movie";
-        const seasonsParam = parts[3] || "";
-        const tagsParam = parts[4] || "";
-
-        if (!tmdbId) {
-          return interaction.reply({ content: "⚠️ ID invalid.", flags: 64 });
-        }
-
-        await interaction.deferUpdate();
-
-        try {
-          const details = await tmdbApi.tmdbGetDetails(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
-
-          // Parse seasons and tags from customId
-          const selectedSeasons = seasonsParam ? seasonsParam.split(",") : [];
-          const selectedTagNames = tagsParam ? tagsParam.split(",") : []; // Convert tag names to IDs for API call
-          let selectedTagIds = [];
-          if (selectedTagNames.length > 0) {
-            try {
-              const allTags = await seerrApi.fetchTags(
-                getSeerrUrl(),
-                getSeerrApiKey()
-              );
-
-              // Filter by type: Radarr for movies, Sonarr for TV
-              // Add defensive check to ensure allTags is an array
-              const filteredTags = Array.isArray(allTags)
-                ? (mediaType === "movie"
-                  ? allTags.filter((tag) => tag.type === "radarr")
-                  : allTags.filter((tag) => tag.type === "sonarr"))
-                : [];
-
-              selectedTagIds = selectedTagNames
-                .map((tagName) => {
-                  const tag = filteredTags.find(
-                    (t) => (t.label || t.name) === tagName
-                  );
-                  return tag ? tag.id : null;
-                })
-                .filter((id) => id !== null);
-            } catch (err) {
-              logger.debug("Failed to fetch tags for API call:", err?.message);
-              // Continue without tags if fetch fails
-            }
-          }
-
-          // Check if media already exists in Seerr
-          // For movies: use ["all"], for TV: use selected seasons or ["all"]
-          const checkSeasons =
-            mediaType === "movie"
-              ? ["all"]
-              : selectedSeasons.length > 0
-                ? selectedSeasons
-                : ["all"];
-          const status = await seerrApi.checkMediaStatus(
-            tmdbId,
-            mediaType,
-            checkSeasons,
-            getSeerrUrl(),
-            getSeerrApiKey()
-          );
-
-          if (status.exists && status.available) {
-            // Media already available
-            await interaction.followUp({
-              content: "✅ This content is already available in your library!",
-              flags: 64,
-            });
-            return;
-          }
-
-          // Send the request with selected seasons and tags
-          // For movies: don't send seasons, for TV: send selected or default to "all"
-          let seasonsToRequest =
-            mediaType === "movie"
-              ? undefined
-              : selectedSeasons.length > 0
-                ? selectedSeasons
-                : ["all"];
-
-          // Resolve "all" to explicit season numbers if needed
-          if (mediaType === "tv" && (seasonsToRequest.includes("all") || (Array.isArray(seasonsToRequest) && seasonsToRequest[0] === "all"))) {
-            if (details.seasons) {
-              const seasonNumbers = details.seasons
-                .filter((s) => s.season_number > 0)
-                .map((s) => s.season_number);
-              if (seasonNumbers.length > 0) {
-                seasonsToRequest = seasonNumbers;
-                logger.info(`[REQUEST BTN] Resolved 'all' seasons to explicit list: ${seasonsToRequest.join(", ")}`);
-              }
-            }
-          }
-
-          // Apply defaults from config
-          const { profileId, serverId } = parseQualityAndServerOptions({}, mediaType);
-
-          await seerrApi.sendRequest({
-            tmdbId,
-            mediaType,
-            seasons: seasonsToRequest,
-            tags: selectedTagIds.length > 0 ? selectedTagIds : undefined,
-            profileId,
-            serverId,
-            seerrUrl: getSeerrUrl(),
-            apiKey: getSeerrApiKey(),
-            discordUserId: interaction.user.id,
-            userMappings: getUserMappings(),
-            isAutoApproved: getSeerrAutoApprove(),
-          });
-          logger.info(`[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}`);
-          logger.info(`[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}`);
-
-          // Track request for notifications if enabled
-          if (process.env.NOTIFY_ON_AVAILABLE === "true") {
-            const requestKey = `${tmdbId}-${mediaType}`;
-            if (!pendingRequests.has(requestKey)) {
-              pendingRequests.set(requestKey, new Set());
-            }
-            pendingRequests.get(requestKey).add(interaction.user.id);
-            savePendingRequests();
-          }
-
-          const imdbId = await tmdbApi.tmdbGetExternalImdb(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
-          const omdb = imdbId ? await fetchOMDbData(imdbId) : null;
-
-          const embed = buildNotificationEmbed(
-            details,
-            mediaType,
-            imdbId,
-            "success",
-            omdb,
-            tmdbId
-          );
-
-          // Build final buttons with requested seasons and tag names (for display)
-          const components = buildButtons(
-            tmdbId,
-            imdbId,
-            true,
-            mediaType,
-            details,
-            selectedSeasons.length > 0 ? selectedSeasons : ["all"],
-            selectedTagNames
-          );
-
-          // Success message - always edit the original message
-          await interaction.editReply({ embeds: [embed], components });
-        } catch (err) {
-          logger.error("Button request error:", err);
-          try {
-            await interaction.followUp({
-              content: "⚠️ I could not send the request.",
-              flags: 64,
-            });
-          } catch (followUpErr) {
-            logger.error("Failed to send follow-up message:", followUpErr);
-          }
-        }
-      }
-
-      // ===== SELECT SEASONS HANDLER (UPDATED FOR MULTIPLE DROPDOWNS) =====
-      // customId format: select_seasons|tmdbId|selectedTagsParam|menuIndex
-      if (
-        interaction.isStringSelectMenu() &&
-        interaction.customId.startsWith("select_seasons|")
-      ) {
-        const parts = interaction.customId.split("|");
-        const tmdbId = parseInt(parts[1], 10);
-        const selectedTagsParam = parts[2] || "";
-        const menuIndex = parts[3] ? parseInt(parts[3], 10) : undefined;
-        const currentSelections = interaction.values;
-
-        if (!tmdbId) {
-          return interaction.reply({
-            content: "⚠️ Invalid selection.",
-            flags: 64,
-          });
-        }
-
-        await interaction.deferUpdate();
-
-        try {
-          // Parse existing tags from customId if any
-          const selectedTags = selectedTagsParam
-            ? selectedTagsParam.split(",")
-            : [];
-
-          // Get TMDB details for rebuilding components
-          const details = await tmdbApi.tmdbGetDetails(
-            tmdbId,
-            "tv",
-            getTmdbApiKey()
-          );
-          const imdbId = await tmdbApi.tmdbGetExternalImdb(
-            tmdbId,
-            "tv",
-            getTmdbApiKey()
-          );
-
-          // Extract all previously selected seasons from existing message components
-          let allSelectedSeasons = [];
-
-          // Check if "all" was selected in current interaction
-          if (currentSelections.includes("all")) {
-            allSelectedSeasons = ["all"];
-          } else {
-            // Accumulate selections from all season dropdowns in the message
-            const existingComponents = interaction.message.components || [];
-
-            for (const row of existingComponents) {
-              for (const component of row.components) {
-                // Check if this is a season selector
-                if (component.customId && component.customId.startsWith("select_seasons|")) {
-                  const componentParts = component.customId.split("|");
-                  const componentMenuIndex = componentParts[3] ? parseInt(componentParts[3], 10) : undefined;
-
-                  // If this is the current menu being interacted with, use current selections
-                  if (componentMenuIndex === menuIndex || (componentMenuIndex === undefined && menuIndex === undefined)) {
-                    allSelectedSeasons.push(...currentSelections.filter(v => v !== "all"));
-                  } else {
-                    // Otherwise, preserve existing selections from this menu
-                    const existingSelections = component.options
-                      ?.filter(opt => opt.default)
-                      .map(opt => opt.value)
-                      .filter(v => v !== "all") || [];
-                    allSelectedSeasons.push(...existingSelections);
-                  }
-                }
-              }
-            }
-
-            // Remove duplicates
-            allSelectedSeasons = [...new Set(allSelectedSeasons)];
-          }
-
-          // Build updated components with accumulated season selections
-          const components = buildButtons(
-            tmdbId,
-            imdbId,
-            false,
-            "tv",
-            details,
-            [],
-            [],
-            allSelectedSeasons,
-            selectedTags
-          );
-
-          // Rebuild season selectors with updated selections
-          const seenSeasons = new Set();
-          const uniqueSeasons = details.seasons.filter((s) => {
-            if (s.season_number <= 0) return false;
-            if (seenSeasons.has(s.season_number)) return false;
-            seenSeasons.add(s.season_number);
-            return true;
-          });
-
-          const tagsParam = selectedTags.length > 0 ? selectedTags.join(",") : "";
-          const hasAllSeasons = allSelectedSeasons.includes("all");
-
-          // Recreate season dropdowns with current selections
-          if (uniqueSeasons.length <= 24) {
-            // Single dropdown
-            const seasonOptions = [
-              { label: "All Seasons", value: "all" },
-              ...uniqueSeasons.map((s) => ({
-                label: `Season ${s.season_number} (${s.episode_count} episodes)`,
-                value: String(s.season_number),
-              })),
-            ];
-
-            const selectMenu = new StringSelectMenuBuilder()
-              .setCustomId(`select_seasons|${tmdbId}|${tagsParam}`)
-              .setPlaceholder("Select seasons to request...")
-              .setMinValues(1)
-              .setMaxValues(Math.min(25, seasonOptions.length))
-              .addOptions(seasonOptions);
-
-            components.push(new ActionRowBuilder().addComponents(selectMenu));
-          } else {
-            // Multiple dropdowns
-            const SEASONS_PER_MENU = 24;
-            const MAX_SEASON_MENUS = 4;
-
-            const firstBatchSeasons = uniqueSeasons.slice(0, SEASONS_PER_MENU);
-            const firstMenuOptions = [
-              { label: "All Seasons", value: "all" },
-              ...firstBatchSeasons.map((s) => ({
-                label: `Season ${s.season_number} (${s.episode_count} episodes)`,
-                value: String(s.season_number),
-              })),
-            ];
-
-            const firstMenu = new StringSelectMenuBuilder()
-              .setCustomId(`select_seasons|${tmdbId}|${tagsParam}|0`)
-              .setPlaceholder(`Seasons 1-${firstBatchSeasons[firstBatchSeasons.length - 1].season_number}`)
-              .setMinValues(0)
-              .setMaxValues(firstMenuOptions.length)
-              .addOptions(firstMenuOptions);
-
-            components.push(new ActionRowBuilder().addComponents(firstMenu));
-
-            let menuIdx = 1;
-            let offset = SEASONS_PER_MENU;
-
-            while (offset < uniqueSeasons.length && menuIdx < MAX_SEASON_MENUS) {
-              const batchSeasons = uniqueSeasons.slice(offset, offset + SEASONS_PER_MENU);
-
-              if (batchSeasons.length > 0) {
-                const batchOptions = batchSeasons.map((s) => ({
-                  label: `Season ${s.season_number} (${s.episode_count} episodes)`,
-                  value: String(s.season_number),
-                }));
-
-                const batchMenu = new StringSelectMenuBuilder()
-                  .setCustomId(`select_seasons|${tmdbId}|${tagsParam}|${menuIdx}`)
-                  .setPlaceholder(
-                    `Seasons ${batchSeasons[0].season_number}-${batchSeasons[batchSeasons.length - 1].season_number}`
-                  )
-                  .setMinValues(0)
-                  .setMaxValues(batchOptions.length)
-                  .addOptions(batchOptions);
-
-                components.push(new ActionRowBuilder().addComponents(batchMenu));
-              }
-
-              offset += SEASONS_PER_MENU;
-              menuIdx++;
-            }
-          }
-
-          // Fetch available tags for tag selector (only if not already selected and not all seasons)
-          if (selectedTags.length === 0 && !hasAllSeasons) {
-            try {
-              const tags = await seerrApi.fetchTags(
-                getSeerrUrl(),
-                getSeerrApiKey()
-              );
-
-              if (tags && tags.length > 0) {
-                const uniqueTags = [];
-                const seenIds = new Set();
-
-                for (const tag of tags) {
-                  if (!seenIds.has(tag.id)) {
-                    seenIds.add(tag.id);
-                    uniqueTags.push(tag);
-                  }
-                }
-
-                const tagOptions = uniqueTags.slice(0, 25).map((tag) => ({
-                  label: tag.label || tag.name || `Tag ${tag.id}`,
-                  value: tag.id.toString(),
-                }));
-
-                const tagMenu = new StringSelectMenuBuilder()
-                  .setCustomId(`select_tags|${tmdbId}|${allSelectedSeasons.join(",")}`)
-                  .setPlaceholder("Select tags (optional)")
-                  .addOptions(tagOptions)
-                  .setMinValues(0)
-                  .setMaxValues(Math.min(5, tagOptions.length));
-
-                const tagRow = new ActionRowBuilder().addComponents(tagMenu);
-                components.push(tagRow);
-              }
-            } catch (err) {
-              logger.debug("Failed to fetch tags for season selector:", err?.message);
-            }
-          }
-
-          await interaction.editReply({
-            components,
-          });
-        } catch (err) {
-          logger.error("Season selection error:", err);
-          try {
-            await interaction.followUp({
-              content: "⚠️ Error processing season selection.",
-              flags: 64,
-            });
-          } catch (followUpErr) {
-            logger.error("Failed to send follow-up message:", followUpErr);
-          }
-        }
-      }
-
-      if (
-        interaction.isButton() &&
-        interaction.customId.startsWith("requested|")
-      ) {
-        try {
-          await interaction.reply({
-            content: "This item was already requested.",
-            flags: 64,
-          });
-        } catch (replyErr) {
-          logger.error("Failed to send 'already requested' reply:", replyErr);
-        }
-      }
-
-      // ===== DAILY RANDOM PICK REQUEST BUTTON HANDLER =====
-      // customId format: request_random_tmdbId_mediaType
-      if (
-        interaction.isButton() &&
-        interaction.customId.startsWith("request_random_")
-      ) {
-        const parts = interaction.customId.split("_");
-        const tmdbId = parseInt(parts[2], 10);
-        const mediaType = parts[3] || "movie";
-
-        if (!tmdbId) {
-          return interaction.reply({ content: "⚠️ Invalid media ID.", flags: 64 });
-        }
-
-        await interaction.deferUpdate();
-
-        try {
-          const details = await tmdbApi.tmdbGetDetails(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
-
-          const { profileId, serverId } = parseQualityAndServerOptions({}, mediaType);
-
-          await seerrApi.sendRequest({
-            tmdbId,
-            mediaType,
-            seasons: mediaType === "tv" ? ["all"] : undefined,
-            profileId,
-            serverId,
-            seerrUrl: getSeerrUrl(),
-            apiKey: getSeerrApiKey(),
-            discordUserId: interaction.user.id,
-            userMappings: getUserMappings(),
-            isAutoApproved: getSeerrAutoApprove(),
-          });
-
-          // Track request for notifications
-          if (process.env.NOTIFY_ON_AVAILABLE === "true") {
-            const requestKey = `${tmdbId}-${mediaType}`;
-            if (!pendingRequests.has(requestKey)) {
-              pendingRequests.set(requestKey, new Set());
-            }
-            pendingRequests.get(requestKey).add(interaction.user.id);
-            savePendingRequests();
-          }
-
-          await interaction.followUp({
-            content: `✅ **${details.title || details.name}** has been requested!`,
-            flags: 64,
-          });
-        } catch (err) {
-          logger.error("Daily random pick request error:", err);
-          await interaction.followUp({
-            content: "⚠️ Error processing request.",
-            flags: 64,
-          });
-        }
-      }
-
-      // ===== SELECT TAGS HANDLER (NEW FLOW) =====
-      // customId format: select_tags|tmdbId|selectedSeasonsParam (for TV) or select_tags|tmdbId| (for movies)
-      // This handler only updates the buttons with tag selection - does NOT send the request
-      if (
-        interaction.isStringSelectMenu() &&
-        interaction.customId.startsWith("select_tags|")
-      ) {
-        const parts = interaction.customId.split("|");
-        const tmdbId = parseInt(parts[1], 10);
-        const selectedSeasonsParam = parts[2] || "";
-        const selectedSeasons = selectedSeasonsParam
-          ? selectedSeasonsParam.split(",")
-          : [];
-        const selectedTagIds = interaction.values.map((v) => v.toString());
-
-        if (!tmdbId) {
-          return interaction.reply({
-            content: "⚠️ Invalid request data.",
-            flags: 64,
-          });
-        }
-
-        await interaction.deferUpdate();
-
-        try {
-          // Determine if this is for TV or movie based on presence of seasons
-          const mediaType = selectedSeasons.length > 0 ? "tv" : "movie";
-
-          // Get TMDB details for building updated buttons
-          const details = await tmdbApi.tmdbGetDetails(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
-          const imdbId = await tmdbApi.tmdbGetExternalImdb(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
-
-          // Fetch all tags to map IDs to names
-          let selectedTagNames = [];
-          if (selectedTagIds.length > 0) {
-            try {
-              const allTags = await seerrApi.fetchTags(
-                getSeerrUrl(),
-                getSeerrApiKey()
-              );
-
-              // Filter by type: Radarr for movies, Sonarr for TV
-              // Add defensive check to ensure allTags is an array
-              const filteredTags = Array.isArray(allTags)
-                ? (mediaType === "movie"
-                  ? allTags.filter((tag) => tag.type === "radarr")
-                  : allTags.filter((tag) => tag.type === "sonarr"))
-                : [];
-
-              selectedTagNames = selectedTagIds
-                .map((tagId) => {
-                  const tag = filteredTags.find(
-                    (t) => t.id.toString() === tagId
-                  );
-                  return tag ? tag.label || tag.name : null;
-                })
-                .filter((name) => name !== null);
-            } catch (err) {
-              logger.debug("Failed to fetch tag names:", err?.message);
-              // Continue with tag IDs if names can't be fetched
-              selectedTagNames = selectedTagIds;
-            }
-          }
-
-          // Build updated buttons with selected seasons and tags
-          // Pass selectedSeasons and selectedTagNames to show them in the Request button label
-          const components = buildButtons(
-            tmdbId,
-            imdbId,
-            false,
-            mediaType,
-            details,
-            [],
-            [],
-            selectedSeasons,
-            selectedTagNames
-          );
-
-          // Remove tag selector after selection - user now sees updated Request button
-          // and can click it to send the request
-
-          await interaction.editReply({
-            components,
-          });
-        } catch (err) {
-          logger.error("Tag selection error:", err);
-          try {
-            await interaction.followUp({
-              content: "⚠️ Error updating selection.",
-              flags: 64,
-            });
-          } catch (followUpErr) {
-            logger.error("Failed to send follow-up message:", followUpErr);
-          }
-        }
-      }
-    } catch (outerErr) {
-      logger.error("Interaction handler error:", outerErr);
-    }
-  });
-
-  return new Promise((resolve, reject) => {
-    client.once("clientReady", async () => {
-      logger.info(`✅ Bot logged in as ${client.user.tag}`);
-      isBotRunning = true;
-
-      logger.info("ℹ️ Jellyfin notifications will be received via webhooks.");
-
-      // Setup daily random pick if enabled
-      scheduleDailyRandomPick(client);
-
-      resolve({ success: true, message: `Logged in as ${client.user.tag}` });
-    });
-
-    client.login(process.env.DISCORD_TOKEN).catch((err) => {
-      logger.error("[DISCORD LOGIN ERROR] Bot login failed:");
-      if (err && err.message) {
-        logger.error("[DISCORD LOGIN ERROR] Message:", err.message);
-      }
-      if (err && err.code) {
-        logger.error("[DISCORD LOGIN ERROR] Code:", err.code);
-      }
-      if (err && err.stack) {
-        logger.error("[DISCORD LOGIN ERROR] Stack:", err.stack);
-      }
-      isBotRunning = false;
-      discordClient = null;
-      reject(err);
-    });
-  });
+if (process.env.TRUST_PROXY === "true") {
+  app.set("trust proxy", 1);
 }
 
 function configureWebServer() {
   // Security headers
-  app.use((req, res, next) => {
+  app.use((_req, res, next) => {
     res.setHeader("X-Frame-Options", "SAMEORIGIN");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-XSS-Protection", "1; mode=block");
@@ -2402,38 +218,44 @@ function configureWebServer() {
     legacyHeaders: false,
   });
 
-  // Strict rate limiter for auth endpoints
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20,
-    message: { success: false, error: "Too many attempts, please try again later." },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-
-  // --- AUTH ENDPOINTS ---
-  app.post("/api/auth/login", authLimiter, login);
-  app.post("/api/auth/register", authLimiter, register);
-  app.post("/api/auth/logout", logout);
-  app.get("/api/auth/check", checkAuth);
+  // Auth routes (before general rate limiter so authLimiter applies)
+  app.use("/api", authRouter);
 
   // Apply rate limiting to all API endpoints (except auth and webhooks)
   app.use("/api/", apiLimiter);
 
+  // Log routes
+  app.use("/api", logRouter);
+
+  // User mapping routes
+  app.use("/api", userMappingRouter);
+
+  // Config/language routes
+  app.use("/api", configRouter);
+
+  // Seerr routes
+  app.use("/api", seerrRouter);
+
+  // Jellyfin test/library routes
+  app.use("/api", jellyfinRouter);
+
+  // Bot management routes (health, status, start-bot, stop-bot)
+  app.use("/api", createBotRoutes({ startBot, jellyfinPoller }));
+
   // Endpoint for Discord servers list (guilds)
-  app.get("/api/discord/guilds", authenticateToken, async (req, res) => {
+  app.get("/api/discord/guilds", authenticateToken, async (_req, res) => {
     try {
-      if (!discordClient || !discordClient.user) {
+      if (!botState.discordClient || !botState.discordClient.user) {
         logger.debug("[GUILDS API] Bot not running or not logged in.");
         return res.json({ success: false, message: "Bot not running" });
       }
       // Debug: log all guilds
       logger.debug(
-        "[GUILDS API] discordClient.guilds.cache:",
-        discordClient.guilds.cache.map((g) => ({ id: g.id, name: g.name }))
+        "[GUILDS API] botState.discordClient.guilds.cache:",
+        botState.discordClient.guilds.cache.map((g) => ({ id: g.id, name: g.name }))
       );
       // Fetch guilds the bot is in
-      const guilds = discordClient.guilds.cache.map((g) => ({
+      const guilds = botState.discordClient.guilds.cache.map((g) => ({
         id: g.id,
         name: g.name,
       }));
@@ -2451,12 +273,12 @@ function configureWebServer() {
     async (req, res) => {
       try {
         const { guildId } = req.params;
-        if (!discordClient || !discordClient.user) {
+        if (!botState.discordClient || !botState.discordClient.user) {
           logger.debug("[CHANNELS API] Bot not running or not logged in.");
           return res.json({ success: false, message: "Bot not running" });
         }
 
-        const guild = discordClient.guilds.cache.get(guildId);
+        const guild = botState.discordClient.guilds.cache.get(guildId);
         if (!guild) {
           return res.json({ success: false, message: "Guild not found" });
         }
@@ -2468,7 +290,7 @@ function configureWebServer() {
           .filter(
             (channel) =>
               channel.type === 0 && // GUILD_TEXT
-              channel.permissionsFor(discordClient.user).has("SendMessages")
+              channel.permissionsFor(botState.discordClient.user).has("SendMessages")
           )
           .forEach((channel) => {
             channels.push({
@@ -2490,7 +312,7 @@ function configureWebServer() {
 
             // Add each thread as a selectable channel
             activeThreads.threads.forEach((thread) => {
-              if (thread.permissionsFor(discordClient.user)?.has("SendMessages")) {
+              if (thread.permissionsFor(botState.discordClient.user)?.has("SendMessages")) {
                 channels.push({
                   id: thread.id,
                   name: `${forumChannel.name} > ${thread.name}`,
@@ -2513,7 +335,7 @@ function configureWebServer() {
           activeThreads.threads.forEach((thread) => {
             // Filter for thread types: PUBLIC_THREAD (10), PRIVATE_THREAD (11), ANNOUNCEMENT_THREAD (12)
             if ([10, 11, 12].includes(thread.type)) {
-              if (thread.permissionsFor(discordClient.user)?.has("SendMessages")) {
+              if (thread.permissionsFor(botState.discordClient.user)?.has("SendMessages")) {
                 const parentChannel = guild.channels.cache.get(thread.parentId);
                 const threadTypeLabel =
                   thread.type === 10 ? "Thread" :
@@ -2552,10 +374,10 @@ function configureWebServer() {
   );
 
   // Endpoint for Discord members from a server
-  app.get("/api/discord-members", authenticateToken, async (req, res) => {
+  app.get("/api/discord-members", authenticateToken, async (_req, res) => {
     try {
       logger.debug("[MEMBERS API] Request received");
-      if (!discordClient || !discordClient.user) {
+      if (!botState.discordClient || !botState.discordClient.user) {
         logger.debug("[MEMBERS API] Bot not running");
         return res.json({ success: false, message: "Bot not running" });
       }
@@ -2567,7 +389,7 @@ function configureWebServer() {
         return res.json({ success: false, message: "No guild selected" });
       }
 
-      const guild = discordClient.guilds.cache.get(guildId);
+      const guild = botState.discordClient.guilds.cache.get(guildId);
       if (!guild) {
         logger.debug("[MEMBERS API] Guild not found in cache");
         return res.json({ success: false, message: "Guild not found" });
@@ -2581,7 +403,7 @@ function configureWebServer() {
       );
 
       // Check if bot has permission to view members
-      const botMember = guild.members.cache.get(discordClient.user.id);
+      const botMember = guild.members.cache.get(botState.discordClient.user.id);
       if (!botMember) {
         logger.debug("[MEMBERS API] Bot member not found in guild");
         return res.json({ success: false, message: "Bot not in guild" });
@@ -2594,7 +416,6 @@ function configureWebServer() {
 
       // Fetch members with proper error handling and intent detection
       let fetchSuccess = false;
-      let fetchError = null;
 
       try {
         logger.debug(
@@ -2607,7 +428,6 @@ function configureWebServer() {
         );
         fetchSuccess = true;
       } catch (fetchErr) {
-        fetchError = fetchErr.message;
         const errorCode = fetchErr.code;
         const errorStatus = fetchErr.status;
 
@@ -2678,10 +498,10 @@ function configureWebServer() {
   });
 
   // Endpoint for Discord roles from a server
-  app.get("/api/discord-roles", authenticateToken, async (req, res) => {
+  app.get("/api/discord-roles", authenticateToken, async (_req, res) => {
     try {
       logger.debug("[ROLES API] Request received");
-      if (!discordClient || !discordClient.user) {
+      if (!botState.discordClient || !botState.discordClient.user) {
         logger.debug("[ROLES API] Bot not running");
         return res.json({ success: false, message: "Bot not running" });
       }
@@ -2693,7 +513,7 @@ function configureWebServer() {
         return res.json({ success: false, message: "No guild selected" });
       }
 
-      const guild = discordClient.guilds.cache.get(guildId);
+      const guild = botState.discordClient.guilds.cache.get(guildId);
       if (!guild) {
         logger.debug("[ROLES API] Guild not found in cache");
         return res.json({ success: false, message: "Guild not found" });
@@ -2720,252 +540,8 @@ function configureWebServer() {
     }
   });
 
-  // Endpoint for Seerr users
-  app.get("/api/seerr-users", authenticateToken, async (req, res) => {
-    try {
-      logger.debug("[SEERR USERS API] Request received");
-      const seerrUrl = process.env.SEERR_URL;
-      const apiKey = process.env.SEERR_API_KEY;
-
-      logger.debug("[SEERR USERS API] SEERR_URL:", seerrUrl);
-      logger.debug("[SEERR USERS API] API_KEY present:", !!apiKey);
-
-      if (!seerrUrl || !apiKey) {
-        logger.debug("[SEERR USERS API] Missing configuration");
-        return res.json({
-          success: false,
-          message: "Seerr configuration missing",
-        });
-      }
-
-      let baseUrl = seerrUrl.replace(/\/$/, "");
-      if (!baseUrl.endsWith("/api/v1")) {
-        baseUrl += "/api/v1";
-      }
-
-      logger.debug(
-        "[SEERR USERS API] Making request to:",
-        `${baseUrl}/user`
-      );
-
-      let response;
-      try {
-        logger.info(
-          "[SEERR USERS API] Fetching users from Seerr (real-time)..."
-        );
-        response = await axios.get(`${baseUrl}/user?take=` + Number.MAX_SAFE_INTEGER, {
-          headers: { "X-Api-Key": apiKey },
-          timeout: TIMEOUTS.SEERR_API,
-        });
-
-        logger.info(
-          "[SEERR USERS API] ✅ Users fetched successfully (real-time)"
-        );
-      } catch (fetchErr) {
-        logger.error(
-          "[SEERR USERS API] Failed to fetch users:",
-          fetchErr.message
-        );
-        throw fetchErr;
-      }
-
-      logger.debug(
-        "[SEERR USERS API] Response received, status:",
-        response.status
-      );
-      logger.debug(
-        "[SEERR USERS API] Response data type:",
-        typeof response.data
-      );
-      logger.debug(
-        "[SEERR USERS API] Response data is array:",
-        Array.isArray(response.data)
-      );
-      if (!Array.isArray(response.data)) {
-        logger.debug(
-          "[SEERR USERS API] Response data keys:",
-          Object.keys(response.data)
-        );
-      }
-      logger.debug(
-        "[SEERR USERS API] Response data length:",
-        Array.isArray(response.data)
-          ? response.data.length
-          : response.data.results?.length || "N/A"
-      );
-
-      // Seerr API returns { pageInfo, results: [] }
-      const userData = response.data.results || [];
-
-      const users = userData
-        .map((user) => {
-          let avatar = user.avatar || null;
-          // If avatar is relative, make it absolute
-          if (avatar && !avatar.startsWith("http")) {
-            avatar = `${seerrUrl.replace(/\/api\/v1$/, "")}${avatar}`;
-          }
-          return {
-            id: user.id,
-            displayName: user.displayName || user.username || `User ${user.id}`,
-            username: user.username || "",
-            email: user.email || "",
-            avatar: avatar,
-          };
-        })
-        .sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || "")
-        ); // Sort alphabetically
-
-      logger.info(
-        `[SEERR USERS API] ✅ Returning ${users.length} users (real-time)`
-      );
-      res.json({ success: true, users, fetchedRealtime: true });
-    } catch (err) {
-      logger.error("[SEERR USERS API] Error:", err.message);
-      if (err.response) {
-        logger.error(
-          "[SEERR USERS API] Response status:",
-          err.response.status
-        );
-        logger.error(
-          "[SEERR USERS API] Response data:",
-          err.response.data
-        );
-      }
-      res.json({ success: false, message: err.message });
-    }
-  });
-
-  // Endpoint for user mappings
-  app.get("/api/user-mappings", authenticateToken, (req, res) => {
-    // Load from config.json using centralized helper
-    const mappings = getUserMappings();
-    res.json(mappings);
-  });
-
-  app.post(
-    "/api/user-mappings",
-    authenticateToken,
-    validateBody(userMappingSchema),
-    (req, res) => {
-      const {
-        discordUserId,
-        seerrUserId,
-        discordUsername,
-        discordDisplayName,
-        seerrDisplayName,
-      } = req.body;
-
-      if (!discordUserId || !seerrUserId) {
-        return res.status(400).json({
-          success: false,
-          message: "Discord user ID and Seerr user ID are required.",
-        });
-      }
-
-      try {
-        const mapping = {
-          discordUserId,
-          seerrUserId,
-          discordUsername: discordUsername || null,
-          discordDisplayName: discordDisplayName || null,
-          seerrDisplayName: seerrDisplayName || null,
-        };
-
-        // Use centralized saveUserMapping helper
-        saveUserMapping(mapping);
-
-        // Reload config into process.env to ensure mapping is immediately active
-        loadConfig();
-
-        res.json({ success: true, message: "Mapping saved successfully." });
-      } catch (error) {
-        logger.error("Error saving user mapping:", error);
-        res.status(500).json({
-          success: false,
-          message: "Failed to save mapping - check server logs.",
-        });
-      }
-    }
-  );
-
-  app.delete(
-    "/api/user-mappings/:discordUserId",
-    authenticateToken,
-    (req, res) => {
-      const { discordUserId } = req.params;
-
-      try {
-        // Use centralized deleteUserMapping helper
-        const deleted = deleteUserMapping(discordUserId);
-
-        if (!deleted) {
-          return res
-            .status(404)
-            .json({ success: false, message: "Mapping not found." });
-        }
-
-        // Reload config into process.env to ensure mapping is immediately removed
-        loadConfig();
-
-        res.json({ success: true, message: "Mapping deleted successfully." });
-      } catch (error) {
-        logger.error("Error deleting user mapping:", error);
-        res.status(500).json({
-          success: false,
-          message: "Failed to delete mapping - check server logs.",
-        });
-      }
-    }
-  );
-
-  // Endpoint for Jellyfin libraries
-  app.post("/api/jellyfin-libraries", authenticateToken, async (req, res) => {
-    try {
-      const { url } = req.body;
-      let { apiKey } = req.body;
-      // If the frontend sends back a masked placeholder, use the real key from config
-      if (isMaskedValue(apiKey)) {
-        apiKey = process.env.JELLYFIN_API_KEY;
-      }
-
-      if (!url || !apiKey) {
-        return res
-          .status(400)
-          .json({ success: false, message: "URL and API Key are required." });
-      }
-
-      const response = await axios.get(
-        `${url.replace(/\/$/, "")}/Library/MediaFolders`,
-        {
-          headers: { "X-MediaBrowser-Token": apiKey },
-          timeout: TIMEOUTS.JELLYFIN_API,
-        }
-      );
-
-      const libraries = response.data.Items.map((item) => ({
-        id: item.Id,
-        name: item.Name,
-        type: item.CollectionType || "unknown",
-      }));
-
-      // Update library cache with fresh data for webhook usage
-      if (response.data.Items && response.data.Items.length > 0) {
-        libraryCache.set(response.data.Items);
-        logger.info(
-          `[LIBRARY CACHE] Updated cache with ${response.data.Items.length} libraries`
-        );
-      }
-
-      res.json({ success: true, libraries });
-    } catch (err) {
-      logger.error("[JELLYFIN LIBRARIES API] Error:", err);
-      res.json({ success: false, message: err.message });
-    }
-  });
-
   // Global error handler middleware - must be last
-  app.use((err, req, res, next) => {
+  app.use((err, req, res, _next) => {
     logger.error("Express error handler:", {
       error: err.message,
       stack: err.stack,
@@ -2987,7 +563,7 @@ function configureWebServer() {
   app.use("/locales", express.static(path.join(__dirname, "locales")));
   app.use(express.static(path.join(__dirname, "web")));
 
-  app.get("/", (req, res) => {
+  app.get("/", (_req, res) => {
     res.sendFile(path.join(__dirname, "web", "index.html"));
   });
 
@@ -3033,9 +609,9 @@ function configureWebServer() {
       }
 
       // Process webhook asynchronously
-      if (discordClient && isBotRunning) {
+      if (botState.discordClient && botState.isBotRunning) {
         // Don't pass res since we already responded
-        await handleJellyfinWebhook(req, null, discordClient, pendingRequests, savePendingRequests);
+        await handleJellyfinWebhook(req, null, botState.discordClient, pendingRequests, savePendingRequests);
       } else {
         logger.warn(
           `⚠️ Jellyfin webhook received but Discord bot is not running — notification dropped (ItemType: ${req.body?.ItemType}, Name: ${req.body?.Name})`
@@ -3044,69 +620,6 @@ function configureWebServer() {
     } catch (error) {
       logger.error(`❌ Error processing Jellyfin webhook (ItemType: ${req.body?.ItemType}, Name: ${req.body?.Name}):`, error);
       // Don't send error response since we already sent 200
-    }
-  });
-
-  app.get("/api/config", authenticateToken, (req, res) => {
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-    res.setHeader("Surrogate-Control", "no-store");
-    const config = readConfig();
-    if (config) {
-      res.json(sanitizeConfigForClient(config));
-    } else {
-      res.json(sanitizeConfigForClient(configTemplate));
-    }
-  });
-
-  // Return webhook secret for copy-to-clipboard (stripped from /api/config)
-  app.get("/api/webhook-secret", authenticateToken, (req, res) => {
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-    res.setHeader("Surrogate-Control", "no-store");
-    res.json({ secret: WEBHOOK_SECRET || null });
-  });
-
-  // Get available languages dynamically from locales directory
-  app.get("/api/languages", async (req, res) => {
-    try {
-      const localesDir = path.join(process.cwd(), "locales");
-      const files = fs.readdirSync(localesDir);
-
-      const languages = [];
-
-      for (const file of files) {
-        if (file.endsWith('.json') && file !== 'template.json') {
-          try {
-            const langPath = path.join(localesDir, file);
-            const langData = JSON.parse(fs.readFileSync(langPath, 'utf8'));
-
-            if (langData._meta && langData._meta.language_code && langData._meta.language_name) {
-              languages.push({
-                code: langData._meta.language_code,
-                name: langData._meta.language_name
-              });
-            }
-          } catch (error) {
-            logger.warn(`Failed to parse language file ${file}: ${error.message}`);
-          }
-        }
-      }
-
-      // Sort by language name
-      languages.sort((a, b) => a.name.localeCompare(b.name));
-
-      res.json(languages);
-    } catch (error) {
-      logger.error(`Failed to load available languages: ${error.message}`);
-      // Return fallback languages
-      res.json([
-        { code: 'en', name: 'English' },
-        { code: 'de', name: 'Deutsch' },
-        { code: 'sv', name: 'Svenska' }
-      ]);
     }
   });
 
@@ -3193,14 +706,14 @@ function configureWebServer() {
         oldGuildId !== process.env.GUILD_ID ||
         jellyfinApiKeyChanged;
 
-      if (isBotRunning && needsRestart) {
+      if (botState.isBotRunning && needsRestart) {
         logger.warn(
           "Critical Discord settings changed. Restarting bot logic..."
         );
 
-        await discordClient.destroy();
-        isBotRunning = false;
-        discordClient = null;
+        await botState.discordClient.destroy();
+        botState.isBotRunning = false;
+        botState.discordClient = null;
         try {
           await startBot();
           res
@@ -3211,7 +724,7 @@ function configureWebServer() {
             message: `Config saved, but bot failed to restart: ${error.message}`,
           });
         }
-      } else if (!isBotRunning && hasDiscordCreds && discordCredsChanged) {
+      } else if (!botState.isBotRunning && hasDiscordCreds && discordCredsChanged) {
         // Check if user wants to auto-start the bot (default: true for backward compatibility)
         const shouldStartBot = configData.startBot !== false; // Default to true if not specified
 
@@ -3254,172 +767,14 @@ function configureWebServer() {
     // Check if Discord credentials are complete and changed
     const hasDiscordCreds = effectiveToken && configData.BOT_ID;
     const discordCredsChanged = oldToken !== effectiveToken;
-    const wouldAutoStart = !isBotRunning && hasDiscordCreds && discordCredsChanged;
+    const wouldAutoStart = !botState.isBotRunning && hasDiscordCreds && discordCredsChanged;
 
     res.json({
       wouldAutoStart,
       hasDiscordCreds,
       discordCredsChanged,
-      isBotRunning
+      isBotRunning: botState.isBotRunning,
     });
-  });
-
-  app.post("/api/test-seerr", authenticateToken, async (req, res) => {
-    const { url, apiKey } = req.body;
-    const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
-    if (!url || !effectiveApiKey) {
-      return res
-        .status(400)
-        .json({ success: false, message: "URL and API Key are required." });
-    }
-
-    try {
-      let baseUrl = url.replace(/\/$/, "");
-      if (!baseUrl.endsWith("/api/v1")) {
-        baseUrl += "/api/v1";
-      }
-
-      const response = await axios.get(`${baseUrl}/settings/about`, {
-        headers: { "X-Api-Key": effectiveApiKey },
-        timeout: TIMEOUTS.SEERR_API,
-      });
-      const version = response.data?.version;
-      res.json({
-        success: true,
-        message: `Connection successful! (v${version})`,
-      });
-    } catch (error) {
-      logger.error("Seerr test failed:", error.message);
-      // Check if the error is due to an invalid API key (401/403)
-      if (error.response && [401, 403].includes(error.response.status)) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Invalid API Key." });
-      }
-      res.status(500).json({
-        success: false,
-        message: "Connection failed. Check URL and API Key.",
-      });
-    }
-  });
-
-  // Fetch quality profiles
-  app.post("/api/seerr/quality-profiles", authenticateToken, async (req, res) => {
-    const { url, apiKey } = req.body;
-    const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
-    if (!url || !effectiveApiKey) {
-      return res
-        .status(400)
-        .json({ success: false, message: "URL and API Key are required." });
-    }
-
-    try {
-      let baseUrl = url.replace(/\/$/, "");
-      if (!baseUrl.endsWith("/api/v1")) {
-        baseUrl += "/api/v1";
-      }
-
-      const profiles = await seerrApi.fetchQualityProfiles(baseUrl, effectiveApiKey);
-      res.json({ success: true, profiles });
-    } catch (error) {
-      logger.error("Failed to fetch quality profiles:", error.message);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch quality profiles.",
-      });
-    }
-  });
-
-  // Fetch servers
-  app.post("/api/seerr/servers", authenticateToken, async (req, res) => {
-    const { url, apiKey } = req.body;
-    const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
-    if (!url || !effectiveApiKey) {
-      return res
-        .status(400)
-        .json({ success: false, message: "URL and API Key are required." });
-    }
-
-    try {
-      let baseUrl = url.replace(/\/$/, "");
-      if (!baseUrl.endsWith("/api/v1")) {
-        baseUrl += "/api/v1";
-      }
-
-      const servers = await seerrApi.fetchServers(baseUrl, effectiveApiKey);
-      res.json({ success: true, servers });
-    } catch (error) {
-      logger.error("Failed to fetch servers:", error.message);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch servers.",
-      });
-    }
-  });
-
-  app.post("/api/test-jellyfin", authenticateToken, async (req, res) => {
-    const { url } = req.body;
-    if (!url) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Jellyfin URL is required." });
-    }
-
-    try {
-      const testUrl = `${url.replace(/\/$/, "")}/System/Info/Public`;
-      const response = await axios.get(testUrl, {
-        timeout: TIMEOUTS.JELLYFIN_API,
-      });
-
-      if (response.data?.ServerName && response.data?.Version) {
-        return res.json({
-          success: true,
-          message: `Connected to ${response.data.ServerName} (v${response.data.Version})`,
-          serverId: response.data.Id,
-        });
-      }
-      throw new Error("Invalid response from Jellyfin server.");
-    } catch (error) {
-      logger.error("Jellyfin test failed:", error.message);
-      res.status(500).json({
-        success: false,
-        message: "Connection failed. Check URL and network.",
-      });
-    }
-  });
-
-  app.get("/api/jellyfin/libraries", authenticateToken, async (req, res) => {
-    try {
-      const apiKey = process.env.JELLYFIN_API_KEY;
-      const baseUrl = process.env.JELLYFIN_URL;
-
-      if (!apiKey || !baseUrl) {
-        return res.status(400).json({
-          success: false,
-          message: "Jellyfin API key and URL are required in configuration.",
-        });
-      }
-
-      // Import fetchLibraries dynamically
-      const { fetchLibraries } = await import("./api/jellyfin.js");
-      const libraries = await fetchLibraries(apiKey, baseUrl);
-
-      res.json({
-        success: true,
-        libraries: libraries.map((lib) => ({
-          id: lib.ItemId,
-          collectionId: lib.CollectionId,
-          name: lib.Name,
-          type: lib.CollectionType,
-        })),
-      });
-    } catch (error) {
-      logger.error("Failed to fetch Jellyfin libraries:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch libraries. Check Jellyfin configuration.",
-      });
-    }
   });
 
   // Test notification endpoint - sends sample notifications with random data
@@ -3435,7 +790,7 @@ function configureWebServer() {
       }
 
       // Check if Discord bot is running and configured
-      if (!discordClient || !discordClient.isReady()) {
+      if (!botState.discordClient || !botState.discordClient.isReady()) {
         return res.status(400).json({
           success: false,
           message: "Discord bot is not running. Please start the bot first.",
@@ -3454,7 +809,6 @@ function configureWebServer() {
 
       // Fetch real data from TMDB/OMDB for realistic test notifications
       const { tmdbGetDetails, tmdbGetExternalImdb } = await import("./api/tmdb.js");
-      const { fetchOMDbData } = await import("./api/omdb.js");
 
       const TMDB_API_KEY = process.env.TMDB_API_KEY;
       if (!TMDB_API_KEY) {
@@ -3582,8 +936,8 @@ function configureWebServer() {
         const fakeReq1 = { body: season1Data };
         const fakeReq2 = { body: season2Data };
 
-        await handleJellyfinWebhook(fakeReq1, null, discordClient, pendingRequests, savePendingRequests);
-        await handleJellyfinWebhook(fakeReq2, null, discordClient, pendingRequests, savePendingRequests);
+        await handleJellyfinWebhook(fakeReq1, null, botState.discordClient, pendingRequests, savePendingRequests);
+        await handleJellyfinWebhook(fakeReq2, null, botState.discordClient, pendingRequests, savePendingRequests);
 
         return res.json({
           success: true,
@@ -3625,7 +979,7 @@ function configureWebServer() {
           };
 
           const fakeReq = { body: episodeData };
-          await handleJellyfinWebhook(fakeReq, null, discordClient, pendingRequests, savePendingRequests);
+          await handleJellyfinWebhook(fakeReq, null, botState.discordClient, pendingRequests, savePendingRequests);
           // Small delay between episodes to simulate realistic webhook timing
           await new Promise(resolve => setTimeout(resolve, 50));
         }
@@ -3645,7 +999,7 @@ function configureWebServer() {
       };
 
       // Send the test notification (pass null for res since we don't need response handling)
-      await handleJellyfinWebhook(fakeReq, null, discordClient, pendingRequests, savePendingRequests);
+      await handleJellyfinWebhook(fakeReq, null, botState.discordClient, pendingRequests, savePendingRequests);
 
       res.json({
         success: true,
@@ -3661,10 +1015,10 @@ function configureWebServer() {
   });
 
   // Test random pick endpoint - sends a sample random pick
-  app.post("/api/test-random-pick", authenticateToken, async (req, res) => {
+  app.post("/api/test-random-pick", authenticateToken, async (_req, res) => {
     try {
       // Check if Discord bot is running and configured
-      if (!discordClient || !discordClient.isReady()) {
+      if (!botState.discordClient || !botState.discordClient.isReady()) {
         return res.status(400).json({
           success: false,
           message: "Discord bot is not running. Please start the bot first.",
@@ -3688,7 +1042,7 @@ function configureWebServer() {
       }
 
       // Get random media and send it
-      await sendDailyRandomPick(discordClient);
+      await sendDailyRandomPick(botState.discordClient);
 
       res.json({
         success: true,
@@ -3704,206 +1058,6 @@ function configureWebServer() {
   });
 
   // Health check endpoint for monitoring
-  app.get("/api/health", (req, res) => {
-    const uptime = process.uptime();
-    const cacheStats = cache.getStats();
-
-    res.json({
-      status: "healthy",
-      version: APP_VERSION,
-      uptime: Math.floor(uptime),
-      uptimeFormatted: `${Math.floor(uptime / 3600)}h ${Math.floor(
-        (uptime % 3600) / 60
-      )}m ${Math.floor(uptime % 60)}s`,
-      bot: {
-        running: isBotRunning,
-        username:
-          isBotRunning && discordClient?.user ? discordClient.user.tag : null,
-        connected: discordClient?.ws?.status === 0, // 0 = READY
-      },
-      cache: {
-        hits: cacheStats.hits,
-        misses: cacheStats.misses,
-        keys: cacheStats.keys,
-        hitRate:
-          cacheStats.hits + cacheStats.misses > 0
-            ? (
-              (cacheStats.hits / (cacheStats.hits + cacheStats.misses)) *
-              100
-            ).toFixed(2) + "%"
-            : "0%",
-      },
-      memory: {
-        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",
-        total:
-          Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + " MB",
-      },
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  // Parse log file and return formatted entries
-  function parseLogFile(filePath, limit = 1000) {
-    try {
-      if (!fs.existsSync(filePath)) {
-        return { entries: [], truncated: false };
-      }
-      const content = fs.readFileSync(filePath, "utf-8");
-      const lines = content.split("\n").filter((line) => line.trim());
-
-      // Keep only the last 'limit' entries
-      const truncated = lines.length > limit;
-      const relevantLines = lines.slice(-limit);
-
-      const entries = relevantLines.map((line) => {
-        // Parse Winston JSON logs
-        try {
-          const logEntry = JSON.parse(line);
-          return {
-            timestamp: logEntry.timestamp || "N/A",
-            level: logEntry.level || "unknown",
-            message: logEntry.message || "",
-          };
-        } catch {
-          // Fallback for non-JSON lines
-          const match = line.match(
-            /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\w+):\s+(.+)$/
-          );
-          if (match) {
-            return {
-              timestamp: match[1],
-              level: match[2],
-              message: match[3],
-            };
-          }
-          return {
-            timestamp: "N/A",
-            level: "unknown",
-            message: line,
-          };
-        }
-      });
-
-      return { entries, truncated };
-    } catch (error) {
-      logger.error("Error parsing log file:", error);
-      return { entries: [], truncated: false };
-    }
-  }
-
-  // API endpoint for error logs
-  app.get("/api/logs/error", authenticateToken, (req, res) => {
-    const logsDir = path.join(process.cwd(), "logs");
-    // Find the current error log file (error-YYYY-MM-DD.log)
-    let errorLogPath = path.join(logsDir, "error.log");
-
-    // Try to find the latest rotated error log file
-    try {
-      const files = fs.readdirSync(logsDir);
-      const errorFiles = files.filter(
-        (f) => f.startsWith("error-") && f.endsWith(".log")
-      );
-      if (errorFiles.length > 0) {
-        errorFiles.sort().reverse();
-        errorLogPath = path.join(logsDir, errorFiles[0]);
-      }
-    } catch (e) {
-      // Fallback to default path
-    }
-
-    const { entries, truncated } = parseLogFile(errorLogPath);
-    res.json({
-      file: path.basename(errorLogPath),
-      count: entries.length,
-      total: truncated ? "1000+" : entries.length,
-      truncated,
-      entries,
-    });
-  });
-
-  // API endpoint for all logs
-  app.get("/api/logs/all", authenticateToken, (req, res) => {
-    const logsDir = path.join(process.cwd(), "logs");
-    // Find the current combined log file (combined-YYYY-MM-DD.log)
-    let combinedLogPath = path.join(logsDir, "combined.log");
-
-    // Try to find the latest rotated combined log file
-    try {
-      const files = fs.readdirSync(logsDir);
-      const combinedFiles = files.filter(
-        (f) => f.startsWith("combined-") && f.endsWith(".log")
-      );
-      if (combinedFiles.length > 0) {
-        combinedFiles.sort().reverse();
-        combinedLogPath = path.join(logsDir, combinedFiles[0]);
-      }
-    } catch (e) {
-      // Fallback to default path
-    }
-
-    const { entries, truncated } = parseLogFile(combinedLogPath);
-    res.json({
-      file: path.basename(combinedLogPath),
-      count: entries.length,
-      total: truncated ? "1000+" : entries.length,
-      truncated,
-      entries,
-    });
-  });
-
-  app.get("/api/status", authenticateToken, (req, res) => {
-    res.json({
-      isBotRunning,
-      botUsername:
-        isBotRunning && discordClient?.user ? discordClient.user.tag : null,
-    });
-  });
-
-  app.post("/api/start-bot", authenticateToken, async (req, res) => {
-    if (isBotRunning) {
-      return res.status(400).json({ message: "Bot is already running." });
-    }
-    try {
-      const result = await startBot();
-      res
-        .status(200)
-        .json({ message: `Bot started successfully! ${result.message}` });
-    } catch (error) {
-      res.status(500).json({
-        message: `Failed to start bot: ${error.message}`,
-      });
-    }
-  });
-
-  app.post("/api/stop-bot", authenticateToken, async (req, res) => {
-    if (!isBotRunning || !discordClient) {
-      return res.status(400).json({ message: "Bot is not running." });
-    }
-
-    // Stop Jellyfin notification services
-    try {
-      if (jellyfinWebSocketClient) {
-        jellyfinWebSocketClient.stop();
-        jellyfinWebSocketClient = null;
-        logger.info("Jellyfin WebSocket client stopped");
-      }
-    } catch (error) {
-      logger.error("Error stopping Jellyfin WebSocket client:", error);
-    }
-
-    try {
-      jellyfinPoller.stop();
-      logger.info("Jellyfin poller stopped");
-    } catch (error) {
-      logger.error("Error stopping Jellyfin poller:", error);
-    }
-
-    await discordClient.destroy();
-    isBotRunning = false;
-    discordClient = null;
-    logger.info("Bot has been stopped.");
-    res.status(200).json({ message: "Bot stopped successfully." });
-  });
 }
 
 // --- INITIALIZE AND START SERVER ---
@@ -3959,7 +1113,7 @@ function startServer() {
         (k) => process.env[k] && String(process.env[k]).trim() !== ""
       );
 
-      if (!isBotRunning && hasConfigFile && hasDiscordCreds) {
+      if (!botState.isBotRunning && hasConfigFile && hasDiscordCreds) {
         logger.info(
           "🚀 Detected existing config.json with Discord credentials. Auto-starting bot..."
         );

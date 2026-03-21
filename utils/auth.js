@@ -2,12 +2,8 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import logger from "./logger.js";
-import {
-  readConfig,
-  updateConfig,
-  getUsers,
-  saveUser as saveUserToConfig,
-} from "./configFile.js";
+import { readConfig, updateConfig } from "./configFile.js";
+import { getUsers, saveUser as saveUserToConfig } from "./userStore.js";
 
 const AUTH_TOKEN_EXPIRATION = "7d";
 const AUTH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -136,32 +132,7 @@ function isTokenRevoked(jti) {
   return revokedTokens.has(jti);
 }
 
-// Generate or retrieve WEBHOOK_SECRET
-function getOrGenerateWebhookSecret() {
-  const config = readConfig();
-  if (config?.WEBHOOK_SECRET && config.WEBHOOK_SECRET.trim() !== "") {
-    return config.WEBHOOK_SECRET;
-  }
-
-  if (process.env.WEBHOOK_SECRET) {
-    return process.env.WEBHOOK_SECRET;
-  }
-
-  logger.warn("WEBHOOK_SECRET not found in config. Generating a new secure secret...");
-  const newSecret = crypto.randomBytes(32).toString("hex");
-
-  if (updateConfig({ WEBHOOK_SECRET: newSecret })) {
-    logger.info("✅ WEBHOOK_SECRET generated and saved to config.json successfully");
-    process.env.WEBHOOK_SECRET = newSecret;
-  } else {
-    logger.error("❌ Failed to save WEBHOOK_SECRET to config");
-    logger.warn("⚠️  Using in-memory WEBHOOK_SECRET - it will change on restart");
-  }
-
-  return newSecret;
-}
-
-export const WEBHOOK_SECRET = getOrGenerateWebhookSecret();
+export { WEBHOOK_SECRET } from "./secrets.js";
 
 export const authenticateToken = (req, res, next) => {
   const token = req.cookies.auth_token;

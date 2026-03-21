@@ -6,6 +6,7 @@
 import axios from "axios";
 import logger from "../utils/logger.js";
 import { TIMEOUTS, CACHE_TTL } from "../lib/constants.js";
+import { getSeerrApiUrl } from "../utils/seerrUrl.js";
 
 // Cache for root folders, tags, quality profiles, and servers
 let rootFoldersCache = null;
@@ -24,11 +25,7 @@ let serversCacheTime = 0;
  */
 function normalizeApiUrl(url) {
   if (!url) return url;
-  let normalized = url.replace(/\/$/, "");
-  if (!normalized.endsWith("/api/v1")) {
-    normalized += "/api/v1";
-  }
-  return normalized;
+  return getSeerrApiUrl(url);
 }
 
 /**

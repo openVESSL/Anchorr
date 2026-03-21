@@ -10,15 +10,7 @@ import { minutesToHhMm } from "./utils/time.js";
 import logger from "./utils/logger.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import { findBestBackdrop } from "./api/tmdb.js";
-
-function isValidUrl(string) {
-  try {
-    new URL(string);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
+import { isValidUrl } from "./utils/url.js";
 
 const debouncedSenders = new Map();
 const sentNotifications = new Map();
@@ -155,7 +147,8 @@ async function processAndSendNotification(
   episodeDetails = null,
   seasonCount = 0,
   seasonDetails = null,
-  isTestNotif = false
+  isTestNotif = false,
+  onPendingRequestsChanged = null
 ) {
   const {
     ItemType,
@@ -960,7 +953,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         null,
         0,
         null,
-        isTestMovie
+        isTestMovie,
+        onPendingRequestsChanged
       );
 
       // Mark this movie as notified
@@ -1083,7 +1077,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           null,
           0,
           null,
-          isTestNotification
+          isTestNotification,
+          onPendingRequestsChanged
         );
         if (res)
           return res
@@ -1104,7 +1099,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           null,
           0,
           null,
-          isTestNotification
+          isTestNotification,
+          onPendingRequestsChanged
         );
         if (res)
           return res
@@ -1178,7 +1174,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
                 episodeDetails,
                 seasonCount,
                 seasonDetails,
-                isBatchTestNotif
+                isBatchTestNotif,
+                onPendingRequestsChanged
               );
 
               const levelSent = getItemLevel(latestData.ItemType);
@@ -1464,7 +1461,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       null,
       0,
       null,
-      isUnknownTest
+      isUnknownTest,
+      onPendingRequestsChanged
     );
     if (res) return res.status(200).send("OK: Notification sent.");
   } catch (err) {

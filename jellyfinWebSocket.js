@@ -2,6 +2,13 @@ import WebSocket from "ws";
 import logger from "./utils/logger.js";
 import * as jellyfinApi from "./api/jellyfin.js";
 import { processAndSendNotification } from "./jellyfinWebhook.js";
+import {
+  fetchLibraryMap,
+  resolveConfigLibraryId,
+  getLibraryChannels,
+  resolveTargetChannel,
+  deduplicator,
+} from "./jellyfin/libraryResolver.js";
 
 /**
  * Jellyfin WebSocket Client for real-time notifications
@@ -16,7 +23,6 @@ export class JellyfinWebSocketClient {
     this.maxReconnectAttempts = 0; // Unlimited retries
     this.baseReconnectDelay = 1000; // Start at 1 second
     this.maxReconnectDelay = 60000; // Cap at 60 seconds
-    this.seenItems = new Map(); // Track seen items for deduplication
     this.client = null;
     this.pendingRequests = null;
     this.libraryIdMap = new Map(); // Collection ID → Virtual Folder ID mapping
@@ -75,7 +81,6 @@ export class JellyfinWebSocketClient {
         this.reconnectAttempts = 0;
 
         // Send initial connection message (required by Jellyfin)
-        // This tells Jellyfin what events we want to subscribe to
         const initMessage = {
           MessageType: "SessionsStart",
           Data: "0,1000",
@@ -108,7 +113,6 @@ export class JellyfinWebSocketClient {
           })`
         );
 
-        // Log close codes for debugging
         const closeCodeMap = {
           1000: "Normal closure",
           1001: "Going away",
@@ -149,9 +153,7 @@ export class JellyfinWebSocketClient {
     );
 
     logger.info(
-      `⏳ WebSocket reconnect attempt ${
-        this.reconnectAttempts + 1
-      } in ${delay}ms`
+      `⏳ WebSocket reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`
     );
 
     setTimeout(() => {
@@ -168,22 +170,8 @@ export class JellyfinWebSocketClient {
    */
   async refreshLibraryMappings() {
     try {
-      const apiKey = process.env.JELLYFIN_API_KEY;
-      const baseUrl = process.env.JELLYFIN_BASE_URL;
-
-      const libraries = await jellyfinApi.fetchLibraries(apiKey, baseUrl);
-
-      // Build mapping: Collection ID → Virtual Folder ID
-      this.libraryIdMap.clear();
-      for (const lib of libraries) {
-        if (lib.CollectionId && lib.CollectionId !== lib.ItemId) {
-          this.libraryIdMap.set(lib.CollectionId, lib.ItemId);
-          logger.debug(
-            `📚 Library "${lib.Name}": CollectionId=${lib.CollectionId} → VirtualFolderId=${lib.ItemId}`
-          );
-        }
-      }
-
+      const { libraries, libraryIdMap } = await fetchLibraryMap();
+      this.libraryIdMap = libraryIdMap;
       logger.info(`✅ Cached ${libraries.length} library mappings`);
     } catch (err) {
       logger.warn("Failed to refresh library mappings:", err?.message || err);
@@ -195,17 +183,14 @@ export class JellyfinWebSocketClient {
    */
   async handleMessage(data) {
     try {
-      // Convert Buffer to string if needed
       const messageStr = data.toString();
 
-      // Skip empty messages
       if (!messageStr || messageStr.trim() === "") {
         return;
       }
 
       const message = JSON.parse(messageStr);
 
-      // Log ALL messages for debugging (except KeepAlive)
       if (message.MessageType !== "KeepAlive") {
         logger.info(`📡 WebSocket message: ${message.MessageType}`);
         if (message.Data) {
@@ -216,7 +201,6 @@ export class JellyfinWebSocketClient {
           logger.debug(`   Data: ${dataPreview}`);
         }
       } else {
-        // Log KeepAlive occasionally (every 100 messages)
         if (!this.keepAliveCount) this.keepAliveCount = 0;
         this.keepAliveCount++;
         if (this.keepAliveCount % 100 === 0) {
@@ -229,10 +213,7 @@ export class JellyfinWebSocketClient {
       } else if (message.MessageType === "KeepAlive") {
         // Ignore keepalive messages silently
       } else {
-        // Log other message types for debugging
-        logger.debug(
-          `Unhandled WebSocket message type: ${message.MessageType}`
-        );
+        logger.debug(`Unhandled WebSocket message type: ${message.MessageType}`);
       }
     } catch (err) {
       logger.warn("Failed to parse WebSocket message:", err?.message || err);
@@ -261,22 +242,9 @@ export class JellyfinWebSocketClient {
       const apiKey = process.env.JELLYFIN_API_KEY;
       const baseUrl = process.env.JELLYFIN_BASE_URL;
       const serverId = process.env.JELLYFIN_SERVER_ID;
+      const libraryChannels = getLibraryChannels();
       const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID;
 
-      // Get library channel mappings
-      let libraryChannels = {};
-      try {
-        const libConfig = process.env.JELLYFIN_NOTIFICATION_LIBRARIES;
-        if (libConfig && typeof libConfig === "string") {
-          libraryChannels = JSON.parse(libConfig);
-        } else if (libConfig && typeof libConfig === "object") {
-          libraryChannels = libConfig;
-        }
-      } catch (e) {
-        logger.warn("Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES:", e);
-      }
-
-      // Process each newly added item
       for (const itemId of itemsAdded) {
         try {
           await this.processNewItem(
@@ -293,10 +261,7 @@ export class JellyfinWebSocketClient {
         }
       }
     } catch (err) {
-      logger.error(
-        "Failed to handle LibraryChanged event:",
-        err?.message || err
-      );
+      logger.error("Failed to handle LibraryChanged event:", err?.message || err);
     }
   }
 
@@ -312,26 +277,19 @@ export class JellyfinWebSocketClient {
     libraryChannels,
     defaultChannelId
   ) {
-    // Deduplication: check if we've seen this item recently (within 24 hours)
-    const now = Date.now();
-    const lastSeen = this.seenItems.get(itemId);
-    const SEEN_THRESHOLD = 24 * 60 * 60 * 1000; // 24 hours
-
-    if (lastSeen && now - lastSeen < SEEN_THRESHOLD) {
+    // Deduplication
+    if (deduplicator.checkAndRecord(itemId)) {
+      const lastSeen = deduplicator.seenItems.get(itemId);
       logger.info(
         `⏭️ Skipping item ${itemId} - already notified recently (${Math.round(
-          (now - lastSeen) / 60000
+          (Date.now() - lastSeen) / 60000
         )} minutes ago)`
       );
       return;
     }
 
-    // Mark as seen
-    this.seenItems.set(itemId, now);
-
     logger.info(`🔍 Processing newly added item: ${itemId}`);
 
-    // Fetch item details
     const item = await jellyfinApi.fetchItemDetails(itemId, apiKey, baseUrl);
     if (!item) {
       logger.warn(`Failed to fetch details for item ${itemId}`);
@@ -339,74 +297,35 @@ export class JellyfinWebSocketClient {
     }
 
     const itemType = item.Type || "Unknown";
-    logger.info(
-      `📺 Item: "${item.Name}" (${itemType}) - ParentId: ${item.ParentId}`
-    );
+    logger.info(`📺 Item: "${item.Name}" (${itemType}) - ParentId: ${item.ParentId}`);
 
-    // Determine library ID
+    // Determine library ID — prefer CollectionFolders from the event payload
     let libraryId = null;
-
-    // Try to use CollectionFolders from LibraryChanged message first
-    if (
-      libraryUpdate.CollectionFolders &&
-      libraryUpdate.CollectionFolders.length > 0
-    ) {
+    if (libraryUpdate.CollectionFolders && libraryUpdate.CollectionFolders.length > 0) {
       libraryId = libraryUpdate.CollectionFolders[0];
       logger.info(`✅ Library ID from CollectionFolders: ${libraryId}`);
-    }
-    // Fallback to item's ParentIds if available
-    else if (item.ParentIds && item.ParentIds.length > 0) {
+    } else if (item.ParentIds && item.ParentIds.length > 0) {
       libraryId = item.ParentIds[0];
       logger.info(`✅ Library ID from item ParentIds: ${libraryId}`);
-    }
-    // Last resort: use ParentId directly
-    else if (item.ParentId) {
+    } else if (item.ParentId) {
       libraryId = item.ParentId;
       logger.info(`✅ Library ID from item ParentId: ${libraryId}`);
     }
 
     if (!libraryId) {
-      logger.warn(
-        `❌ Could not determine library ID for item ${itemId} - skipping notification`
-      );
+      logger.warn(`❌ Could not determine library ID for item ${itemId} - skipping notification`);
       return;
     }
 
-    // Map Collection ID to Virtual Folder ID if needed
-    let configLibraryId = libraryId;
-    if (this.libraryIdMap.has(libraryId)) {
-      configLibraryId = this.libraryIdMap.get(libraryId);
-      logger.info(
-        `🔄 Mapped Collection ID ${libraryId} → Virtual Folder ID ${configLibraryId}`
-      );
-    }
+    const configLibraryId = resolveConfigLibraryId(libraryId, this.libraryIdMap);
+    const targetChannelId = resolveTargetChannel(configLibraryId, libraryChannels);
 
-    // Check if this library is enabled for notifications
-    if (
-      Object.keys(libraryChannels).length > 0 &&
-      !libraryChannels[configLibraryId]
-    ) {
-      logger.info(
-        `❌ Skipping item from library ${configLibraryId} (not in notification list)`
-      );
-      logger.info(
-        `   Available libraries: ${Object.keys(libraryChannels).join(", ")}`
-      );
-      return;
-    }
+    if (!targetChannelId) return;
 
-    // Determine target channel
-    const targetChannelId =
-      libraryChannels[configLibraryId] || defaultChannelId;
     logger.info(`✅ Will send to channel: ${targetChannelId}`);
 
-    // Transform to webhook format and send notification
     try {
-      const webhookData = jellyfinApi.transformToWebhookFormat(
-        item,
-        baseUrl,
-        serverId
-      );
+      const webhookData = jellyfinApi.transformToWebhookFormat(item, baseUrl, serverId);
 
       await processAndSendNotification(
         webhookData,
@@ -417,10 +336,7 @@ export class JellyfinWebSocketClient {
 
       logger.info(`📤 Notification sent for "${item.Name}"`);
     } catch (err) {
-      logger.error(
-        `Failed to send notification for item ${itemId}:`,
-        err?.message || err
-      );
+      logger.error(`Failed to send notification for item ${itemId}:`, err?.message || err);
     }
   }
 

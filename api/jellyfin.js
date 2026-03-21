@@ -83,7 +83,7 @@ export async function fetchLibraries(apiKey, baseUrl) {
       "Failed to fetch libraries from Jellyfin:",
       err?.message || err
     );
-    return [];
+    throw err;
   }
 }
 
