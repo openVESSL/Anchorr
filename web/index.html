@@ -676,6 +676,42 @@
                         </div>
                       </div>
 
+                      <!-- Jellyseerr Webhook Section -->
+                      <div class="webhook-box" style="margin-top: 2rem;">
+                        <h3 class="webhook-title">Jellyseerr Webhook <span style="font-size: 0.75rem; font-weight: 500; color: var(--subtext0); margin-left: 0.5rem;">(alternative)</span></h3>
+                        <div class="webhook-content">
+                          <p>
+                            Instead of (or alongside) the Jellyfin webhook plugin, you can use <strong class="emphasis-mauve">Jellyseerr's built-in webhook</strong> to notify Anchorr when media becomes available. This requires less Jellyfin-side configuration.
+                          </p>
+
+                          <div class="form-check form-switch" style="margin: 1rem 0; padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                            <input class="form-check-input" type="checkbox" id="SEERR_WEBHOOK_ENABLED" name="SEERR_WEBHOOK_ENABLED">
+                            <label class="form-check-label" for="SEERR_WEBHOOK_ENABLED" style="margin-left: 0.5rem;">
+                              <strong>Enable Jellyseerr Webhook</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Activate the <code>/seerr-webhook</code> endpoint</div>
+                            </label>
+                          </div>
+
+                          <div id="seerr-webhook-details" style="display: none;">
+                            <p style="margin-top: 1rem;">Add this URL in <strong class="emphasis-mauve">Jellyseerr → Settings → Notifications → Webhook</strong>:</p>
+                            <div class="webhook-url-container">
+                              <code id="seerr-webhook-url" class="code-block"></code>
+                              <button type="button" id="copy-seerr-webhook-btn" class="btn btn-secondary">Copy URL</button>
+                            </div>
+
+                            <p style="margin-top: 1.25rem;">
+                              Set the <strong class="emphasis-mauve">Authorization Header</strong> to your <strong class="emphasis-mauve">Webhook Secret</strong> (same one shown in the Jellyfin section above). In Jellyseerr this field is called <code>Authorization Header</code>.
+                            </p>
+
+                            <div class="form-text" style="margin: 1rem 0; padding: 0.6rem 0.9rem; background-color: var(--surface0); border-left: 3px solid var(--blue); border-radius: 4px;">
+                              <i class="bi bi-info-circle" style="color: var(--blue);"></i>
+                              Enable <strong>MEDIA_AVAILABLE</strong> as the notification type in Jellyseerr. Other notification types (requests, approvals, etc.) are ignored by Anchorr.
+                            </div>
+
+                          </div>
+                        </div>
+                      </div>
+
                       <!-- Embed Customization Section -->
                       <div class="form-group" style="margin-top: 2rem;">
                         <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">

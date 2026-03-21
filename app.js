@@ -6,6 +6,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import { handleJellyfinWebhook } from "./jellyfinWebhook.js";
+import { handleSeerrWebhook } from "./seerrWebhook.js";
 import { configTemplate } from "./lib/config.js";
 import { sendDailyRandomPick } from "./bot/dailyPick.js";
 
@@ -620,6 +621,43 @@ function configureWebServer() {
     } catch (error) {
       logger.error(`❌ Error processing Jellyfin webhook (ItemType: ${req.body?.ItemType}, Name: ${req.body?.Name}):`, error);
       // Don't send error response since we already sent 200
+    }
+  });
+
+  // --- JELLYSEERR WEBHOOK ENDPOINT ---
+  app.post("/seerr-webhook", webhookLimiter, express.json({ type: "*/*" }), async (req, res) => {
+    if (process.env.SEERR_WEBHOOK_ENABLED !== "true") {
+      return res.status(404).send("Not found");
+    }
+
+    // Secret check via Authorization header — same WEBHOOK_SECRET as the Jellyfin endpoint
+    const provided = req.headers["authorization"] || "";
+    const expected = WEBHOOK_SECRET;
+    const providedBuf = Buffer.from(provided, "utf8");
+    const expectedBuf = Buffer.from(expected, "utf8");
+    const valid =
+      providedBuf.length === expectedBuf.length &&
+      crypto.timingSafeEqual(providedBuf, expectedBuf);
+    if (!valid) {
+      logger.warn(`⚠️ Seerr webhook rejected: invalid or missing Authorization header (from ${req.ip})`);
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    if (!req.body || !req.body.notification_type) {
+      return res.status(400).json({ success: false, error: "Invalid payload" });
+    }
+
+    logger.info(`📥 Received Jellyseerr webhook: ${req.body.notification_type}`);
+    res.status(200).json({ success: true, message: "Webhook received" });
+
+    if (botState.discordClient && botState.isBotRunning) {
+      try {
+        await handleSeerrWebhook(req.body, botState.discordClient, pendingRequests, savePendingRequests);
+      } catch (err) {
+        logger.error(`❌ Error processing Jellyseerr webhook:`, err);
+      }
+    } else {
+      logger.warn(`⚠️ Jellyseerr webhook received but Discord bot is not running — notification dropped`);
     }
   });
 

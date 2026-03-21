@@ -39,6 +39,7 @@ export const configSchema = Joi.object({
   NOTIFY_ON_AVAILABLE: Joi.string().valid("true", "false").optional(),
   PRIVATE_MESSAGE_MODE: Joi.string().valid("true", "false").optional(),
   SEERR_AUTO_APPROVE: Joi.string().valid("true", "false").optional(),
+  SEERR_WEBHOOK_ENABLED: Joi.string().valid("true", "false").optional(),
   DEBUG: Joi.string().valid("true", "false").optional(),
   USER_MAPPINGS: Joi.array().items(Joi.object()).optional(),
   USER_MAPPING_METADATA: Joi.object().optional(),
