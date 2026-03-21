@@ -356,6 +356,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // This works well for localhost and for accessing via a local network IP.
     const host = window.location.hostname;
     webhookUrlElement.textContent = `http://${host}:${actualPort}/jellyfin-webhook`;
+    const seerrUrlEl = document.getElementById("seerr-webhook-url");
+    if (seerrUrlEl) seerrUrlEl.textContent = `http://${host}:${actualPort}/seerr-webhook`;
   }
 
   // --- Auth Logic ---
@@ -912,6 +914,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       fallbackCopyTextToClipboard(textToCopy);
     }
   });
+
+  // Jellyseerr webhook toggle
+  const seerrWebhookToggle = document.getElementById("SEERR_WEBHOOK_ENABLED");
+  const seerrWebhookDetails = document.getElementById("seerr-webhook-details");
+  if (seerrWebhookToggle && seerrWebhookDetails) {
+    seerrWebhookToggle.addEventListener("change", () => {
+      seerrWebhookDetails.style.display = seerrWebhookToggle.checked ? "block" : "none";
+    });
+  }
+
+  // Copy Jellyseerr webhook URL
+  const copySeerrWebhookBtn = document.getElementById("copy-seerr-webhook-btn");
+  if (copySeerrWebhookBtn) {
+    copySeerrWebhookBtn.addEventListener("click", () => {
+      const textToCopy = document.getElementById("seerr-webhook-url")?.textContent || "";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy)
+          .then(() => showToast("Seerr webhook URL copied to clipboard!"))
+          .catch(() => fallbackCopyTextToClipboard(textToCopy));
+      } else {
+        fallbackCopyTextToClipboard(textToCopy);
+      }
+    });
+  }
 
   // Copy webhook URL
   copyWebhookBtn.addEventListener("click", () => {
@@ -1679,7 +1705,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const episodeChannelSelect = document.getElementById("JELLYFIN_EPISODE_CHANNEL_ID");
     const seasonChannelSelect = document.getElementById("JELLYFIN_SEASON_CHANNEL_ID");
     const dailyRandomPickChannelSelect = document.getElementById("DAILY_RANDOM_PICK_CHANNEL_ID");
-
     if (!guildId) {
       if (channelSelect) {
         channelSelect.innerHTML =
@@ -1802,6 +1827,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             dailyRandomPickChannelSelect.value = currentValue;
           }
         }
+
       } else {
         if (channelSelect) {
           channelSelect.innerHTML =

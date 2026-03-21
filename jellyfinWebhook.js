@@ -428,8 +428,13 @@ async function processAndSendNotification(
   embed.setColor(embedColor);
 
   // Add fields based on ItemType
-  if (ItemType === "Episode" || ItemType === "Season") {
-    // Episodes and Seasons: No fields, just title and optional list below
+  if (ItemType === "Episode" && episodeCount <= 1) {
+    // Single episode: show overview
+    if (showOverview && overviewText) {
+      embed.addFields({ name: "Episode Summary", value: overviewText });
+    }
+  } else if (ItemType === "Season") {
+    // Seasons: no fields
   } else {
     // Movies and Series: Summary, Genre, Runtime, Rating
     const fields = [];
@@ -519,6 +524,12 @@ async function processAndSendNotification(
   
   if (showBackdrop && isValidUrl(backdrop)) {
     embed.setImage(backdrop);
+  }
+
+  // Series poster thumbnail for single episode notifications
+  if (ItemType === "Episode" && episodeCount <= 1 && details?.poster_path) {
+    const posterUrl = `https://image.tmdb.org/t/p/w500${details.poster_path}`;
+    if (isValidUrl(posterUrl)) embed.setThumbnail(posterUrl);
   }
 
   const buttonComponents = [];
