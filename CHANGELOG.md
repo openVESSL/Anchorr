@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔒 Security
+
+- **Web dashboard binds to localhost by default**: Bare-metal installations no longer expose port 8282 on all network interfaces. The server now binds to `127.0.0.1` unless `BIND_HOST` is set. Docker Compose sets `BIND_HOST=0.0.0.0` automatically so container port mapping continues to work. Users running bare-metal who need external access should use a reverse proxy
+
 ### 🐛 Fixed
 
 - **Jellyseerr webhook channel routing**: Notifications now respect Library Channel Mapping (`JELLYFIN_NOTIFICATION_LIBRARIES`). Previously the Seerr webhook always sent to `JELLYFIN_CHANNEL_ID`; it now resolves the correct channel by matching the Jellyfin library `CollectionType` to the media type (movie / TV). Falls back to `JELLYFIN_CHANNEL_ID` if no match is found or libraries are not configured
