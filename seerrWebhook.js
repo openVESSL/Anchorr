@@ -45,8 +45,12 @@ async function resolveChannelForMediaType(mediaType) {
   const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID || null;
   const libraryChannels = getLibraryChannels();
 
-  if (!Object.keys(libraryChannels).length) return defaultChannelId;
+  if (!Object.keys(libraryChannels).length) {
+    logger.info(`[SEERR WEBHOOK] No library channel mapping configured, using default channel`);
+    return defaultChannelId;
+  }
 
+  logger.info(`[SEERR WEBHOOK] Library channels configured: ${JSON.stringify(libraryChannels)}`);
   const apiKey = process.env.JELLYFIN_API_KEY;
   const baseUrl = process.env.JELLYFIN_BASE_URL;
   if (!apiKey || !baseUrl) {
@@ -70,14 +74,15 @@ async function resolveChannelForMediaType(mediaType) {
   }
 
   const targetType = mediaType === "movie" ? "movies" : "tvshows";
+  logger.info(`[SEERR WEBHOOK] Looking for library with CollectionType="${targetType}" among: ${libraries.map(l => `${l.Name}(${l.CollectionType},id=${l.ItemId})`).join(", ")}`);
   for (const lib of libraries) {
     if (lib.CollectionType === targetType && libraryChannels[lib.ItemId]) {
-      logger.debug(`[SEERR WEBHOOK] Resolved channel via library mapping: ${lib.Name} → ${libraryChannels[lib.ItemId]}`);
+      logger.info(`[SEERR WEBHOOK] Resolved channel via library mapping: ${lib.Name} → ${libraryChannels[lib.ItemId]}`);
       return libraryChannels[lib.ItemId];
     }
   }
 
-  logger.debug(`[SEERR WEBHOOK] No library channel match found for type "${targetType}", falling back to default channel`);
+  logger.info(`[SEERR WEBHOOK] No library channel match found for type "${targetType}", falling back to default channel (${defaultChannelId})`);
   return defaultChannelId;
 }
 
