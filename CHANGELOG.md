@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### 🐛 Fixed
+
+- **Jellyseerr webhook channel routing**: Notifications now respect Library Channel Mapping (`JELLYFIN_NOTIFICATION_LIBRARIES`). Previously the Seerr webhook always sent to `JELLYFIN_CHANNEL_ID`; it now resolves the correct channel by matching the Jellyfin library `CollectionType` to the media type (movie / TV). Falls back to `JELLYFIN_CHANNEL_ID` if no match is found or libraries are not configured
+
+---
+
 ## [1.4.5] - 2026-03-21
 
 ### 🐛 Fixed
