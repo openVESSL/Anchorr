@@ -61,7 +61,7 @@ Anchorr is designed to run **locally on your home network** alongside your Jelly
 If you choose to expose Anchorr to the internet (e.g. via port forwarding or a reverse proxy), be aware of the following risks:
 
 - The **web dashboard** (including configuration and secrets) would be publicly reachable
-- **Authentication** is a simple username/password with no 2FA or brute-force protection
+- **Authentication** is a simple username/password with no 2FA (brute-force lockout is in place, but it is not a substitute for proper access control)
 - **Secrets** (Discord token, API keys, webhook secret) are base64-encoded in `config.json` — note that base64 is not encryption and can be trivially decoded
 - There is **no HTTPS** built in — use a reverse proxy (e.g. Nginx + Let's Encrypt) if you expose it
 
@@ -98,6 +98,8 @@ node app.js
 ```
 
 The web dashboard will be available at `http://localhost:8282`
+
+> **Note:** The server binds to `127.0.0.1` (localhost only) by default. This means the dashboard is only accessible from the machine running Anchorr. If you need to access it from another device on your network, either use a reverse proxy or set `BIND_HOST=0.0.0.0` before starting (e.g. `BIND_HOST=0.0.0.0 node app.js`). Docker deployments handle this automatically.
 
 ### 3️⃣ Configure via Web Dashboard
 
@@ -173,6 +175,7 @@ docker run -d \
   -v ./anchorr-data:/usr/src/app/config \
   -e WEBHOOK_PORT=8282 \
   -e NODE_ENV=production \
+  -e BIND_HOST=0.0.0.0 \
   nairdah/anchorr:latest
 ```
 
@@ -206,6 +209,7 @@ If you use **Docker Desktop** or other GUI tools (Portainer, Unraid, etc.), you 
    - **Environment variables:**
      - `WEBHOOK_PORT=8282`
      - `NODE_ENV=production`
+     - `BIND_HOST=0.0.0.0`
    - **Restart policy:** Unless stopped
 
 ### Using a Different Port
@@ -266,6 +270,7 @@ docker run -d \
   -v ./anchorr-data:/usr/src/app/config \
   -e WEBHOOK_PORT=8282 \
   -e NODE_ENV=production \
+  -e BIND_HOST=0.0.0.0 \
   nairdah/anchorr:latest
 ```
 
