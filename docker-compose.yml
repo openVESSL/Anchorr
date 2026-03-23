@@ -6,6 +6,7 @@ services:
     environment:
       - WEBHOOK_PORT=8282
       - NODE_ENV=production
+      - BIND_HOST=0.0.0.0
     ports:
       - "8282:8282"
     volumes:

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### 🔒 Security
+
+- **Web dashboard binds to localhost by default**: Bare-metal installations no longer expose port 8282 on all network interfaces. The server now binds to `127.0.0.1` unless `BIND_HOST` is set. Docker Compose sets `BIND_HOST=0.0.0.0` automatically so container port mapping continues to work. Users running bare-metal who need external access should use a reverse proxy
+
+---
+
 ## [1.4.5] - 2026-03-21
 
 ### 🐛 Fixed

@@ -30,6 +30,7 @@ export const configSchema = Joi.object({
   JELLYFIN_EPISODE_CHANNEL_ID: Joi.string().allow("").optional(),
   JELLYFIN_SEASON_CHANNEL_ID: Joi.string().allow("").optional(),
   WEBHOOK_PORT: Joi.alternatives(Joi.string(), Joi.number().port()).optional(),
+  BIND_HOST: Joi.string().ip({ version: ["ipv4", "ipv6"] }).optional(),
   WEBHOOK_SECRET: Joi.string().allow("").optional(),
   WEBHOOK_DEBOUNCE_MS: Joi.alternatives(
     Joi.string(),

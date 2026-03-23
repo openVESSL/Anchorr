@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import net from "net";
 import { fileURLToPath } from "url";
 import express from "express";
 import cookieParser from "cookie-parser";
@@ -1078,17 +1079,28 @@ function startServer() {
 
   loadConfig();
   port = process.env.WEBHOOK_PORT || 8282;
-  logger.info(`Attempting to start server on port ${port}...`);
-  server = app.listen(port, "0.0.0.0");
+  // Default to localhost-only for bare-metal safety. Docker sets BIND_HOST=0.0.0.0
+  // so that container port mapping works. Never expose the dashboard externally
+  // without a reverse proxy and authentication. Must be a valid IPv4/IPv6 address.
+  const bindHost = process.env.BIND_HOST || "127.0.0.1";
+  if (net.isIP(bindHost) === 0) {
+    logger.error(
+      `❌ Invalid BIND_HOST value "${bindHost}". Must be a valid IPv4 or IPv6 address (e.g. 127.0.0.1 or 0.0.0.0).`
+    );
+    process.exit(1);
+  }
+  logger.info(`Attempting to start server on port ${port} (${bindHost})...`);
+  server = app.listen(port, bindHost);
 
   server.on("listening", () => {
     const address = server.address();
     if (address) {
-      logger.info(`✅ Anchorr web server is running on port ${address.port}.`);
+      logger.info(`✅ Anchorr web server is running on ${address.address}:${address.port}.`);
       logger.info(`📝 Access it at:`);
       logger.info(`   - Local: http://127.0.0.1:${address.port}`);
-      logger.info(`   - Network: http://<your-server-ip>:${address.port}`);
-      logger.info(`   - Docker: http://<host-ip>:${address.port}`);
+      if (address.address !== "127.0.0.1") {
+        logger.info(`   - Network: http://<your-server-ip>:${address.port}`);
+      }
     }
 
     // Auto-start bot if a valid config.json is present
@@ -1139,6 +1151,10 @@ function startServer() {
     if (err.code === "EADDRINUSE") {
       logger.error(
         `❌ Port ${port} is already in use. Please free the port or change WEBHOOK_PORT.`
+      );
+    } else if (err.code === "EADDRNOTAVAIL") {
+      logger.error(
+        `❌ Cannot bind to address "${bindHost}" (EADDRNOTAVAIL). The address set in BIND_HOST does not exist on this machine. Use 127.0.0.1 (local only) or 0.0.0.0 (all interfaces).`
       );
     } else {
       logger.error("Server error:", err);
