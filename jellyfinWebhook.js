@@ -132,9 +132,9 @@ function cleanTitle(title) {
 
   // Remove metadata patterns like [tvdbid-123], [imdbid-123], (?)
   return title
-    .replace(/\s*\[tvdbid-\d+\]\s*/gi, "")
-    .replace(/\s*\[imdbid-\d+\]\s*/gi, "")
-    .replace(/\s*\(\?\)\s*$/, "")
+    .replace(/\[tvdbid-\d+\]/gi, "")
+    .replace(/\[imdbid-\d+\]/gi, "")
+    .replace(/\(\?\)$/, "")
     .trim();
 }
 

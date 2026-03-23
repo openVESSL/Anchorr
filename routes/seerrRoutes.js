@@ -106,9 +106,9 @@ router.post("/test-seerr", authenticateToken, async (req, res) => {
   }
 
   try {
-    const baseUrl = getSeerrApiUrl(url);
+    const safeBase = new URL(getSeerrApiUrl(url)).href.replace(/\/$/, "");
 
-    const response = await axios.get(`${baseUrl}/settings/about`, {
+    const response = await axios.get(`${safeBase}/settings/about`, {
       headers: { "X-Api-Key": effectiveApiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
@@ -134,9 +134,9 @@ router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
   }
 
   try {
-    const baseUrl = getSeerrApiUrl(url);
+    const safeBase = new URL(getSeerrApiUrl(url)).href.replace(/\/$/, "");
 
-    const profiles = await seerrApi.fetchQualityProfiles(baseUrl, effectiveApiKey);
+    const profiles = await seerrApi.fetchQualityProfiles(safeBase, effectiveApiKey);
     res.json({ success: true, profiles });
   } catch (error) {
     logger.error("Failed to fetch quality profiles:", error.message);
@@ -155,9 +155,9 @@ router.post("/seerr/servers", authenticateToken, async (req, res) => {
   }
 
   try {
-    const baseUrl = getSeerrApiUrl(url);
+    const safeBase = new URL(getSeerrApiUrl(url)).href.replace(/\/$/, "");
 
-    const servers = await seerrApi.fetchServers(baseUrl, effectiveApiKey);
+    const servers = await seerrApi.fetchServers(safeBase, effectiveApiKey);
     res.json({ success: true, servers });
   } catch (error) {
     logger.error("Failed to fetch servers:", error.message);
