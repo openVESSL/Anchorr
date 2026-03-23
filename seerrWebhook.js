@@ -49,7 +49,10 @@ async function resolveChannelForMediaType(mediaType) {
 
   const apiKey = process.env.JELLYFIN_API_KEY;
   const baseUrl = process.env.JELLYFIN_BASE_URL;
-  if (!apiKey || !baseUrl) return defaultChannelId;
+  if (!apiKey || !baseUrl) {
+    logger.warn("[SEERR WEBHOOK] Library channels are configured but JELLYFIN_API_KEY or JELLYFIN_BASE_URL is missing — cannot resolve library-based channel, using default");
+    return defaultChannelId;
+  }
 
   let libraries;
   try {
@@ -110,8 +113,8 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
   if (tmdbId && process.env.TMDB_API_KEY) {
     try {
       details = await tmdbGetDetails(tmdbId, mediaType, process.env.TMDB_API_KEY);
-    } catch (_e) {
-      logger.warn(`[SEERR WEBHOOK] Could not fetch TMDB details for ${tmdbId}`);
+    } catch (err) {
+      logger.warn(`[SEERR WEBHOOK] Could not fetch TMDB details for ${tmdbId}: ${err?.message || err}`);
     }
   }
 

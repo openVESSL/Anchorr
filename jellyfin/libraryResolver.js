@@ -55,7 +55,8 @@ export function getLibraryChannels() {
     if (typeof raw === "object") return raw;
     return JSON.parse(raw);
   } catch (e) {
-    logger.warn("Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES:", e);
+    const preview = typeof raw === "string" ? raw.slice(0, 80) : String(raw);
+    logger.warn(`Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES (value preview: ${preview}): ${e?.message || e}`);
     return {};
   }
 }

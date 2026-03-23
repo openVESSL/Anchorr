@@ -16,7 +16,7 @@ export async function fetchOMDbData(imdbId) {
     });
     return res.data;
   } catch (err) {
-    logger.warn("OMDb fetch failed:", err?.message || err);
+    logger.warn(`OMDb fetch failed for ${imdbId}: ${err?.message || err}`);
     return null;
   }
 }

@@ -204,7 +204,7 @@ export async function findLibraryByAncestors(
             return library.ItemId;
           }
         } catch (err) {
-          // Silent fail for recursive search
+          logger.debug(`Library search: could not check items for ancestor ${ancestor?.Id}: ${err?.message || err}`);
         }
       }
     }
