@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { authenticateToken } from "../utils/auth.js";
 import { botState } from "../bot/botState.js";
 import cache from "../utils/cache.js";
@@ -7,6 +8,14 @@ import logger from "../utils/logger.js";
 const { version: APP_VERSION } = await import("../package.json", { with: { type: "json" } });
 
 const router = Router();
+
+const botControlLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { success: false, error: "Too many requests, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 router.get("/health", (req, res) => {
   const uptime = process.uptime();
@@ -61,7 +70,7 @@ router.get("/status", authenticateToken, (req, res) => {
 
 // Factory so routes can call startBot() and jellyfinPoller.stop() from app.js
 export function createBotRoutes({ startBot, jellyfinPoller }) {
-  router.post("/start-bot", authenticateToken, async (req, res) => {
+  router.post("/start-bot", botControlLimiter, authenticateToken, async (req, res) => {
     if (botState.isBotRunning) {
       return res.status(400).json({ message: "Bot is already running." });
     }
@@ -73,7 +82,7 @@ export function createBotRoutes({ startBot, jellyfinPoller }) {
     }
   });
 
-  router.post("/stop-bot", authenticateToken, async (req, res) => {
+  router.post("/stop-bot", botControlLimiter, authenticateToken, async (req, res) => {
     if (!botState.isBotRunning || !botState.discordClient) {
       return res.status(400).json({ message: "Bot is not running." });
     }

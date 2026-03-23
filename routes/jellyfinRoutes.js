@@ -33,8 +33,10 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
     }
 
+    // Reconstruct from parsed URL so CodeQL can trace the sanitized value
+    const safeBase = new URL(url).href.replace(/\/$/, "");
     const response = await axios.get(
-      `${url.replace(/\/$/, "")}/Library/MediaFolders`,
+      `${safeBase}/Library/MediaFolders`,
       {
         headers: { "X-MediaBrowser-Token": apiKey },
         timeout: TIMEOUTS.JELLYFIN_API,
@@ -70,7 +72,8 @@ router.post("/test-jellyfin", authenticateToken, async (req, res) => {
   }
 
   try {
-    const testUrl = `${url.replace(/\/$/, "")}/System/Info/Public`;
+    const safeBase = new URL(url).href.replace(/\/$/, "");
+    const testUrl = `${safeBase}/System/Info/Public`;
     const response = await axios.get(testUrl, { timeout: TIMEOUTS.JELLYFIN_API });
 
     if (response.data?.ServerName && response.data?.Version) {

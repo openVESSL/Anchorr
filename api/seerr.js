@@ -524,7 +524,6 @@ export async function sendRequest({
 
     logger.info(`[SEERR] 🚀 Sending POST to: ${finalUrl}`);
     logger.info(`[SEERR] 📦 Payload: ${JSON.stringify(payload)}`);
-    logger.debug(`[SEERR] 🔑 Using API Key: ${apiKey ? apiKey.substring(0, 5) + "..." : "MISSING"}`);
 
     // Build headers
     const headers = {

@@ -33,13 +33,28 @@ async function loadTranslations(language) {
 }
 
 function sanitizeTranslationHtml(str) {
-  // Strip script tags, event handlers and javascript: URLs from translation strings.
-  // Translations may contain safe markup (strong, code, a) so we can't use textContent,
-  // but we must prevent injected scripts from executing.
-  return str
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/\son\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "")
-    .replace(/javascript\s*:/gi, "");
+  if (typeof str !== "string") return str;
+  // DOM-based allowlist sanitizer: only permit safe inline elements.
+  // Regex-based HTML stripping is inherently bypass-prone; parsing via the
+  // browser's own HTML parser is the only reliable approach.
+  const div = document.createElement("div");
+  div.innerHTML = str;
+  div.querySelectorAll("*").forEach((el) => {
+    const allowed = ["STRONG", "EM", "CODE", "BR", "A", "B", "I"];
+    if (!allowed.includes(el.tagName)) {
+      el.replaceWith(document.createTextNode(el.textContent));
+      return;
+    }
+    // Strip all attributes; re-allow only safe href on <a>
+    for (const attr of [...el.attributes]) {
+      if (el.tagName === "A" && attr.name === "href") {
+        if (/^javascript:/i.test(attr.value.trim())) el.removeAttribute("href");
+      } else {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+  return div.innerHTML;
 }
 
 function updateUITranslations() {
