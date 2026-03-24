@@ -942,12 +942,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Copy Jellyseerr webhook URL
   const copySeerrWebhookBtn = document.getElementById("copy-seerr-webhook-btn");
   if (copySeerrWebhookBtn) {
-    copySeerrWebhookBtn.addEventListener("click", () => {
+    copySeerrWebhookBtn.addEventListener("click", async () => {
       const textToCopy = document.getElementById("seerr-webhook-url")?.textContent || "";
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(textToCopy)
-          .then(() => showToast("Seerr webhook URL copied to clipboard!"))
-          .catch(() => fallbackCopyTextToClipboard(textToCopy));
+        try {
+          await navigator.clipboard.writeText(textToCopy);
+          showToast("Seerr webhook URL copied to clipboard!");
+        } catch {
+          fallbackCopyTextToClipboard(textToCopy);
+        }
       } else {
         fallbackCopyTextToClipboard(textToCopy);
       }

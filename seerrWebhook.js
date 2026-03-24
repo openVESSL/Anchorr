@@ -138,9 +138,10 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
   const omdb = imdbId ? await fetchOMDbData(imdbId) : null;
 
   // Title and year from TMDB (more reliable than Jellyseerr subject)
-  const title = details
+  const rawTitle = details
     ? (mediaType === "movie" ? details.title : details.name) || subject
     : subject;
+  const title = rawTitle?.slice(0, 250) ?? subject?.slice(0, 250) ?? "";
   const year = details
     ? (mediaType === "movie"
         ? details.release_date?.slice(0, 4)
@@ -164,7 +165,7 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
     || omdb?.Genre
     || "Unknown";
 
-  const overview = message?.trim() || details?.overview || omdb?.Plot || "No description available.";
+  const overview = (message?.trim() || details?.overview || omdb?.Plot || "No description available.").slice(0, 1024);
 
   let headerLine = "Summary";
   if (omdb) {
