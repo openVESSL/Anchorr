@@ -19,9 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub Actions workflow permissions**: `docker-publish.yml` now declares `permissions: contents: read` to follow least-privilege principle
 - **SSRF defence-in-depth on config-test routes**: URLs returned by `getSeerrApiUrl()` are re-parsed through `new URL()` before being passed to axios, making the validation boundary explicit
 
-### 🐛 Fixed
+### 🚀 Added
 
-- **Jellyseerr webhook channel routing**: Notifications now respect Library Channel Mapping (`JELLYFIN_NOTIFICATION_LIBRARIES`). Previously the Seerr webhook always sent to `JELLYFIN_CHANNEL_ID`; it now resolves the correct channel by matching the Jellyfin library `CollectionType` to the media type (movie / TV). Falls back to `JELLYFIN_CHANNEL_ID` if no match is found or libraries are not configured
+- **Seerr webhook support** (ref [#84](../../issues/84)): Anchorr can now receive webhook events directly from Jellyseerr/Overseerr as an alternative to the Jellyfin webhook plugin. When a `MEDIA_AVAILABLE` event fires, Anchorr posts a Discord notification to the correct channel (respecting Library Channel Mapping) and optionally sends a DM to the user who requested the media. Note: Seerr webhooks only fire for movies and full TV show requests — not for individual episodes. For per-episode notifications, continue using the Jellyfin webhook plugin
 
 ---
 
