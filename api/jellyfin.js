@@ -116,6 +116,8 @@ export async function findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl) {
     const status = err?.response?.status;
     if (status === 401 || status === 403) {
       logger.error(`[findItemByTmdbId] Jellyfin rejected request for TMDB ID ${tmdbId} (HTTP ${status}) — check JELLYFIN_API_KEY`);
+    } else if (status >= 500) {
+      logger.error(`[findItemByTmdbId] Jellyfin server error for TMDB ID ${tmdbId} (HTTP ${status}): ${err?.message || err}`);
     } else {
       logger.warn(`[findItemByTmdbId] Could not look up TMDB ID ${tmdbId} in Jellyfin: ${err?.message || err}${err?.code ? ` (${err.code})` : ""}`);
     }

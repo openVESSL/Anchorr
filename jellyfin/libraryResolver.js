@@ -49,11 +49,16 @@ export function resolveConfigLibraryId(libraryId, libraryIdMap) {
  * Returns an object mapping libraryId → channelId, or {} if not configured.
  */
 export function getLibraryChannels() {
+  const raw = process.env.JELLYFIN_NOTIFICATION_LIBRARIES;
   try {
-    const raw = process.env.JELLYFIN_NOTIFICATION_LIBRARIES;
     if (!raw) return {};
-    if (typeof raw === "object") return raw;
-    return JSON.parse(raw);
+    if (typeof raw === "object" && !Array.isArray(raw)) return raw;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      logger.warn(`JELLYFIN_NOTIFICATION_LIBRARIES parsed as an array, expected an object — returning empty mapping`);
+      return {};
+    }
+    return parsed;
   } catch (e) {
     const preview = typeof raw === "string" ? raw.slice(0, 80) : String(raw);
     logger.warn(`Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES (value preview: ${preview}): ${e?.message || e}`);

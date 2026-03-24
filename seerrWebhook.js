@@ -26,6 +26,7 @@ function buildJellyfinSearchUrl(title) {
     u.hash = `!/search?query=${encodeURIComponent(title)}`;
     return u.toString();
   } catch (_e) {
+    logger.warn(`[SEERR WEBHOOK] Could not parse JELLYFIN_BASE_URL as a valid URL, falling back to string concatenation: ${_e?.message || _e}`);
     const baseNoSlash = String(base).replace(/\/+$/, "");
     return `${baseNoSlash}/web/index.html#!/search?query=${encodeURIComponent(title)}`;
   }
@@ -107,7 +108,7 @@ async function resolveChannel(tmdbId, mediaType) {
         logger.warn(`[SEERR WEBHOOK] Library ${libraryItemId} resolved for TMDB ID ${tmdbId} but has no channel mapping — falling back to default channel`);
       }
     } else {
-      logger.info(`[SEERR WEBHOOK] Item with TMDB ID ${tmdbId} not yet found in Jellyfin, falling back to default channel`);
+      logger.info(`[SEERR WEBHOOK] TMDB ID ${tmdbId} not found in Jellyfin — item may not be indexed yet, or a lookup error occurred (see above if any), falling back to default channel`);
     }
   }
 
@@ -153,7 +154,14 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
   }
 
   const imdbId = details?.external_ids?.imdb_id || null;
-  const omdb = imdbId ? await fetchOMDbData(imdbId) : null;
+  let omdb = null;
+  if (imdbId) {
+    try {
+      omdb = await fetchOMDbData(imdbId);
+    } catch (err) {
+      logger.warn(`[SEERR WEBHOOK] Could not fetch OMDb data for IMDb ID ${imdbId}: ${err?.message || err}`);
+    }
+  }
 
   // Title and year from TMDB (more reliable than Jellyseerr subject)
   const rawTitle = details
@@ -275,7 +283,13 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
     : null;
 
   // Channel — prefer library-mapped channel, fall back to JELLYFIN_CHANNEL_ID
-  const channelId = await resolveChannel(tmdbId, mediaType);
+  let channelId;
+  try {
+    channelId = await resolveChannel(tmdbId, mediaType);
+  } catch (err) {
+    logger.error(`[SEERR WEBHOOK] Unexpected error resolving channel for TMDB ID ${tmdbId}: ${err?.message || err}`);
+    channelId = process.env.JELLYFIN_CHANNEL_ID || null;
+  }
   if (!channelId) {
     logger.error("[SEERR WEBHOOK] ❌ No Discord channel configured — set JELLYFIN_CHANNEL_ID or configure library channels");
     return;
