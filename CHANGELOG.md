@@ -23,6 +23,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Seerr webhook support** (ref [#84](../../issues/84)): Anchorr can now receive webhook events directly from Jellyseerr/Overseerr as an alternative to the Jellyfin webhook plugin. When a `MEDIA_AVAILABLE` event fires, Anchorr posts a Discord notification to the correct channel (respecting Library Channel Mapping) and optionally sends a DM to the user who requested the media. Note: Seerr webhooks only fire for movies and full TV show requests — not for individual episodes. For per-episode notifications, continue using the Jellyfin webhook plugin
 
+### ⚠️ Migration Notes
+
+**Docker Compose users — action required if you use a custom `docker-compose.yml`:**
+
+The official `docker-compose.yml` now includes required environment variables. If you are running a custom or manually created Compose file, make sure your `environment:` section contains all three:
+
+```yaml
+environment:
+  - WEBHOOK_PORT=8282
+  - NODE_ENV=production
+  - BIND_HOST=0.0.0.0
+```
+
+`BIND_HOST=0.0.0.0` is required for the container to accept connections from outside. Without it, the dashboard will only be reachable from inside the container itself. If you cloned the repository and use the included `docker-compose.yml`, no action is needed — it is already set correctly.
+
 ---
 
 ## [1.4.5] - 2026-03-21
