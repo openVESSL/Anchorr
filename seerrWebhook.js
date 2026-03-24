@@ -32,8 +32,9 @@ function buildJellyfinSearchUrl(title) {
 }
 
 // Cache resolved library list to avoid N+1 Jellyfin API calls on every webhook
-const libraryResolutionCache = { data: null, timestamp: null };
+const libraryResolutionCache = { data: null, timestamp: null, errorTimestamp: null };
 const LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const LIBRARY_CACHE_ERROR_COOLDOWN_MS = 60 * 1000; // 60 seconds backoff after a failed fetch
 
 /**
  * Resolve the Discord channel ID for a given media item.
@@ -63,12 +64,17 @@ async function resolveChannel(tmdbId, mediaType) {
     const now = Date.now();
     if (libraryResolutionCache.data && now - libraryResolutionCache.timestamp < LIBRARY_CACHE_TTL_MS) {
       libraries = libraryResolutionCache.data;
+    } else if (libraryResolutionCache.errorTimestamp && now - libraryResolutionCache.errorTimestamp < LIBRARY_CACHE_ERROR_COOLDOWN_MS) {
+      logger.info(`[SEERR WEBHOOK] Skipping library fetch — in error cooldown, using default channel`);
+      return defaultChannelId;
     } else {
       libraries = await fetchLibraries(apiKey, baseUrl);
       libraryResolutionCache.data = libraries;
       libraryResolutionCache.timestamp = now;
+      libraryResolutionCache.errorTimestamp = null;
     }
   } catch (e) {
+    libraryResolutionCache.errorTimestamp = Date.now();
     logger.warn(`[SEERR WEBHOOK] Could not fetch Jellyfin libraries, using default: ${e?.message || e}`);
     return defaultChannelId;
   }
@@ -90,7 +96,9 @@ async function resolveChannel(tmdbId, mediaType) {
     if (jellyfinItemId) {
       const itemType = mediaType === "movie" ? "Movie" : "Series";
       const libraryItemId = await findLibraryByAncestors(jellyfinItemId, apiKey, baseUrl, libraryMap, itemType);
-      if (libraryItemId) {
+      if (!libraryItemId) {
+        logger.warn(`[SEERR WEBHOOK] Could not determine library for Jellyfin item ${jellyfinItemId} (TMDB ID ${tmdbId}), falling back to default channel`);
+      } else {
         const channelId = libraryChannels[libraryItemId];
         if (channelId) {
           logger.info(`[SEERR WEBHOOK] Resolved channel via item lookup: Jellyfin item ${jellyfinItemId} → library ${libraryItemId} → channel ${channelId}`);
