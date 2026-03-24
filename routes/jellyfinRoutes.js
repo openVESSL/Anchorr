@@ -3,7 +3,6 @@ import axios from "axios";
 import { authenticateToken } from "../utils/auth.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
-import { libraryCache } from "../jellyfinWebhook.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -36,23 +35,24 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
     // Reconstruct from parsed URL so CodeQL can trace the sanitized value
     const safeBase = new URL(url).href.replace(/\/$/, "");
     const response = await axios.get(
-      `${safeBase}/Library/MediaFolders`,
+      `${safeBase}/Library/VirtualFolders`,
       {
         headers: { "X-MediaBrowser-Token": apiKey },
         timeout: TIMEOUTS.JELLYFIN_API,
       }
     );
 
-    const libraries = response.data.Items.map((item) => ({
-      id: item.Id,
-      name: item.Name,
+    const raw = response.data;
+    if (!Array.isArray(raw)) {
+      logger.error(`[JELLYFIN LIBRARIES API] Unexpected response from /Library/VirtualFolders: expected array, got ${typeof raw}`);
+      return res.status(502).json({ success: false, message: "Jellyfin returned an unexpected response format. Check your API key permissions." });
+    }
+
+    const libraries = raw.map((item) => ({
+      id: item.ItemId ?? null,
+      name: item.Name ?? null,
       type: item.CollectionType || "unknown",
     }));
-
-    if (response.data.Items?.length > 0) {
-      libraryCache.set(response.data.Items);
-      logger.info(`[LIBRARY CACHE] Updated cache with ${response.data.Items.length} libraries`);
-    }
 
     res.json({ success: true, libraries });
   } catch (err) {
@@ -105,6 +105,11 @@ router.get("/jellyfin/libraries", authenticateToken, async (req, res) => {
 
     const { fetchLibraries } = await import("../api/jellyfin.js");
     const libraries = await fetchLibraries(apiKey, baseUrl);
+
+    if (!Array.isArray(libraries)) {
+      logger.error(`[JELLYFIN LIBRARIES] fetchLibraries returned non-array: ${typeof libraries}`);
+      return res.status(502).json({ success: false, message: "Unexpected response from Jellyfin library fetch." });
+    }
 
     res.json({
       success: true,

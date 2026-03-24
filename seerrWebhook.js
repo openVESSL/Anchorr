@@ -73,12 +73,23 @@ async function resolveChannelForMediaType(mediaType) {
     return defaultChannelId;
   }
 
+  if (!Array.isArray(libraries)) {
+    logger.error(`[SEERR WEBHOOK] fetchLibraries returned non-array (${typeof libraries}), falling back to default channel`);
+    return defaultChannelId;
+  }
+
   const targetType = mediaType === "movie" ? "movies" : "tvshows";
-  logger.info(`[SEERR WEBHOOK] Looking for library with CollectionType="${targetType}" among: ${libraries.map(l => `${l.Name}(${l.CollectionType},id=${l.ItemId})`).join(", ")}`);
+  if (mediaType !== "movie" && mediaType !== "tv") {
+    logger.warn(`[SEERR WEBHOOK] Unexpected mediaType "${mediaType}", defaulting targetType to "tvshows"`);
+  }
+  logger.info(`[SEERR WEBHOOK] Looking for library with CollectionType="${targetType}" among: ${libraries.map(l => `${l.Name}(${l.CollectionType},itemId=${l.ItemId},collectionId=${l.CollectionId})`).join(", ")}`);
   for (const lib of libraries) {
-    if (lib.CollectionType === targetType && libraryChannels[lib.ItemId]) {
-      logger.info(`[SEERR WEBHOOK] Resolved channel via library mapping: ${lib.Name} → ${libraryChannels[lib.ItemId]}`);
-      return libraryChannels[lib.ItemId];
+    if (lib.CollectionType === targetType) {
+      const channelId = libraryChannels[lib.ItemId] || libraryChannels[lib.CollectionId];
+      if (channelId) {
+        logger.info(`[SEERR WEBHOOK] Resolved channel via library mapping: ${lib.Name} → ${channelId}`);
+        return channelId;
+      }
     }
   }
 
