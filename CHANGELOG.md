@@ -16,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ReDoS fix in webhook title cleanup**: Regex patterns in `cleanTitle()` with leading `\s*` could cause polynomial backtracking on adversarial input. Whitespace is now trimmed separately
 - **Rate limiting on bot control endpoints**: `/start-bot` and `/stop-bot` are now rate-limited (10 req/min)
 - **Translation sanitizer rewritten**: `sanitizeTranslationHtml()` now uses a DOM-based allowlist parser instead of regex, closing several regex-bypass vectors (nested tags, `</script >` with trailing space, incomplete event-handler stripping)
-- **GitHub Actions workflow permissions**: `docker-publish.yml` now declares explicit top-level `permissions: {}` with job-level `contents: read` to follow least-privilege principle
 - **SSRF defence-in-depth**: All user-supplied and env-var URLs are now constructed via `URL` object pathname manipulation (not string interpolation) before being passed to axios, covering config-test routes and internal API clients (`fetchLibraries`, `fetchRecentlyAdded`, `findItemByTmdbId`, `fetchFromServers`)
 - **Clear-text logging removed**: Request payload was being logged in the Seerr request handler; removed
 - **Rate limiting on auth check endpoint**: `/auth/check` is now rate-limited
