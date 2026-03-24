@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Web dashboard binds to localhost by default**: Bare-metal installations no longer expose port 8282 on all network interfaces. The server now binds to `127.0.0.1` unless `BIND_HOST` is set. Docker Compose sets `BIND_HOST=0.0.0.0` automatically so container port mapping continues to work. Users running bare-metal who need external access should use a reverse proxy
 
+### ⚠️ Migration Notes
+
+**Docker Compose users — action required if you use a custom `docker-compose.yml`:**
+
+The official `docker-compose.yml` now includes required environment variables. If you are running a custom or manually created Compose file, make sure your `environment:` section contains all three:
+
+```yaml
+environment:
+  - WEBHOOK_PORT=8282
+  - NODE_ENV=production
+  - BIND_HOST=0.0.0.0
+```
+
+`BIND_HOST=0.0.0.0` is required for the container to accept connections from outside. Without it, the dashboard will only be reachable from inside the container itself. If you cloned the repository and use the included `docker-compose.yml`, no action is needed — it is already set correctly.
+
 ---
 
 ## [1.4.5] - 2026-03-21
