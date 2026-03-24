@@ -25,18 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⚠️ Migration Notes
 
-**Docker Compose users — action required if you use a custom `docker-compose.yml`:**
-
-The official `docker-compose.yml` now includes required environment variables. If you are running a custom or manually created Compose file, make sure your `environment:` section contains all three:
-
-```yaml
-environment:
-  - WEBHOOK_PORT=8282
-  - NODE_ENV=production
-  - BIND_HOST=0.0.0.0
-```
-
-`BIND_HOST=0.0.0.0` is required for the container to accept connections from outside. Without it, the dashboard will only be reachable from inside the container itself. If you cloned the repository and use the included `docker-compose.yml`, no action is needed — it is already set correctly.
+**Docker Compose users:** Make sure your `environment:` section includes `BIND_HOST=0.0.0.0`. Without it, the dashboard will only be reachable from inside the container. If you use the included `docker-compose.yml`, no action needed.
 
 ---
 
