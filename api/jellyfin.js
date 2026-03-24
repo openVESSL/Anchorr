@@ -113,7 +113,12 @@ export async function findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl) {
     const items = response.data?.Items || [];
     return items.length > 0 ? items[0].Id : null;
   } catch (err) {
-    logger.warn(`Could not find Jellyfin item for TMDB ID ${tmdbId}: ${err?.message || err}`);
+    const status = err?.response?.status;
+    if (status === 401 || status === 403) {
+      logger.error(`[findItemByTmdbId] Jellyfin rejected request for TMDB ID ${tmdbId} (HTTP ${status}) — check JELLYFIN_API_KEY`);
+    } else {
+      logger.warn(`[findItemByTmdbId] Could not look up TMDB ID ${tmdbId} in Jellyfin: ${err?.message || err}`);
+    }
     return null;
   }
 }
@@ -174,7 +179,7 @@ export async function findLibraryByAncestors(
 
     // Check each ancestor to see if it matches a library by ID or Path
     for (const ancestor of ancestors) {
-      for (const [mapKey, library] of libraryMap.entries()) {
+      for (const [_mapKey, library] of libraryMap.entries()) {
         // 1. Check ID match
         if (
           ancestor.Id === library.CollectionId ||
@@ -215,7 +220,7 @@ export async function findLibraryByAncestors(
     for (const ancestor of ancestors) {
       if (ancestor.Type === "AggregateFolder") continue;
 
-      for (const [mapKey, library] of libraryMap.entries()) {
+      for (const [_mapKey, library] of libraryMap.entries()) {
         if (!isTypeMatch(library.CollectionType, itemType)) continue;
 
         try {

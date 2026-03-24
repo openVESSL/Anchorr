@@ -69,7 +69,7 @@ async function resolveChannel(tmdbId, mediaType) {
       libraryResolutionCache.timestamp = now;
     }
   } catch (e) {
-    logger.warn(`[SEERR WEBHOOK] Could not fetch Jellyfin libraries, using default: ${e.message}`);
+    logger.warn(`[SEERR WEBHOOK] Could not fetch Jellyfin libraries, using default: ${e?.message || e}`);
     return defaultChannelId;
   }
 
@@ -96,6 +96,7 @@ async function resolveChannel(tmdbId, mediaType) {
           logger.info(`[SEERR WEBHOOK] Resolved channel via item lookup: Jellyfin item ${jellyfinItemId} → library ${libraryItemId} → channel ${channelId}`);
           return channelId;
         }
+        logger.warn(`[SEERR WEBHOOK] Library ${libraryItemId} resolved for TMDB ID ${tmdbId} but has no channel mapping — falling back to default channel`);
       }
     } else {
       logger.info(`[SEERR WEBHOOK] Item with TMDB ID ${tmdbId} not yet found in Jellyfin, falling back to default channel`);
