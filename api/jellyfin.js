@@ -88,6 +88,37 @@ export async function fetchLibraries(apiKey, baseUrl) {
 }
 
 /**
+ * Find a Jellyfin item by its TMDB provider ID
+ * @param {string} tmdbId - TMDB ID to search for
+ * @param {string} mediaType - "movie" or "tv"
+ * @param {string} apiKey - Jellyfin API key
+ * @param {string} baseUrl - Jellyfin base URL
+ * @returns {Promise<string|null>} Jellyfin item ID or null if not found
+ */
+export async function findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl) {
+  try {
+    const itemType = mediaType === "movie" ? "Movie" : "Series";
+    const url = `${baseUrl.replace(/\/$/, "")}/Items`;
+    const response = await axios.get(url, {
+      headers: { "X-MediaBrowser-Token": apiKey },
+      params: {
+        Recursive: true,
+        AnyProviderIdEquals: `Tmdb.${tmdbId}`,
+        IncludeItemTypes: itemType,
+        Limit: 1,
+        Fields: "ProviderIds",
+      },
+      timeout: 5000,
+    });
+    const items = response.data?.Items || [];
+    return items.length > 0 ? items[0].Id : null;
+  } catch (err) {
+    logger.warn(`Could not find Jellyfin item for TMDB ID ${tmdbId}: ${err?.message || err}`);
+    return null;
+  }
+}
+
+/**
  * Find library for an item by querying Jellyfin's ancestor endpoint
  * This is more reliable than traversing parent chain
  * @param {string} itemId - Item ID to find library for

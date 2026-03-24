@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { tmdbGetDetails, findBestBackdrop } from "./api/tmdb.js";
 import { fetchOMDbData } from "./api/omdb.js";
-import { fetchLibraries } from "./api/jellyfin.js";
+import { fetchLibraries, findItemByTmdbId, findLibraryByAncestors } from "./api/jellyfin.js";
 import { getLibraryChannels } from "./jellyfin/libraryResolver.js";
 import { minutesToHhMm } from "./utils/time.js";
 import { isValidUrl } from "./utils/url.js";
@@ -36,12 +36,13 @@ const libraryResolutionCache = { data: null, timestamp: null };
 const LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
- * Resolve the Discord channel ID for a given media type.
- * Prefers a library-mapped channel (JELLYFIN_NOTIFICATION_LIBRARIES) matched by
- * CollectionType ("movies" / "tvshows"), falling back to JELLYFIN_CHANNEL_ID.
- * Results are cached for 10 minutes to avoid repeated Jellyfin API calls.
+ * Resolve the Discord channel ID for a given media item.
+ * Looks up the item in Jellyfin by TMDB ID, then uses ancestor-based library
+ * detection (same as the Jellyfin webhook) to find the exact library and its
+ * mapped channel. Falls back to JELLYFIN_CHANNEL_ID if the item is not yet
+ * in Jellyfin or no mapping is configured.
  */
-async function resolveChannelForMediaType(mediaType) {
+async function resolveChannel(tmdbId, mediaType) {
   const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID || null;
   const libraryChannels = getLibraryChannels();
 
@@ -50,7 +51,6 @@ async function resolveChannelForMediaType(mediaType) {
     return defaultChannelId;
   }
 
-  logger.info(`[SEERR WEBHOOK] Library channels configured: ${JSON.stringify(libraryChannels)}`);
   const apiKey = process.env.JELLYFIN_API_KEY;
   const baseUrl = process.env.JELLYFIN_BASE_URL;
   if (!apiKey || !baseUrl) {
@@ -69,7 +69,7 @@ async function resolveChannelForMediaType(mediaType) {
       libraryResolutionCache.timestamp = now;
     }
   } catch (e) {
-    logger.warn(`[SEERR WEBHOOK] Could not fetch Jellyfin libraries for channel resolution, using default: ${e.message}`);
+    logger.warn(`[SEERR WEBHOOK] Could not fetch Jellyfin libraries, using default: ${e.message}`);
     return defaultChannelId;
   }
 
@@ -78,22 +78,31 @@ async function resolveChannelForMediaType(mediaType) {
     return defaultChannelId;
   }
 
-  const targetType = mediaType === "movie" ? "movies" : "tvshows";
-  if (mediaType !== "movie" && mediaType !== "tv") {
-    logger.warn(`[SEERR WEBHOOK] Unexpected mediaType "${mediaType}", defaulting targetType to "tvshows"`);
-  }
-  logger.info(`[SEERR WEBHOOK] Looking for library with CollectionType="${targetType}" among: ${libraries.map(l => `${l.Name}(${l.CollectionType},itemId=${l.ItemId},collectionId=${l.CollectionId})`).join(", ")}`);
+  const libraryMap = new Map();
   for (const lib of libraries) {
-    if (lib.CollectionType === targetType) {
-      const channelId = libraryChannels[lib.ItemId] || libraryChannels[lib.CollectionId];
-      if (channelId) {
-        logger.info(`[SEERR WEBHOOK] Resolved channel via library mapping: ${lib.Name} → ${channelId}`);
-        return channelId;
+    libraryMap.set(lib.CollectionId, lib);
+    if (lib.ItemId !== lib.CollectionId) libraryMap.set(lib.ItemId, lib);
+  }
+
+  // Look up the item in Jellyfin by TMDB ID, then find its library via ancestors
+  if (tmdbId) {
+    const jellyfinItemId = await findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl);
+    if (jellyfinItemId) {
+      const itemType = mediaType === "movie" ? "Movie" : "Series";
+      const libraryItemId = await findLibraryByAncestors(jellyfinItemId, apiKey, baseUrl, libraryMap, itemType);
+      if (libraryItemId) {
+        const channelId = libraryChannels[libraryItemId];
+        if (channelId) {
+          logger.info(`[SEERR WEBHOOK] Resolved channel via item lookup: Jellyfin item ${jellyfinItemId} → library ${libraryItemId} → channel ${channelId}`);
+          return channelId;
+        }
       }
+    } else {
+      logger.info(`[SEERR WEBHOOK] Item with TMDB ID ${tmdbId} not yet found in Jellyfin, falling back to default channel`);
     }
   }
 
-  logger.info(`[SEERR WEBHOOK] No library channel match found for type "${targetType}", falling back to default channel (${defaultChannelId})`);
+  logger.info(`[SEERR WEBHOOK] Falling back to default channel (${defaultChannelId})`);
   return defaultChannelId;
 }
 
@@ -257,7 +266,7 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
     : null;
 
   // Channel — prefer library-mapped channel, fall back to JELLYFIN_CHANNEL_ID
-  const channelId = await resolveChannelForMediaType(mediaType);
+  const channelId = await resolveChannel(tmdbId, mediaType);
   if (!channelId) {
     logger.error("[SEERR WEBHOOK] ❌ No Discord channel configured — set JELLYFIN_CHANNEL_ID or configure library channels");
     return;
