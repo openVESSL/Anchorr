@@ -38,12 +38,18 @@ function normalizeApiUrl(url) {
  */
 async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
   const results = [];
-  const apiUrl = normalizeApiUrl(seerrUrl);
+  const safeApiUrl = new URL(normalizeApiUrl(seerrUrl));
+  const basePath = safeApiUrl.pathname.replace(/\/$/, "");
+  const buildUrl = (suffix) => {
+    const u = new URL(safeApiUrl.href);
+    u.pathname = basePath + suffix;
+    return u.href;
+  };
 
   // Fetch from Radarr servers
   try {
     const radarrListResponse = await axios.get(
-      `${apiUrl}/service/radarr`,
+      buildUrl("/service/radarr"),
       {
         headers: { "X-Api-Key": apiKey },
         timeout: TIMEOUTS.SEERR_API,
@@ -53,8 +59,9 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
     for (const server of radarrListResponse.data) {
       try {
         if (fetchDetails) {
+          const serverId = parseInt(server.id, 10);
           const detailsResponse = await axios.get(
-            `${apiUrl}/service/radarr/${server.id}`,
+            buildUrl(`/service/radarr/${serverId}`),
             {
               headers: { "X-Api-Key": apiKey },
               timeout: TIMEOUTS.SEERR_API,
@@ -80,7 +87,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
   // Fetch from Sonarr servers
   try {
     const sonarrListResponse = await axios.get(
-      `${apiUrl}/service/sonarr`,
+      buildUrl("/service/sonarr"),
       {
         headers: { "X-Api-Key": apiKey },
         timeout: TIMEOUTS.SEERR_API,
@@ -90,8 +97,9 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
     for (const server of sonarrListResponse.data) {
       try {
         if (fetchDetails) {
+          const serverId = parseInt(server.id, 10);
           const detailsResponse = await axios.get(
-            `${apiUrl}/service/sonarr/${server.id}`,
+            buildUrl(`/service/sonarr/${serverId}`),
             {
               headers: { "X-Api-Key": apiKey },
               timeout: TIMEOUTS.SEERR_API,
@@ -523,7 +531,6 @@ export async function sendRequest({
     const finalUrl = `${apiUrl}/request`;
 
     logger.info(`[SEERR] 🚀 Sending POST to: ${finalUrl}`);
-    logger.info(`[SEERR] 📦 Payload: ${JSON.stringify(payload)}`);
 
     // Build headers
     const headers = {

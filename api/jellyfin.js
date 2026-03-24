@@ -9,7 +9,10 @@ import logger from "../utils/logger.js";
  */
 export async function fetchLibraries(apiKey, baseUrl) {
   try {
-    const url = `${baseUrl.replace(/\/$/, "")}/Library/VirtualFolders`;
+    const safeBase = new URL(baseUrl);
+    const basePathNoSlash = safeBase.pathname.replace(/\/$/, "");
+    safeBase.pathname = basePathNoSlash + "/Library/VirtualFolders";
+    const url = safeBase.href;
     const response = await axios.get(url, {
       headers: { "X-MediaBrowser-Token": apiKey },
       timeout: 5000,
@@ -25,7 +28,9 @@ export async function fetchLibraries(apiKey, baseUrl) {
     for (const vf of virtualFolders) {
       try {
         // Query the Items endpoint to find the actual library collection
-        const itemsUrl = `${baseUrl.replace(/\/$/, "")}/Items`;
+        const itemsUrlObj = new URL(baseUrl);
+        itemsUrlObj.pathname = basePathNoSlash + "/Items";
+        const itemsUrl = itemsUrlObj.href;
         const itemsResponse = await axios.get(itemsUrl, {
           headers: { "X-MediaBrowser-Token": apiKey },
           params: {
@@ -84,6 +89,46 @@ export async function fetchLibraries(apiKey, baseUrl) {
       err?.message || err
     );
     throw err;
+  }
+}
+
+/**
+ * Find a Jellyfin item by its TMDB provider ID
+ * @param {string} tmdbId - TMDB ID to search for
+ * @param {string} mediaType - "movie" or "tv"
+ * @param {string} apiKey - Jellyfin API key
+ * @param {string} baseUrl - Jellyfin base URL
+ * @returns {Promise<string|null>} Jellyfin item ID or null if not found
+ */
+export async function findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl) {
+  try {
+    const itemType = mediaType === "movie" ? "Movie" : "Series";
+    const safeBase = new URL(baseUrl);
+    safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
+    const url = safeBase.href;
+    const response = await axios.get(url, {
+      headers: { "X-MediaBrowser-Token": apiKey },
+      params: {
+        Recursive: true,
+        AnyProviderIdEquals: `Tmdb.${tmdbId}`,
+        IncludeItemTypes: itemType,
+        Limit: 1,
+        Fields: "ProviderIds",
+      },
+      timeout: 5000,
+    });
+    const items = response.data?.Items || [];
+    return items.length > 0 ? items[0].Id : null;
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 401 || status === 403) {
+      logger.error(`[findItemByTmdbId] Jellyfin rejected request for TMDB ID ${tmdbId} (HTTP ${status}) — check JELLYFIN_API_KEY`);
+    } else if (status >= 500) {
+      logger.error(`[findItemByTmdbId] Jellyfin server error for TMDB ID ${tmdbId} (HTTP ${status}): ${err?.message || err}`);
+    } else {
+      logger.warn(`[findItemByTmdbId] Could not look up TMDB ID ${tmdbId} in Jellyfin: ${err?.message || err}${err?.code ? ` (${err.code})` : ""}`);
+    }
+    return null;
   }
 }
 
@@ -375,7 +420,9 @@ export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50) {
   try {
     // Use /Items endpoint with SortBy=DateCreated for recently added items
     // Note: /Items/Latest requires userId and has compatibility issues with API keys
-    const url = `${baseUrl.replace(/\/$/, "")}/Items`;
+    const safeBase = new URL(baseUrl);
+    safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
+    const url = safeBase.href;
     const response = await axios.get(url, {
       headers: { "X-MediaBrowser-Token": apiKey },
       params: {

@@ -6,6 +6,8 @@ on:
       - main
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   docker:
     runs-on: ubuntu-latest

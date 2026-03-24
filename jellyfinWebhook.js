@@ -246,10 +246,11 @@ async function processAndSendNotification(
       logger.debug(`Using cached TMDB data for ${tmdbId}`);
     } else {
       try {
+        const tmdbIdNum = parseInt(tmdbId, 10);
         const res = await axios.get(
           `https://api.themoviedb.org/3/${
             ItemType === "Movie" ? "movie" : "tv"
-          }/${tmdbId}`,
+          }/${tmdbIdNum}`,
           {
             params: {
               api_key: process.env.TMDB_API_KEY,
