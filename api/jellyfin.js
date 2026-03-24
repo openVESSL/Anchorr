@@ -9,7 +9,10 @@ import logger from "../utils/logger.js";
  */
 export async function fetchLibraries(apiKey, baseUrl) {
   try {
-    const url = `${baseUrl.replace(/\/$/, "")}/Library/VirtualFolders`;
+    const safeBase = new URL(baseUrl);
+    const basePathNoSlash = safeBase.pathname.replace(/\/$/, "");
+    safeBase.pathname = basePathNoSlash + "/Library/VirtualFolders";
+    const url = safeBase.href;
     const response = await axios.get(url, {
       headers: { "X-MediaBrowser-Token": apiKey },
       timeout: 5000,
@@ -25,7 +28,9 @@ export async function fetchLibraries(apiKey, baseUrl) {
     for (const vf of virtualFolders) {
       try {
         // Query the Items endpoint to find the actual library collection
-        const itemsUrl = `${baseUrl.replace(/\/$/, "")}/Items`;
+        const itemsUrlObj = new URL(baseUrl);
+        itemsUrlObj.pathname = basePathNoSlash + "/Items";
+        const itemsUrl = itemsUrlObj.href;
         const itemsResponse = await axios.get(itemsUrl, {
           headers: { "X-MediaBrowser-Token": apiKey },
           params: {
@@ -98,7 +103,9 @@ export async function fetchLibraries(apiKey, baseUrl) {
 export async function findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl) {
   try {
     const itemType = mediaType === "movie" ? "Movie" : "Series";
-    const url = `${baseUrl.replace(/\/$/, "")}/Items`;
+    const safeBase = new URL(baseUrl);
+    safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
+    const url = safeBase.href;
     const response = await axios.get(url, {
       headers: { "X-MediaBrowser-Token": apiKey },
       params: {
@@ -413,7 +420,9 @@ export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50) {
   try {
     // Use /Items endpoint with SortBy=DateCreated for recently added items
     // Note: /Items/Latest requires userId and has compatibility issues with API keys
-    const url = `${baseUrl.replace(/\/$/, "")}/Items`;
+    const safeBase = new URL(baseUrl);
+    safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
+    const url = safeBase.href;
     const response = await axios.get(url, {
       headers: { "X-MediaBrowser-Token": apiKey },
       params: {

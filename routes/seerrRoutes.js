@@ -106,9 +106,10 @@ router.post("/test-seerr", authenticateToken, async (req, res) => {
   }
 
   try {
-    const safeBase = new URL(getSeerrApiUrl(url)).href.replace(/\/$/, "");
+    const safeUrl = new URL(getSeerrApiUrl(url));
+    safeUrl.pathname = safeUrl.pathname.replace(/\/$/, "") + "/settings/about";
 
-    const response = await axios.get(`${safeBase}/settings/about`, {
+    const response = await axios.get(safeUrl.href, {
       headers: { "X-Api-Key": effectiveApiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
