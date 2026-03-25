@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🚀 Added
 
-- **Seerr webhook support** (ref [#84](../../issues/84)): Anchorr can now receive webhook events directly from Jellyseerr/Overseerr as an alternative to the Jellyfin webhook plugin. When a `MEDIA_AVAILABLE` event fires, Anchorr posts a Discord notification to the correct channel (respecting Library Channel Mapping) and optionally sends a DM to the user who requested the media. Note: Seerr webhooks only fire for movies and full TV show requests — not for individual episodes. For per-episode notifications, continue using the Jellyfin webhook plugin
+- **Seerr webhook support** (ref [#84](../../issues/84)): Anchorr can now receive `MEDIA_AVAILABLE` events directly from Seerr. Sends a rich Discord notification to the correct library channel, with poster, backdrop, rating, runtime, and links to IMDb, Letterboxd, and Jellyfin. If `NOTIFY_ON_AVAILABLE` is enabled, the requesting user also gets a DM. Note: Seerr webhooks cover movies and full TV show requests only — use the Jellyfin webhook plugin for per-episode notifications
 
 ### ⚠️ Migration Notes
 

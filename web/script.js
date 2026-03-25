@@ -930,7 +930,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // Jellyseerr webhook toggle
+  // Seerr webhook toggle
   const seerrWebhookToggle = document.getElementById("SEERR_WEBHOOK_ENABLED");
   const seerrWebhookDetails = document.getElementById("seerr-webhook-details");
   if (seerrWebhookToggle && seerrWebhookDetails) {
@@ -939,7 +939,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Copy Jellyseerr webhook URL
+  // Copy Seerr webhook URL
   const copySeerrWebhookBtn = document.getElementById("copy-seerr-webhook-btn");
   if (copySeerrWebhookBtn) {
     copySeerrWebhookBtn.addEventListener("click", async () => {

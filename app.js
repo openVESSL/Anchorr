@@ -648,17 +648,17 @@ function configureWebServer() {
       return res.status(400).json({ success: false, error: "Invalid payload" });
     }
 
-    logger.info(`📥 Received Jellyseerr webhook: ${req.body.notification_type}`);
+    logger.info(`📥 Received Seerr webhook: ${req.body.notification_type}`);
     res.status(200).json({ success: true, message: "Webhook received" });
 
     if (botState.discordClient && botState.isBotRunning) {
       try {
         await handleSeerrWebhook(req.body, botState.discordClient, pendingRequests, savePendingRequests);
       } catch (err) {
-        logger.error(`❌ Error processing Jellyseerr webhook:`, err);
+        logger.error(`❌ Error processing Seerr webhook:`, err);
       }
     } else {
-      logger.warn(`⚠️ Jellyseerr webhook received but Discord bot is not running — notification dropped`);
+      logger.warn(`⚠️ Seerr webhook received but Discord bot is not running — notification dropped`);
     }
   });
 

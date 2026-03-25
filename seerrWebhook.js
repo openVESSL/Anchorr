@@ -37,12 +37,13 @@ const libraryResolutionCache = { data: null, timestamp: null, errorTimestamp: nu
 const LIBRARY_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const LIBRARY_CACHE_ERROR_COOLDOWN_MS = 60 * 1000; // 60 seconds backoff after a failed fetch
 
+// Retry delays when the item is not yet indexed in Jellyfin (timing issue)
+const RETRY_DELAYS_MS = [30_000, 2 * 60_000, 5 * 60_000, 15 * 60_000]; // 30s, 2min, 5min, 15min
+
 /**
  * Resolve the Discord channel ID for a given media item.
- * Looks up the item in Jellyfin by TMDB ID, then uses ancestor-based library
- * detection (same as the Jellyfin webhook) to find the exact library and its
- * mapped channel. Falls back to JELLYFIN_CHANNEL_ID if the item is not yet
- * in Jellyfin or no mapping is configured.
+ * Returns { channelId, needsRetry } where needsRetry is true when the item was
+ * not found in Jellyfin yet (timing issue) and a retry may succeed later.
  */
 async function resolveChannel(tmdbId, mediaType) {
   const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID || null;
@@ -50,14 +51,14 @@ async function resolveChannel(tmdbId, mediaType) {
 
   if (!Object.keys(libraryChannels).length) {
     logger.info(`[SEERR WEBHOOK] No library channel mapping configured, using default channel`);
-    return defaultChannelId;
+    return { channelId: defaultChannelId, needsRetry: false };
   }
 
   const apiKey = process.env.JELLYFIN_API_KEY;
   const baseUrl = process.env.JELLYFIN_BASE_URL;
   if (!apiKey || !baseUrl) {
     logger.warn("[SEERR WEBHOOK] Library channels are configured but JELLYFIN_API_KEY or JELLYFIN_BASE_URL is missing — cannot resolve library-based channel, using default");
-    return defaultChannelId;
+    return { channelId: defaultChannelId, needsRetry: false };
   }
 
   let libraries;
@@ -67,7 +68,7 @@ async function resolveChannel(tmdbId, mediaType) {
       libraries = libraryResolutionCache.data;
     } else if (libraryResolutionCache.errorTimestamp && now - libraryResolutionCache.errorTimestamp < LIBRARY_CACHE_ERROR_COOLDOWN_MS) {
       logger.info(`[SEERR WEBHOOK] Skipping library fetch — in error cooldown, using default channel`);
-      return defaultChannelId;
+      return { channelId: defaultChannelId, needsRetry: false };
     } else {
       libraries = await fetchLibraries(apiKey, baseUrl);
       libraryResolutionCache.data = libraries;
@@ -77,12 +78,12 @@ async function resolveChannel(tmdbId, mediaType) {
   } catch (e) {
     libraryResolutionCache.errorTimestamp = Date.now();
     logger.warn(`[SEERR WEBHOOK] Could not fetch Jellyfin libraries, using default: ${e?.message || e}`);
-    return defaultChannelId;
+    return { channelId: defaultChannelId, needsRetry: false };
   }
 
   if (!Array.isArray(libraries)) {
     logger.error(`[SEERR WEBHOOK] fetchLibraries returned non-array (${typeof libraries}), falling back to default channel`);
-    return defaultChannelId;
+    return { channelId: defaultChannelId, needsRetry: false };
   }
 
   const libraryMap = new Map();
@@ -99,21 +100,92 @@ async function resolveChannel(tmdbId, mediaType) {
       const libraryItemId = await findLibraryByAncestors(jellyfinItemId, apiKey, baseUrl, libraryMap, itemType);
       if (!libraryItemId) {
         logger.warn(`[SEERR WEBHOOK] Could not determine library for Jellyfin item ${jellyfinItemId} (TMDB ID ${tmdbId}), falling back to default channel`);
-      } else {
-        const channelId = libraryChannels[libraryItemId];
-        if (channelId) {
-          logger.info(`[SEERR WEBHOOK] Resolved channel via item lookup: Jellyfin item ${jellyfinItemId} → library ${libraryItemId} → channel ${channelId}`);
-          return channelId;
-        }
-        logger.warn(`[SEERR WEBHOOK] Library ${libraryItemId} resolved for TMDB ID ${tmdbId} but has no channel mapping — falling back to default channel`);
+        return { channelId: defaultChannelId, needsRetry: false };
       }
+      const channelId = libraryChannels[libraryItemId];
+      if (channelId) {
+        logger.info(`[SEERR WEBHOOK] Resolved channel via item lookup: Jellyfin item ${jellyfinItemId} → library ${libraryItemId} → channel ${channelId}`);
+        return { channelId, needsRetry: false };
+      }
+      logger.warn(`[SEERR WEBHOOK] Library ${libraryItemId} resolved for TMDB ID ${tmdbId} but has no channel mapping — falling back to default channel`);
+      return { channelId: defaultChannelId, needsRetry: false };
     } else {
-      logger.info(`[SEERR WEBHOOK] TMDB ID ${tmdbId} not found in Jellyfin — item may not be indexed yet, or a lookup error occurred (see above if any), falling back to default channel`);
+      // Item not indexed in Jellyfin yet — this is a timing issue, worth retrying
+      logger.info(`[SEERR WEBHOOK] TMDB ID ${tmdbId} not found in Jellyfin — item may not be indexed yet, will retry`);
+      return { channelId: defaultChannelId, needsRetry: true };
     }
   }
 
   logger.info(`[SEERR WEBHOOK] Falling back to default channel (${defaultChannelId})`);
-  return defaultChannelId;
+  return { channelId: defaultChannelId, needsRetry: false };
+}
+
+/**
+ * Send the pre-built notification to the given channel and DM any users to notify.
+ */
+async function dispatchNotification(channelId, payload, client) {
+  let channel;
+  try {
+    channel = await client.channels.fetch(channelId);
+  } catch (err) {
+    logger.error(`[SEERR WEBHOOK] ❌ Failed to fetch Discord channel ${channelId}: ${err.message}`);
+    return;
+  }
+
+  try {
+    await channel.send(payload.messageOptions);
+    logger.info(`[SEERR WEBHOOK] Sent notification for: ${payload.embedTitle}`);
+  } catch (err) {
+    logger.error(`[SEERR WEBHOOK] Failed to send Discord message: ${err.message}`);
+    return;
+  }
+
+  for (const userId of payload.usersToNotify) {
+    try {
+      const user = await client.users.fetch(userId);
+      await user.send(payload.dmMessageOptions);
+      logger.info(`[SEERR WEBHOOK] Sent DM to user ${userId} for ${payload.embedTitle}`);
+    } catch (err) {
+      logger.error(`[SEERR WEBHOOK] Failed to send DM to user ${userId}: ${err?.message || err}`);
+    }
+  }
+}
+
+/**
+ * Attempt to resolve the channel for the given media item and dispatch the notification.
+ * If the item is not yet indexed in Jellyfin (needsRetry), schedules exponential-backoff
+ * retries. After all retries are exhausted, sends to the default channel.
+ */
+async function resolveAndDispatch(tmdbId, mediaType, payload, client, attempt) {
+  let channelId, needsRetry;
+  try {
+    ({ channelId, needsRetry } = await resolveChannel(tmdbId, mediaType));
+  } catch (err) {
+    logger.error(`[SEERR WEBHOOK] Unexpected error resolving channel for TMDB ID ${tmdbId}: ${err?.message || err}`);
+    channelId = process.env.JELLYFIN_CHANNEL_ID || null;
+    needsRetry = false;
+  }
+
+  if (needsRetry && attempt < RETRY_DELAYS_MS.length) {
+    const delay = RETRY_DELAYS_MS[attempt];
+    logger.info(`[SEERR WEBHOOK] Retry ${attempt + 1}/${RETRY_DELAYS_MS.length} for TMDB ID ${tmdbId} scheduled in ${delay / 1000}s`);
+    setTimeout(() => {
+      resolveAndDispatch(tmdbId, mediaType, payload, client, attempt + 1)
+        .catch(err => logger.error(`[SEERR WEBHOOK] Retry ${attempt + 2} failed for TMDB ID ${tmdbId}: ${err?.message || err}`));
+    }, delay);
+    return;
+  }
+
+  if (needsRetry) {
+    logger.warn(`[SEERR WEBHOOK] All retries exhausted for TMDB ID ${tmdbId} — sending to default channel`);
+  }
+
+  if (!channelId) {
+    logger.error("[SEERR WEBHOOK] ❌ No Discord channel configured — set JELLYFIN_CHANNEL_ID or configure library channels");
+    return;
+  }
+
+  await dispatchNotification(channelId, payload, client);
 }
 
 export async function handleSeerrWebhook(data, client, pendingRequests, onPendingRequestsChanged) {
@@ -163,7 +235,7 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
     }
   }
 
-  // Title and year from TMDB (more reliable than Jellyseerr subject)
+  // Title and year from TMDB (more reliable than Seerr subject)
   const rawTitle = details
     ? (mediaType === "movie" ? details.title : details.name) || subject
     : subject;
@@ -225,7 +297,7 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
     .setTitle(embedTitle)
     .setColor(embedColor);
 
-  // Poster from TMDB or Jellyseerr payload
+  // Poster from TMDB or Seerr payload
   const posterPath = details?.poster_path;
   const posterUrl = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : (image || null);
   if (posterUrl && isValidUrl(posterUrl)) {
@@ -282,75 +354,41 @@ export async function handleSeerrWebhook(data, client, pendingRequests, onPendin
     ? new ActionRowBuilder().addComponents(buttonComponents)
     : null;
 
-  // Channel — prefer library-mapped channel, fall back to JELLYFIN_CHANNEL_ID
-  let channelId;
-  try {
-    channelId = await resolveChannel(tmdbId, mediaType);
-  } catch (err) {
-    logger.error(`[SEERR WEBHOOK] Unexpected error resolving channel for TMDB ID ${tmdbId}: ${err?.message || err}`);
-    channelId = process.env.JELLYFIN_CHANNEL_ID || null;
-  }
-  if (!channelId) {
-    logger.error("[SEERR WEBHOOK] ❌ No Discord channel configured — set JELLYFIN_CHANNEL_ID or configure library channels");
-    return;
-  }
-
-  let channel;
-  try {
-    channel = await client.channels.fetch(channelId);
-  } catch (err) {
-    logger.error(`[SEERR WEBHOOK] ❌ Failed to fetch Discord channel ${channelId}: ${err.message}`);
-    return;
-  }
-
   const messageOptions = { embeds: [embed] };
   if (buttons) messageOptions.components = [buttons];
 
-  try {
-    await channel.send(messageOptions);
-    logger.info(`[SEERR WEBHOOK] Sent notification for: ${embedTitle}`);
-  } catch (err) {
-    logger.error(`[SEERR WEBHOOK] Failed to send Discord message: ${err.message}`);
-    return;
-  }
-
-  // DMs
+  // Build DM embed once (reused for all users to notify) — only when needed
+  let dmMessageOptions = {};
   if (usersToNotify.length > 0) {
+    const dmEmbed = new EmbedBuilder()
+      .setAuthor({ name: "✅ Your request is now available!" })
+      .setTitle(embedTitle)
+      .setColor(process.env.EMBED_COLOR_SUCCESS || "#a6e3a1")
+      .setDescription(`${title} is now available on Jellyfin!`)
+      .addFields(
+        { name: "Genre", value: genres, inline: true },
+        { name: "Runtime", value: runtime, inline: true },
+        { name: "Rating", value: rating, inline: true }
+      );
+
+    if (backdropPath) {
+      const backdropUrl = `https://image.tmdb.org/t/p/w1280${backdropPath}`;
+      if (isValidUrl(backdropUrl)) dmEmbed.setImage(backdropUrl);
+    }
+
+    dmMessageOptions = { embeds: [dmEmbed] };
     const watchUrl = buildJellyfinSearchUrl(title);
-
-    for (const userId of usersToNotify) {
-      try {
-        const user = await client.users.fetch(userId);
-        const dmEmbed = new EmbedBuilder()
-          .setAuthor({ name: "✅ Your request is now available!" })
-          .setTitle(embedTitle)
-          .setColor(process.env.EMBED_COLOR_SUCCESS || "#a6e3a1")
-          .setDescription(`${title} is now available on Jellyfin!`)
-          .addFields(
-            { name: "Genre", value: genres, inline: true },
-            { name: "Runtime", value: runtime, inline: true },
-            { name: "Rating", value: rating, inline: true }
-          );
-
-        if (backdropPath) {
-          const backdropUrl = `https://image.tmdb.org/t/p/w1280${backdropPath}`;
-          if (isValidUrl(backdropUrl)) dmEmbed.setImage(backdropUrl);
-        }
-
-        const dmMessageOptions = { embeds: [dmEmbed] };
-        if (watchUrl && isValidUrl(watchUrl)) {
-          dmMessageOptions.components = [
-            new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("▶ Watch Now!").setURL(watchUrl)
-            ),
-          ];
-        }
-
-        await user.send(dmMessageOptions);
-        logger.info(`[SEERR WEBHOOK] Sent DM to user ${userId} for ${embedTitle}`);
-      } catch (err) {
-        logger.error(`[SEERR WEBHOOK] Failed to send DM to user ${userId}: ${err?.message || err}`);
-      }
+    if (watchUrl && isValidUrl(watchUrl)) {
+      dmMessageOptions.components = [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("▶ Watch Now!").setURL(watchUrl)
+        ),
+      ];
     }
   }
+
+  const payload = { messageOptions, dmMessageOptions, embedTitle, usersToNotify };
+
+  // Resolve channel with retry if item is not yet indexed in Jellyfin
+  await resolveAndDispatch(tmdbId, mediaType, payload, client, 0);
 }
