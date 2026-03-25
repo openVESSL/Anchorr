@@ -9,25 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 🔒 Security
-
-- **Web dashboard binds to localhost by default**: Bare-metal installations no longer expose port 8282 on all network interfaces. The server now binds to `127.0.0.1` unless `BIND_HOST` is set. Docker Compose sets `BIND_HOST=0.0.0.0` automatically so container port mapping continues to work. Users running bare-metal who need external access should use a reverse proxy
-- **API key no longer partially logged**: A debug line in the Seerr request handler was logging the first 5 characters of the API key. Removed
-- **ReDoS fix in webhook title cleanup**: Regex patterns in `cleanTitle()` with leading `\s*` could cause polynomial backtracking on adversarial input. Whitespace is now trimmed separately
-- **Rate limiting on bot control endpoints**: `/start-bot` and `/stop-bot` are now rate-limited (10 req/min)
-- **Translation sanitizer rewritten**: `sanitizeTranslationHtml()` now uses a DOM-based allowlist parser instead of regex, closing several regex-bypass vectors (nested tags, `</script >` with trailing space, incomplete event-handler stripping)
-- **SSRF defence-in-depth**: All user-supplied and env-var URLs are now constructed via `URL` object pathname manipulation (not string interpolation) before being passed to axios, covering config-test routes and internal API clients (`fetchLibraries`, `fetchRecentlyAdded`, `findItemByTmdbId`, `fetchFromServers`)
-- **Clear-text logging removed**: Request payload was being logged in the Seerr request handler; removed
-- **Rate limiting on auth check endpoint**: `/auth/check` is now rate-limited
-- **Numeric validation on TMDB IDs**: `tmdbId` from the Jellyfin webhook payload is parsed as an integer before use in the TMDB API URL
-
 ### 🚀 Added
 
 - **Seerr webhook support** (ref [#84](../../issues/84)): Anchorr can now receive `MEDIA_AVAILABLE` events directly from Seerr. Sends a rich Discord notification to the correct library channel, with poster, backdrop, rating, runtime, and links to IMDb, Letterboxd, and Jellyfin. If `NOTIFY_ON_AVAILABLE` is enabled, the requesting user also gets a DM. Note: Seerr webhooks cover movies and full TV show requests only — use the Jellyfin webhook plugin for per-episode notifications
 
+---
+
+## [1.4.6] - 2026-03-25
+
+### 🔒 Security
+
+- **Web dashboard binds to localhost by default**: Bare-metal installs now bind to `127.0.0.1` instead of all interfaces. Set `BIND_HOST=0.0.0.0` if you need external access (Docker Compose does this automatically)
+- **Rate limiting**: `/start-bot`, `/stop-bot`, and `/auth/check` are now rate-limited
+- **SSRF hardening**: All URLs passed to axios are now constructed via `URL` object pathname manipulation instead of string interpolation
+- **Translation sanitizer**: Rewritten with a DOM-based allowlist parser, closing several XSS bypass vectors
+- **Misc**: Partial API key no longer logged; request payload logging removed; TMDB IDs validated as integers; GitHub Actions workflow permissions scoped to least-privilege
+
 ### ⚠️ Migration Notes
 
-**Docker Compose users:** Make sure your `environment:` section includes `BIND_HOST=0.0.0.0`. Without it, the dashboard will only be reachable from inside the container. If you use the included `docker-compose.yml`, no action needed.
+**Docker Compose users:** Add `BIND_HOST=0.0.0.0` to your `environment:` section. If you use the included `docker-compose.yml`, no action needed.
 
 ---
 
