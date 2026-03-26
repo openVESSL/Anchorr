@@ -7,6 +7,7 @@ import {
 import { tmdbGetDetails, findBestBackdrop } from "./api/tmdb.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import { fetchLibraries, findItemByTmdbId, findLibraryByAncestors } from "./api/jellyfin.js";
+import { fetchMediaInfo, fetchRootFolders } from "./api/seerr.js";
 import { getLibraryChannels } from "./jellyfin/libraryResolver.js";
 import { minutesToHhMm } from "./utils/time.js";
 import { isValidUrl } from "./utils/url.js";
@@ -39,6 +40,71 @@ const LIBRARY_CACHE_ERROR_COOLDOWN_MS = 60 * 1000; // 60 seconds backoff after a
 
 // Retry delays when the item is not yet indexed in Jellyfin (timing issue)
 const RETRY_DELAYS_MS = [30_000, 2 * 60_000, 5 * 60_000, 15 * 60_000]; // 30s, 2min, 5min, 15min
+
+/**
+ * Attempt to resolve a Jellyfin library for a media item using Seerr's service
+ * metadata, without depending on Jellyfin having indexed the item yet.
+ *
+ * Flow: Seerr mediaInfo.serviceId → root folders for that service → match
+ * against Jellyfin library Locations.
+ *
+ * Returns a library ItemId string, or null if resolution fails or is ambiguous.
+ */
+async function resolveLibraryViaService(tmdbId, mediaType, libraries) {
+  const seerrUrl = process.env.SEERR_URL;
+  const seerrApiKey = process.env.SEERR_API_KEY;
+  if (!seerrUrl || !seerrApiKey) return null;
+
+  const mediaInfo = await fetchMediaInfo(tmdbId, mediaType, seerrUrl, seerrApiKey);
+  if (mediaInfo?.serviceId == null) return null;
+
+  const serviceId = mediaInfo.serviceId;
+
+  let rootFolders;
+  try {
+    rootFolders = await fetchRootFolders(seerrUrl, seerrApiKey);
+  } catch (err) {
+    logger.warn(`[SEERR WEBHOOK] Could not fetch root folders for service resolution: ${err?.message || err}`);
+    return null;
+  }
+
+  const serviceFolders = rootFolders.filter(
+    // eslint-disable-next-line eqeqeq -- serviceId may be string or number depending on Seerr version
+    (f) => f.serverId == serviceId
+  );
+  if (serviceFolders.length === 0) {
+    logger.info(`[SEERR WEBHOOK] No root folders found for Seerr service ID ${serviceId}`);
+    return null;
+  }
+
+  const matches = [];
+  for (const library of libraries) {
+    for (const location of (library.Locations || [])) {
+      const normLocation = location.replace(/\\/g, "/").toLowerCase().replace(/\/$/, "");
+      for (const folder of serviceFolders) {
+        const normFolder = folder.path.replace(/\\/g, "/").toLowerCase().replace(/\/$/, "");
+        if (normFolder === normLocation || normLocation.startsWith(normFolder + "/")) {
+          if (!matches.find((m) => m.ItemId === library.ItemId)) {
+            matches.push(library);
+          }
+        }
+      }
+    }
+  }
+
+  if (matches.length === 1) {
+    logger.info(`[SEERR WEBHOOK] Resolved library via Seerr service: service ${serviceId} → "${matches[0].Name}" (${matches[0].ItemId})`);
+    return matches[0].ItemId;
+  }
+
+  if (matches.length > 1) {
+    logger.warn(`[SEERR WEBHOOK] Ambiguous library match for service ${serviceId}: [${matches.map((m) => m.Name).join(", ")}] — falling back to Jellyfin lookup`);
+  } else {
+    logger.info(`[SEERR WEBHOOK] No Jellyfin library matched root folders for service ${serviceId} — falling back to Jellyfin lookup`);
+  }
+
+  return null;
+}
 
 /**
  * Resolve the Discord channel ID for a given media item.
@@ -92,8 +158,20 @@ async function resolveChannel(tmdbId, mediaType) {
     if (lib.ItemId !== lib.CollectionId) libraryMap.set(lib.ItemId, lib);
   }
 
-  // Look up the item in Jellyfin by TMDB ID, then find its library via ancestors
   if (tmdbId) {
+    // Stage 1: resolve via Seerr service metadata → root folder → Jellyfin library path
+    // This works before Jellyfin has indexed the item, so no timing dependency.
+    const libraryItemIdViaSeerr = await resolveLibraryViaService(tmdbId, mediaType, libraries);
+    if (libraryItemIdViaSeerr) {
+      const channelId = libraryChannels[libraryItemIdViaSeerr];
+      if (channelId) {
+        return { channelId, needsRetry: false };
+      }
+      logger.warn(`[SEERR WEBHOOK] Library ${libraryItemIdViaSeerr} resolved via Seerr service but has no channel mapping — falling back to default channel`);
+      return { channelId: defaultChannelId, needsRetry: false };
+    }
+
+    // Stage 2: fall back to looking up the item in Jellyfin by TMDB ID
     const jellyfinItemId = await findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl);
     if (jellyfinItemId) {
       const itemType = mediaType === "movie" ? "Movie" : "Series";
@@ -104,13 +182,13 @@ async function resolveChannel(tmdbId, mediaType) {
       }
       const channelId = libraryChannels[libraryItemId];
       if (channelId) {
-        logger.info(`[SEERR WEBHOOK] Resolved channel via item lookup: Jellyfin item ${jellyfinItemId} → library ${libraryItemId} → channel ${channelId}`);
+        logger.info(`[SEERR WEBHOOK] Resolved channel via Jellyfin item lookup: item ${jellyfinItemId} → library ${libraryItemId} → channel ${channelId}`);
         return { channelId, needsRetry: false };
       }
       logger.warn(`[SEERR WEBHOOK] Library ${libraryItemId} resolved for TMDB ID ${tmdbId} but has no channel mapping — falling back to default channel`);
       return { channelId: defaultChannelId, needsRetry: false };
     } else {
-      // Item not indexed in Jellyfin yet — this is a timing issue, worth retrying
+      // Item not indexed in Jellyfin yet — worth retrying
       logger.info(`[SEERR WEBHOOK] TMDB ID ${tmdbId} not found in Jellyfin — item may not be indexed yet, will retry`);
       return { channelId: defaultChannelId, needsRetry: true };
     }

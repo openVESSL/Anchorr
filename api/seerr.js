@@ -126,6 +126,33 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
 }
 
 /**
+ * Fetch the mediaInfo object for a specific item from Seerr.
+ * Returns the raw mediaInfo (including serviceId, externalServiceId, status, etc.)
+ * or null if the item is not found or the request fails.
+ * @param {string} tmdbId - TMDB ID
+ * @param {string} mediaType - 'movie' or 'tv'
+ * @param {string} seerrUrl - Seerr base URL
+ * @param {string} apiKey - Seerr API key
+ * @returns {Promise<Object|null>}
+ */
+export async function fetchMediaInfo(tmdbId, mediaType, seerrUrl, apiKey) {
+  try {
+    const endpoint = mediaType === "movie" ? "movie" : "tv";
+    const safeBase = new URL(normalizeApiUrl(seerrUrl));
+    safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + `/${endpoint}/${parseInt(tmdbId, 10)}`;
+    const response = await axios.get(safeBase.href, {
+      headers: { "X-Api-Key": apiKey },
+      timeout: TIMEOUTS.SEERR_API,
+    });
+    return response.data?.mediaInfo || null;
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    logger.warn(`[fetchMediaInfo] Could not fetch Seerr media info for TMDB ID ${tmdbId}: ${err?.message || err}`);
+    return null;
+  }
+}
+
+/**
  * Check if media exists and is available in Seerr
  * @param {number} tmdbId - TMDB ID
  * @param {string} mediaType - 'movie' or 'tv'
