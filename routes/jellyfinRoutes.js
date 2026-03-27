@@ -45,7 +45,7 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
 
     const items = Array.isArray(response.data) ? response.data : (response.data.Items ?? []);
     const libraries = items.map((item) => ({
-      id: item.Id,
+      id: item.ItemId || item.Id,
       name: item.Name,
       type: item.CollectionType || "unknown",
     }));
@@ -95,7 +95,7 @@ router.post("/test-jellyfin", authenticateToken, async (req, res) => {
 router.get("/jellyfin/libraries", authenticateToken, async (req, res) => {
   try {
     const apiKey = process.env.JELLYFIN_API_KEY;
-    const baseUrl = process.env.JELLYFIN_URL;
+    const baseUrl = process.env.JELLYFIN_BASE_URL;
 
     if (!apiKey || !baseUrl) {
       return res.status(400).json({
