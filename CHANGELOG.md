@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.4.7] - 2026-03-28
+
 ### 🐛 Fixed
 
 - **Library channel mapping broken when using per-library Discord channels**: The config UI was saving `item.Id` (undefined on VirtualFolder objects) as the library key in `JELLYFIN_NOTIFICATION_LIBRARIES`. Jellyfin's `/Library/VirtualFolders` endpoint returns `ItemId`, not `Id`, so all channel lookups silently failed and notifications were either skipped or always routed to the default channel
@@ -17,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Seerr users not loading in User Mapping UI**: `response.data.results` assumed a paginated response, but some Seerr variants return a plain array — fixed to handle both formats
 - **Wrong timeout constant in `checkMediaStatus`**: Used `TIMEOUTS.TMDB_API` instead of `TIMEOUTS.SEERR_API` for a Seerr API call (both are 8000ms, so no behavioral difference, but now correctly named)
 - **`JELLYFIN_BASE_URL` typo in library route**: `GET /jellyfin/libraries` was reading `process.env.JELLYFIN_URL` (undefined) instead of `JELLYFIN_BASE_URL`, always returning 400
+- **Dashboard version never displayed**: `import ... with { type: "json" }` syntax requires Node 20.10+ but the Docker image runs Node 18. Switched to `createRequire` so the version is correctly loaded and returned by `/api/health`
 
 ### 🏗️ Code Quality
 

@@ -1,11 +1,13 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
+import { createRequire } from "module";
 import { authenticateToken } from "../utils/auth.js";
 import { botState } from "../bot/botState.js";
 import cache from "../utils/cache.js";
 import logger from "../utils/logger.js";
 
-const { version: APP_VERSION } = await import("../package.json", { with: { type: "json" } });
+const require = createRequire(import.meta.url);
+const { version: APP_VERSION } = require("../package.json");
 
 const router = Router();
 
