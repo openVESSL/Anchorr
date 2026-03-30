@@ -2467,10 +2467,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (addMappingBtn) {
     addMappingBtn.addEventListener("click", async () => {
       const discordSelect = document.getElementById("discord-user-select");
-      const seerrSelect = document.getElementById(
-        "seerr-user-select"
-      );
-      const discordUserId = discordSelect.dataset.value;
+      const seerrSelect = document.getElementById("seerr-user-select");
+      const manualIdInput = document.getElementById("discord-user-id-manual");
+
+      const manualId = manualIdInput?.value?.trim();
+      const discordUserId = manualId || discordSelect.dataset.value;
       const seerrUserId = seerrSelect.dataset.value;
 
       if (!discordUserId || !seerrUserId) {
@@ -2519,6 +2520,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
           discordTrigger.value = "";
           discordTrigger.style.display = "block";
+          if (manualIdInput) manualIdInput.value = "";
 
           // Reset Seerr custom select
           delete seerrSelect.dataset.value;

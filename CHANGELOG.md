@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.8] - 2026-03-30
+
+### 🐛 Fixed
+
+- **Bot crashes after a few days**: An unhandled promise rejection (e.g. from a Discord API blip or rate limit) was calling `process.exit(1)`, killing the entire process. Unhandled rejections are now logged as errors without terminating the bot
+- **User mapping dropdown missing offline/uncached members**: `guild.members.fetch()` was capped at 1000 and Discord only returns members who are cached — users who are offline or in large servers would not appear. The cap has been removed and a manual Discord User ID input field has been added as a fallback for users who still don't show up in the list
+
+---
+
 ## [1.4.7] - 2026-03-28
 
 ### 🐛 Fixed

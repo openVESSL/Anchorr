@@ -423,7 +423,7 @@ function configureWebServer() {
           "[MEMBERS API] Attempting to fetch members (real-time with force refresh)..."
         );
         // Force refresh members from Discord - ignores cache and fetches latest from server
-        await guild.members.fetch({ force: true, limit: 1000 });
+        await guild.members.fetch({ force: true });
         logger.info(
           "[MEMBERS API] ✅ Members fetched successfully (real-time)"
         );
@@ -477,8 +477,7 @@ function configureWebServer() {
           avatar: member.user.displayAvatarURL({ size: 64 }),
           discriminator: member.user.discriminator,
         }))
-        .sort((a, b) => a.username.localeCompare(b.username)) // Sort alphabetically
-        .slice(0, 1000); // Increased limit to 1000 members
+        .sort((a, b) => a.username.localeCompare(b.username));
 
       logger.info(
         `[MEMBERS API] Returning ${members.length} members (real-time: ${fetchSuccess})`
@@ -1186,9 +1185,8 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+process.on("unhandledRejection", (reason, _promise) => {
+  logger.error("Unhandled Rejection:", reason);
 });
 
 startServer();
