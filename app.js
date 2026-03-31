@@ -121,9 +121,7 @@ function loadConfig() {
     );
     logger.debug(
       "[LOADCONFIG] DISCORD_TOKEN in process.env:",
-      process.env.DISCORD_TOKEN
-        ? process.env.DISCORD_TOKEN.slice(0, 6) + "..."
-        : "UNDEFINED"
+      process.env.DISCORD_TOKEN ? "SET" : "UNDEFINED"
     );
   } else {
     logger.debug("[LOADCONFIG] Config file does not exist or failed to load");
@@ -598,7 +596,11 @@ function configureWebServer() {
   app.post("/jellyfin-webhook", webhookLimiter, verifyWebhookSecret, express.json({ type: "*/*" }), async (req, res) => {
     try {
       logger.info("📥 Received Jellyfin webhook");
-      logger.debug("Webhook payload:", JSON.stringify(req.body, null, 2));
+      logger.debug("Webhook payload (ItemType, ItemId, Name):", JSON.stringify({
+        ItemType: req.body?.ItemType,
+        ItemId: req.body?.ItemId,
+        Name: req.body?.Name,
+      }));
 
       // Acknowledge receipt immediately
       res.status(200).json({ success: true, message: "Webhook received" });

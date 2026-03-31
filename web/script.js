@@ -1375,17 +1375,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <label class="library-label">
                   <input
                     type="checkbox"
-                    value="${lib.id}"
+                    value="${escapeHtml(lib.id)}"
                     class="library-checkbox"
                     ${isChecked ? "checked" : ""}
                   />
                   <div class="library-info">
-                    <span class="library-name">${lib.name}</span>
+                    <span class="library-name">${escapeHtml(lib.name)}</span>
                   </div>
                 </label>
                 <select
                   class="library-channel-select"
-                  data-library-id="${lib.id}"
+                  data-library-id="${escapeHtml(lib.id)}"
                   ${!isChecked ? "disabled" : ""}
                 >
                   <option value="">Use Default Channel</option>
@@ -2935,7 +2935,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? "allowlist"
           : "blocklist";
         const roleColor =
-          role.color && role.color !== "#000000" ? role.color : "#b8bdc2";
+          role.color && /^#[0-9a-fA-F]{6}$/.test(role.color) && role.color !== "#000000"
+            ? role.color
+            : "#b8bdc2";
 
         return `
         <label class="role-item">
@@ -3052,10 +3054,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         .map(
           (entry) => `
         <div class="log-entry">
-          <span class="log-timestamp">${entry.timestamp}</span>
-          <span class="log-level ${
+          <span class="log-timestamp">${escapeHtml(entry.timestamp)}</span>
+          <span class="log-level ${escapeHtml(
             entry.level
-          }">${entry.level.toUpperCase()}</span>
+          )}">${escapeHtml(entry.level.toUpperCase())}</span>
           <span class="log-message">${escapeHtml(entry.message)}</span>
         </div>
       `

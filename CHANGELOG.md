@@ -11,7 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.4.8] - 2026-03-30
+## [1.4.8] - 2026-03-31
+
+### 🔒 Security
+
+- **Discord token fragment no longer logged**: Debug log in `loadConfig()` previously emitted the first 6 characters of the Discord bot token — now logs `SET` / `UNDEFINED` only
+- **Webhook debug log no longer dumps full payload**: Debug log on incoming webhook requests now only emits `ItemType`, `ItemId`, and `Name` instead of the raw payload (which could include internal server paths and URLs)
+- **XSS: log viewer timestamp and level fields now escaped**: `timestamp` and `level` fields in the dashboard log viewer were inserted into HTML without escaping — both are now passed through `escapeHtml()`
+- **XSS: Jellyfin library name and ID now escaped**: Library names and IDs from the Jellyfin API were inserted raw into the library selection UI — both are now escaped before rendering
+- **XSS: role color validated before use in style attribute**: The Discord role color value is now validated against a strict hex color pattern (`/^#[0-9a-fA-F]{6}$/`) before being inserted into a CSS `style` attribute
 
 ### 🐛 Fixed
 
