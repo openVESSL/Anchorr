@@ -2569,6 +2569,124 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Auto-Map from Seerr button
+  const autoMapSeerrBtn = document.getElementById("auto-map-seerr-btn");
+  if (autoMapSeerrBtn) {
+    autoMapSeerrBtn.addEventListener("click", async () => {
+      autoMapSeerrBtn.disabled = true;
+      const originalHtml = autoMapSeerrBtn.innerHTML;
+      autoMapSeerrBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading...';
+
+      try {
+        const res = await fetch("/api/seerr/auto-map-preview");
+        const data = await res.json();
+
+        if (!data.success) {
+          showToast(`Error: ${data.message}`);
+          return;
+        }
+
+        const modal = document.getElementById("auto-map-modal");
+        const list = document.getElementById("auto-map-list");
+        const empty = document.getElementById("auto-map-empty");
+        const saveBtn = document.getElementById("auto-map-save-btn");
+
+        if (data.candidates.length === 0) {
+          list.style.display = "none";
+          empty.style.display = "block";
+          saveBtn.style.display = "none";
+        } else {
+          list.style.display = "block";
+          empty.style.display = "none";
+          saveBtn.style.display = "";
+
+          list.innerHTML = data.candidates
+            .map(
+              (c, i) => `
+            <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--surface1); cursor: pointer;">
+              <input type="checkbox" class="auto-map-checkbox" data-index="${i}" checked style="width: 16px; height: 16px; flex-shrink: 0; cursor: pointer;">
+              ${c.seerrAvatar ? `<img src="${escapeHtml(c.seerrAvatar)}" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;flex-shrink:0;">` : ""}
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 500; color: var(--text);">${escapeHtml(c.seerrDisplayName)}</div>
+                <div style="font-size: 0.8rem; color: var(--subtext0);">Discord ID: ${escapeHtml(c.discordId)}</div>
+              </div>
+            </label>`
+            )
+            .join("");
+
+          modal._candidates = data.candidates;
+        }
+
+        modal.style.display = "flex";
+      } catch (_err) {
+        showToast("Failed to fetch auto-map preview.");
+      } finally {
+        autoMapSeerrBtn.disabled = false;
+        autoMapSeerrBtn.innerHTML = originalHtml;
+      }
+    });
+  }
+
+  // Auto-Map modal save/cancel
+  const autoMapSaveBtn = document.getElementById("auto-map-save-btn");
+  const autoMapCancelBtn = document.getElementById("auto-map-cancel-btn");
+  const autoMapModal = document.getElementById("auto-map-modal");
+
+  function closeAutoMapModal() {
+    autoMapModal.style.display = "none";
+    autoMapModal._candidates = null;
+  }
+
+  if (autoMapCancelBtn) {
+    autoMapCancelBtn.addEventListener("click", closeAutoMapModal);
+  }
+
+  if (autoMapModal) {
+    autoMapModal.addEventListener("click", (e) => {
+      if (e.target === autoMapModal) closeAutoMapModal();
+    });
+  }
+
+  if (autoMapSaveBtn) {
+    autoMapSaveBtn.addEventListener("click", async () => {
+      const candidates = autoMapModal._candidates || [];
+      const checked = Array.from(
+        document.querySelectorAll(".auto-map-checkbox:checked")
+      );
+      const selected = checked.map((cb) => candidates[parseInt(cb.dataset.index, 10)]).filter(Boolean);
+
+      if (selected.length === 0) {
+        showToast("No mappings selected.");
+        return;
+      }
+
+      autoMapSaveBtn.disabled = true;
+      autoMapSaveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+      try {
+        const res = await fetch("/api/user-mappings/auto-map", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mappings: selected }),
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          closeAutoMapModal();
+          showToast(`${result.saved} mapping${result.saved !== 1 ? "s" : ""} saved!`);
+          await loadMappings();
+        } else {
+          showToast(`Error: ${result.message}`);
+        }
+      } catch (_err) {
+        showToast("Failed to save mappings.");
+      } finally {
+        autoMapSaveBtn.disabled = false;
+        autoMapSaveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Save Mappings';
+      }
+    });
+  }
+
   // Refresh All Users button (Discord + Seerr)
   const refreshAllUsersBtn = document.getElementById("refresh-all-users-btn");
   if (refreshAllUsersBtn) {

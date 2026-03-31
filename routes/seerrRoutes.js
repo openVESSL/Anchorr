@@ -5,6 +5,7 @@ import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
 import { getSeerrApiUrl, normalizeSeerrUrl } from "../utils/seerrUrl.js";
 import * as seerrApi from "../api/seerr.js";
+import { getUserMappings } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -163,6 +164,69 @@ router.post("/seerr/servers", authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error("Failed to fetch servers:", error.message);
     res.status(500).json({ success: false, message: "Failed to fetch servers." });
+  }
+});
+
+router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
+  const seerrUrl = process.env.SEERR_URL;
+  const apiKey = process.env.SEERR_API_KEY;
+
+  if (!seerrUrl || !apiKey) {
+    return res.status(400).json({ success: false, message: "Seerr not configured." });
+  }
+
+  try {
+    const baseUrl = getSeerrApiUrl(seerrUrl);
+
+    const usersRes = await axios.get(`${baseUrl}/user?take=1000`, {
+      headers: { "X-Api-Key": apiKey },
+      timeout: TIMEOUTS.SEERR_API,
+    });
+    const userData = Array.isArray(usersRes.data)
+      ? usersRes.data
+      : usersRes.data.results || [];
+
+    const existingMappings = getUserMappings();
+    const mappedDiscordIds = new Set(existingMappings.map((m) => m.discordUserId));
+
+    const candidates = [];
+    const BATCH_SIZE = 5;
+
+    for (let i = 0; i < userData.length; i += BATCH_SIZE) {
+      const batch = userData.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(async (user) => {
+          const settingsRes = await axios.get(
+            `${baseUrl}/user/${user.id}/settings/notifications`,
+            { headers: { "X-Api-Key": apiKey }, timeout: TIMEOUTS.SEERR_API }
+          );
+          return { user, discordId: settingsRes.data?.discordId || null };
+        })
+      );
+
+      for (const result of results) {
+        if (result.status !== "fulfilled" || !result.value.discordId) continue;
+        const { user, discordId } = result.value;
+        if (mappedDiscordIds.has(discordId)) continue;
+
+        let avatar = user.avatar || null;
+        if (avatar && !avatar.startsWith("http")) {
+          avatar = `${normalizeSeerrUrl(seerrUrl)}${avatar}`;
+        }
+        candidates.push({
+          seerrUserId: user.id,
+          seerrDisplayName: user.displayName || user.username || `User ${user.id}`,
+          seerrAvatar: avatar,
+          discordId,
+        });
+      }
+    }
+
+    logger.info(`[AUTO-MAP] Found ${candidates.length} unmapped Seerr users with a Discord ID`);
+    res.json({ success: true, candidates });
+  } catch (err) {
+    logger.error("[AUTO-MAP] Preview failed:", err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

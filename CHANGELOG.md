@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.8] - 2026-03-31
 
+### ✨ Added
+
+- **Auto-Map from Seerr**: New button in the User Mapping section that detects Seerr users who have linked their Discord account and lets you map them in one click. Shows a preview with checkboxes before saving — Discord usernames are resolved automatically via the bot if it's running
+
 ### 🔒 Security
 
 - **Discord token fragment no longer logged**: Debug log in `loadConfig()` previously emitted the first 6 characters of the Discord bot token — now logs `SET` / `UNDEFINED` only

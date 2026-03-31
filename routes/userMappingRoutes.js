@@ -85,6 +85,67 @@ router.post(
   }
 );
 
+router.post("/user-mappings/auto-map", authenticateToken, async (req, res) => {
+  const { mappings } = req.body;
+
+  if (!Array.isArray(mappings) || mappings.length === 0) {
+    return res.status(400).json({ success: false, message: "No mappings provided." });
+  }
+
+  const existingMappings = getUserMappings();
+  const mappedDiscordIds = new Set(existingMappings.map((m) => m.discordUserId));
+
+  let saved = 0;
+  let skipped = 0;
+
+  for (const m of mappings) {
+    if (!m.discordId || !/^\d{17,20}$/.test(m.discordId) || !m.seerrUserId) {
+      skipped++;
+      continue;
+    }
+    if (mappedDiscordIds.has(m.discordId)) {
+      skipped++;
+      continue;
+    }
+
+    let discordUsername = null;
+    let discordDisplayName = null;
+    let discordAvatar = null;
+
+    if (botState.isBotRunning && botState.discordClient) {
+      try {
+        const user = await botState.discordClient.users.fetch(m.discordId);
+        discordUsername = user.username;
+        discordDisplayName = user.displayName ?? user.globalName ?? user.username;
+        discordAvatar = user.displayAvatarURL({ size: 64, extension: "png" });
+      } catch (_err) {
+        // couldn't resolve — save with ID only
+      }
+    }
+
+    try {
+      saveUserMapping({
+        discordUserId: m.discordId,
+        seerrUserId: m.seerrUserId,
+        discordUsername,
+        discordDisplayName,
+        discordAvatar,
+        seerrDisplayName: m.seerrDisplayName || null,
+      });
+      mappedDiscordIds.add(m.discordId);
+      saved++;
+    } catch (err) {
+      logger.error(`[AUTO-MAP] Failed to save mapping for ${m.discordId}:`, err.message);
+      skipped++;
+    }
+  }
+
+  if (saved > 0) loadConfigToEnv();
+
+  logger.info(`[AUTO-MAP] Saved ${saved} mappings, skipped ${skipped}`);
+  res.json({ success: true, saved, skipped });
+});
+
 router.delete("/user-mappings/:discordUserId", authenticateToken, (req, res) => {
   const { discordUserId } = req.params;
 
