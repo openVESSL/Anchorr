@@ -32,8 +32,12 @@ router.get("/discord-user/:userId", authenticateToken, async (req, res) => {
       displayName: user.displayName ?? user.globalName ?? user.username,
       avatar: user.displayAvatarURL({ size: 64, extension: "png" }),
     });
-  } catch (_err) {
-    res.status(404).json({ success: false, message: "Discord user not found." });
+  } catch (err) {
+    if (err.code === 10013 || err.status === 404) {
+      return res.status(404).json({ success: false, message: "Discord user not found." });
+    }
+    logger.error(`[DISCORD USER LOOKUP] Failed to fetch user ${userId}:`, err.message);
+    res.status(502).json({ success: false, message: "Failed to reach Discord API." });
   }
 });
 
@@ -92,6 +96,10 @@ router.post("/user-mappings/auto-map", authenticateToken, async (req, res) => {
     return res.status(400).json({ success: false, message: "No mappings provided." });
   }
 
+  if (mappings.length > 500) {
+    return res.status(400).json({ success: false, message: "Too many mappings (max 500)." });
+  }
+
   const existingMappings = getUserMappings();
   const mappedDiscordIds = new Set(existingMappings.map((m) => m.discordUserId));
 
@@ -99,7 +107,7 @@ router.post("/user-mappings/auto-map", authenticateToken, async (req, res) => {
   let skipped = 0;
 
   for (const m of mappings) {
-    if (!m.discordId || !/^\d{17,20}$/.test(m.discordId) || !m.seerrUserId) {
+    if (!m.discordId || !/^\d{17,20}$/.test(m.discordId) || !m.seerrUserId || !Number.isInteger(Number(m.seerrUserId))) {
       skipped++;
       continue;
     }
@@ -118,8 +126,8 @@ router.post("/user-mappings/auto-map", authenticateToken, async (req, res) => {
         discordUsername = user.username;
         discordDisplayName = user.displayName ?? user.globalName ?? user.username;
         discordAvatar = user.displayAvatarURL({ size: 64, extension: "png" });
-      } catch (_err) {
-        // couldn't resolve — save with ID only
+      } catch (err) {
+        logger.warn(`[AUTO-MAP] Could not resolve Discord user ${m.discordId} — saving with ID only:`, err.message);
       }
     }
 
@@ -130,7 +138,7 @@ router.post("/user-mappings/auto-map", authenticateToken, async (req, res) => {
         discordUsername,
         discordDisplayName,
         discordAvatar,
-        seerrDisplayName: m.seerrDisplayName || null,
+        seerrDisplayName: typeof m.seerrDisplayName === "string" ? m.seerrDisplayName.trim().slice(0, 100) : null,
       });
       mappedDiscordIds.add(m.discordId);
       saved++;

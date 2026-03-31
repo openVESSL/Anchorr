@@ -226,7 +226,11 @@ router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
     res.json({ success: true, candidates });
   } catch (err) {
     logger.error("[AUTO-MAP] Preview failed:", err.message);
-    res.status(500).json({ success: false, message: err.message });
+    const statusCode = err.response?.status;
+    const clientMessage = statusCode
+      ? `Seerr returned ${statusCode} — check your API key and URL.`
+      : "Failed to fetch auto-map preview — check server logs.";
+    res.status(500).json({ success: false, message: clientMessage });
   }
 });
 

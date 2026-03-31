@@ -2633,12 +2633,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 avatarEl.src = u.avatar;
                 avatarEl.style.display = "block";
               }
-            } catch (_e) { /* silently skip unresolvable users */ }
+            } catch (e) { console.warn("[AUTO-MAP] Could not resolve Discord user", c.discordId, e); }
           });
         }
 
         modal.style.display = "flex";
-      } catch (_err) {
+      } catch (err) {
+        console.error("[AUTO-MAP] Preview fetch error:", err);
         showToast("Failed to fetch auto-map preview.");
       } finally {
         autoMapSeerrBtn.disabled = false;
@@ -2698,7 +2699,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         } else {
           showToast(`Error: ${result.message}`);
         }
-      } catch (_err) {
+      } catch (err) {
+        console.error("[AUTO-MAP] Save error:", err);
         showToast("Failed to save mappings.");
       } finally {
         autoMapSaveBtn.disabled = false;
