@@ -2571,6 +2571,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Auto-Map from Seerr button
   const autoMapSeerrBtn = document.getElementById("auto-map-seerr-btn");
+  let autoMapAbortController = null;
+
   if (autoMapSeerrBtn) {
     autoMapSeerrBtn.addEventListener("click", async () => {
       autoMapSeerrBtn.disabled = true;
@@ -2582,7 +2584,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const data = await res.json();
 
         if (!data.success) {
-          showToast(`Error: ${data.message}`);
+          showToast(`Error: ${data.message || data.error || "Unknown error"}`);
           return;
         }
 
@@ -2619,10 +2621,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           modal._candidates = data.candidates;
 
-          // Resolve Discord names + avatars in the background
+          // Resolve Discord names + avatars in the background (aborted on modal close)
+          if (autoMapAbortController) autoMapAbortController.abort();
+          autoMapAbortController = new AbortController();
+          const { signal } = autoMapAbortController;
+
           data.candidates.forEach(async (c, i) => {
             try {
-              const r = await fetch(`/api/discord-user/${encodeURIComponent(c.discordId)}`);
+              const r = await fetch(`/api/discord-user/${encodeURIComponent(c.discordId)}`, { signal });
               if (!r.ok) return;
               const u = await r.json();
               if (!u.success) return;
@@ -2633,7 +2639,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 avatarEl.src = u.avatar;
                 avatarEl.style.display = "block";
               }
-            } catch (e) { console.warn("[AUTO-MAP] Could not resolve Discord user", c.discordId, e); }
+            } catch (e) {
+              if (e.name !== "AbortError") console.warn("[AUTO-MAP] Could not resolve Discord user", c.discordId, e);
+            }
           });
         }
 
@@ -2654,6 +2662,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const autoMapModal = document.getElementById("auto-map-modal");
 
   function closeAutoMapModal() {
+    if (autoMapAbortController) {
+      autoMapAbortController.abort();
+      autoMapAbortController = null;
+    }
     autoMapModal.style.display = "none";
     autoMapModal._candidates = null;
   }
@@ -2697,7 +2709,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           showToast(`${result.saved} mapping${result.saved !== 1 ? "s" : ""} saved!`);
           await loadMappings();
         } else {
-          showToast(`Error: ${result.message}`);
+          showToast(`Error: ${result.message || result.error || "Unknown error"}`);
         }
       } catch (err) {
         console.error("[AUTO-MAP] Save error:", err);
