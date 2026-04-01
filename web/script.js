@@ -2581,10 +2581,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       try {
         const res = await fetch("/api/seerr/auto-map-preview");
+        if (!res.ok) {
+          console.error("[AUTO-MAP] Preview fetch returned", res.status);
+          showToast(`Error: Server returned ${res.status}`);
+          return;
+        }
         const data = await res.json();
 
         if (!data.success) {
-          showToast(`Error: ${data.message || data.error || "Unknown error"}`);
+          showToast(`Error: ${data.message || "Unknown error"}`);
           return;
         }
 
@@ -2621,7 +2626,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           modal._candidates = data.candidates;
 
-          // Resolve Discord names + avatars in the background (aborted on modal close)
+          // Resolve Discord names + avatars in the background (aborted on modal close).
+          // Promises are intentionally fire-and-forget; failures only affect display enrichment.
           if (autoMapAbortController) autoMapAbortController.abort();
           autoMapAbortController = new AbortController();
           const { signal } = autoMapAbortController;
@@ -2629,13 +2635,19 @@ document.addEventListener("DOMContentLoaded", async () => {
           data.candidates.forEach(async (c, i) => {
             try {
               const r = await fetch(`/api/discord-user/${encodeURIComponent(c.discordId)}`, { signal });
-              if (!r.ok) return;
+              if (!r.ok) {
+                console.warn("[AUTO-MAP] Discord user lookup failed", c.discordId, r.status);
+                return;
+              }
               const u = await r.json();
-              if (!u.success) return;
+              if (!u.success) {
+                console.warn("[AUTO-MAP] Discord user lookup returned success=false", c.discordId, u.message);
+                return;
+              }
               const nameEl = document.getElementById(`auto-map-discord-name-${i}`);
               const avatarEl = document.getElementById(`auto-map-discord-avatar-${i}`);
               if (nameEl) nameEl.textContent = `@${u.username}${u.displayName !== u.username ? ` · ${u.displayName}` : ""}`;
-              if (avatarEl && u.avatar) {
+              if (avatarEl && u.avatar && isSafeAvatarUrl(u.avatar)) {
                 avatarEl.src = u.avatar;
                 avatarEl.style.display = "block";
               }
@@ -2702,6 +2714,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ mappings: selected }),
         });
+        if (!res.ok) {
+          console.error("[AUTO-MAP] Save fetch returned", res.status);
+          showToast(`Error: Server returned ${res.status}`);
+          return;
+        }
         const result = await res.json();
 
         if (result.success) {
@@ -2709,7 +2726,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           showToast(`${result.saved} mapping${result.saved !== 1 ? "s" : ""} saved!`);
           await loadMappings();
         } else {
-          showToast(`Error: ${result.message || result.error || "Unknown error"}`);
+          showToast(`Error: ${result.message || "Unknown error"}`);
         }
       } catch (err) {
         console.error("[AUTO-MAP] Save error:", err);
