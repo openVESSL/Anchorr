@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.4.8] - 2026-04-02
+
+### ✨ Added
+
+- **Auto-Map from Seerr**: New button in the User Mapping section that detects Seerr users who have linked their Discord account and lets you map them in one click. Shows a preview with checkboxes before saving — Discord usernames are resolved automatically via the bot if it's running. A companion **Sync with Seerr** button checks existing mappings against Seerr and surfaces any that are stale (Discord unlinked, ID changed, or Seerr user deleted) so they can be removed in bulk
+
+### 🔒 Security
+
+- **Discord token fragment no longer logged**: Debug log in `loadConfig()` previously emitted the first 6 characters of the Discord bot token — now logs `SET` / `UNDEFINED` only
+- **Webhook debug log no longer dumps full payload**: Debug log on incoming webhook requests now only emits `ItemType`, `ItemId`, and `Name` instead of the raw payload (which could include internal server paths and URLs)
+- **XSS: log viewer timestamp and level fields now escaped**: `timestamp` and `level` fields in the dashboard log viewer were inserted into HTML without escaping — both are now passed through `escapeHtml()`
+- **XSS: Jellyfin library name and ID now escaped**: Library names and IDs from the Jellyfin API were inserted raw into the library selection UI — both are now escaped before rendering
+- **XSS: role color validated before use in style attribute**: The Discord role color value is now validated against a strict hex color pattern (`/^#[0-9a-fA-F]{6}$/`) before being inserted into a CSS `style` attribute
+
+### 🐛 Fixed
+
+- **Bot crashes after a few days**: An unhandled promise rejection (e.g. from a Discord API blip or rate limit) was calling `process.exit(1)`, killing the entire process. Unhandled rejections are now logged as errors without terminating the bot
+- **User mapping dropdown missing offline/uncached members**: `guild.members.fetch()` was capped at 1000 and Discord only returns members who are cached — users who are offline or in large servers would not appear. The cap has been removed and a manual Discord User ID input field has been added as a fallback for users who still don't show up in the list. When a manual ID is entered, the bot resolves the username via the Discord API so the mapping list shows a proper name instead of a raw ID
 
 ---
 

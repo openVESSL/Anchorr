@@ -808,9 +808,17 @@
                         <div class="add-mapping-form" style="margin-top: 1.5rem;">
                           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                             <h4 style="font-size: 1.1rem; margin: 0; color: var(--mauve); line-height: 1.4;">Add New Mapping</h4>
-                            <button type="button" id="refresh-all-users-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
-                              <i class="bi bi-arrow-clockwise"></i> Refresh Users
-                            </button>
+                            <div style="display: flex; gap: 0.5rem;">
+                              <button type="button" id="auto-map-seerr-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
+                                <i class="bi bi-magic"></i> Auto-Map from Seerr
+                              </button>
+                              <button type="button" id="sync-seerr-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
+                                <i class="bi bi-arrow-repeat"></i> Sync with Seerr
+                              </button>
+                              <button type="button" id="refresh-all-users-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh Users
+                              </button>
+                            </div>
                           </div>
                           <div class="form-group">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
@@ -826,7 +834,10 @@
                               </div>
                             </div>
                             <div class="form-text">
-                              Select a Discord server member
+                              Select a Discord server member, or enter their User ID manually below if they don't appear in the list.
+                            </div>
+                            <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                              <input type="text" id="discord-user-id-manual" placeholder="Or enter Discord User ID manually..." style="flex: 1; background: var(--surface0); border: 1px solid var(--surface2); color: var(--text); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.9rem;" />
                             </div>
                           </div>
                           <div class="form-group">
@@ -1316,6 +1327,50 @@
         }
       });
     </script>
+
+    <!-- Auto-Map from Seerr Modal -->
+    <div id="auto-map-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content" style="max-width: 560px;">
+        <div class="modal-header">
+          <h3><i class="bi bi-magic" style="color: var(--mauve);"></i> Auto-Map from Seerr</h3>
+        </div>
+        <div class="modal-body">
+          <p>The following Seerr users have linked their Discord account. Select which ones to map:</p>
+          <div id="auto-map-list" style="margin-top: 1rem; max-height: 320px; overflow-y: auto;"></div>
+          <p id="auto-map-empty" style="display: none; opacity: 0.7; font-style: italic; margin-top: 1rem;">No new users with a linked Discord account found in Seerr.</p>
+        </div>
+        <div class="modal-actions">
+          <button id="auto-map-save-btn" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Save Mappings
+          </button>
+          <button id="auto-map-cancel-btn" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sync with Seerr Modal -->
+    <div id="sync-seerr-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content" style="max-width: 560px;">
+        <div class="modal-header">
+          <h3><i class="bi bi-arrow-repeat" style="color: var(--mauve);"></i> Sync with Seerr</h3>
+        </div>
+        <div class="modal-body">
+          <p>The following bot mappings no longer match what's linked in Seerr. Select which ones to remove:</p>
+          <div id="sync-seerr-list" style="margin-top: 1rem; max-height: 320px; overflow-y: auto;"></div>
+          <p id="sync-seerr-empty" style="display: none; opacity: 0.7; font-style: italic; margin-top: 1rem;">All mappings are in sync with Seerr.</p>
+        </div>
+        <div class="modal-actions">
+          <button id="sync-seerr-remove-btn" class="btn btn-danger">
+            <i class="bi bi-trash"></i> Remove Selected
+          </button>
+          <button id="sync-seerr-cancel-btn" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancel
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Bot Auto-Start Confirmation Modal -->
     <div id="bot-autostart-modal" class="modal-overlay" style="display: none;">

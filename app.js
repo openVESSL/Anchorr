@@ -121,9 +121,7 @@ function loadConfig() {
     );
     logger.debug(
       "[LOADCONFIG] DISCORD_TOKEN in process.env:",
-      process.env.DISCORD_TOKEN
-        ? process.env.DISCORD_TOKEN.slice(0, 6) + "..."
-        : "UNDEFINED"
+      process.env.DISCORD_TOKEN ? "SET" : "UNDEFINED"
     );
   } else {
     logger.debug("[LOADCONFIG] Config file does not exist or failed to load");
@@ -423,7 +421,7 @@ function configureWebServer() {
           "[MEMBERS API] Attempting to fetch members (real-time with force refresh)..."
         );
         // Force refresh members from Discord - ignores cache and fetches latest from server
-        await guild.members.fetch({ force: true, limit: 1000 });
+        await guild.members.fetch({ force: true });
         logger.info(
           "[MEMBERS API] ✅ Members fetched successfully (real-time)"
         );
@@ -477,8 +475,7 @@ function configureWebServer() {
           avatar: member.user.displayAvatarURL({ size: 64 }),
           discriminator: member.user.discriminator,
         }))
-        .sort((a, b) => a.username.localeCompare(b.username)) // Sort alphabetically
-        .slice(0, 1000); // Increased limit to 1000 members
+        .sort((a, b) => a.username.localeCompare(b.username));
 
       logger.info(
         `[MEMBERS API] Returning ${members.length} members (real-time: ${fetchSuccess})`
@@ -599,7 +596,11 @@ function configureWebServer() {
   app.post("/jellyfin-webhook", webhookLimiter, verifyWebhookSecret, express.json({ type: "*/*" }), async (req, res) => {
     try {
       logger.info("📥 Received Jellyfin webhook");
-      logger.debug("Webhook payload:", JSON.stringify(req.body, null, 2));
+      logger.debug("Webhook payload (ItemType, ItemId, Name):", JSON.stringify({
+        ItemType: req.body?.ItemType,
+        ItemId: req.body?.ItemId,
+        Name: req.body?.Name,
+      }));
 
       // Acknowledge receipt immediately
       res.status(200).json({ success: true, message: "Webhook received" });
@@ -1186,9 +1187,8 @@ process.on("uncaughtException", (err) => {
   process.exit(1);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+process.on("unhandledRejection", (reason, _promise) => {
+  logger.error("Unhandled Rejection:", reason);
 });
 
 startServer();

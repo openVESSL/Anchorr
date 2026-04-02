@@ -19,6 +19,7 @@ yarn-error.log*
 .claude
 .idea/
 .vscode/
+.code-reviewer-graph
 
 # Testing
 coverage/

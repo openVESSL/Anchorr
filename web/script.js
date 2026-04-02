@@ -1375,17 +1375,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <label class="library-label">
                   <input
                     type="checkbox"
-                    value="${lib.id}"
+                    value="${escapeHtml(lib.id)}"
                     class="library-checkbox"
                     ${isChecked ? "checked" : ""}
                   />
                   <div class="library-info">
-                    <span class="library-name">${lib.name}</span>
+                    <span class="library-name">${escapeHtml(lib.name)}</span>
                   </div>
                 </label>
                 <select
                   class="library-channel-select"
-                  data-library-id="${lib.id}"
+                  data-library-id="${escapeHtml(lib.id)}"
                   ${!isChecked ? "disabled" : ""}
                 >
                   <option value="">Use Default Channel</option>
@@ -2320,7 +2320,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Display mappings (with avatars if members loaded)
       displayMappings();
-    } catch (error) {}
+    } catch (error) {
+      console.error("[MAPPINGS] Failed to reload mappings:", error);
+      showToast("Mappings updated, but failed to refresh the list. Please reload the page.");
+    }
   }
 
   // Update mappings that have missing metadata
@@ -2467,10 +2470,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (addMappingBtn) {
     addMappingBtn.addEventListener("click", async () => {
       const discordSelect = document.getElementById("discord-user-select");
-      const seerrSelect = document.getElementById(
-        "seerr-user-select"
-      );
-      const discordUserId = discordSelect.dataset.value;
+      const seerrSelect = document.getElementById("seerr-user-select");
+      const manualIdInput = document.getElementById("discord-user-id-manual");
+
+      const manualId = manualIdInput?.value?.trim();
+      const discordUserId = manualId || discordSelect.dataset.value;
       const seerrUserId = seerrSelect.dataset.value;
 
       if (!discordUserId || !seerrUserId) {
@@ -2479,7 +2483,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       // Extract display names and avatar from the selected options
-      const discordMember = discordMembers.find((m) => m.id === discordUserId);
+      let discordMember = discordMembers.find((m) => m.id === discordUserId);
+
+      // If the ID was entered manually and isn't in the cached member list, look it up via the bot
+      if (manualId && !discordMember) {
+        try {
+          const lookupRes = await fetch(`/api/discord-user/${encodeURIComponent(manualId)}`);
+          const lookupData = await lookupRes.json();
+          if (lookupData.success) {
+            discordMember = {
+              id: lookupData.id,
+              username: lookupData.username,
+              displayName: lookupData.displayName,
+              avatar: lookupData.avatar,
+            };
+          } else {
+            showToast(`Could not resolve Discord user: ${lookupData.message}`);
+            return;
+          }
+        } catch (_err) {
+          showToast("Failed to look up Discord user.");
+          return;
+        }
+      }
       const seerrUser = seerrUsers.find(
         (u) => String(u.id) === String(seerrUserId)
       );
@@ -2519,6 +2545,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
           discordTrigger.value = "";
           discordTrigger.style.display = "block";
+          if (manualIdInput) manualIdInput.value = "";
 
           // Reset Seerr custom select
           delete seerrSelect.dataset.value;
@@ -2541,6 +2568,324 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       } catch (error) {
         showToast("Failed to add mapping.");
+      }
+    });
+  }
+
+  // Auto-Map from Seerr button
+  const autoMapSeerrBtn = document.getElementById("auto-map-seerr-btn");
+
+  if (autoMapSeerrBtn) {
+    autoMapSeerrBtn.addEventListener("click", async () => {
+      autoMapSeerrBtn.disabled = true;
+      const originalHtml = autoMapSeerrBtn.innerHTML;
+      autoMapSeerrBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading...';
+
+      try {
+        const res = await fetch("/api/seerr/auto-map-preview");
+        if (!res.ok) {
+          console.error("[AUTO-MAP] Preview fetch returned", res.status);
+          showToast(`Error: Server returned ${res.status}`);
+          return;
+        }
+        const data = await res.json();
+
+        if (!data.success) {
+          showToast(`Error: ${data.message || "Unknown error"}`);
+          return;
+        }
+
+        const modal = document.getElementById("auto-map-modal");
+        const list = document.getElementById("auto-map-list");
+        const empty = document.getElementById("auto-map-empty");
+        const saveBtn = document.getElementById("auto-map-save-btn");
+
+        if (data.candidates.length === 0) {
+          list.style.display = "none";
+          empty.style.display = "block";
+          saveBtn.style.display = "none";
+        } else {
+          list.style.display = "block";
+          empty.style.display = "none";
+          saveBtn.style.display = "";
+
+          // Discord names + avatars are resolved server-side during preview generation.
+          list.innerHTML = data.candidates
+            .map(
+              (c, i) => `
+            <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--surface1); cursor: pointer;">
+              <input type="checkbox" class="auto-map-checkbox" data-index="${i}" checked style="width: 16px; height: 16px; flex-shrink: 0; cursor: pointer;">
+              <div style="position: relative; width: 36px; height: 36px; flex-shrink: 0;">
+                ${c.seerrAvatar && isSafeAvatarUrl(c.seerrAvatar) ? `<img src="${escapeHtml(c.seerrAvatar)}" onerror="this.style.display='none'" style="width:36px;height:36px;border-radius:50%;position:absolute;">` : ""}
+                ${c.discordAvatar && isSafeAvatarUrl(c.discordAvatar) ? `<img src="${escapeHtml(c.discordAvatar)}" style="width:36px;height:36px;border-radius:50%;position:absolute;">` : ""}
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 500; color: var(--text);">${escapeHtml(c.seerrDisplayName)}</div>
+                <div style="font-size: 0.8rem; color: var(--subtext0);">${c.discordUsername ? escapeHtml(`@${c.discordUsername}${c.discordDisplayName !== c.discordUsername ? ` · ${c.discordDisplayName}` : ""}`) : escapeHtml(`Discord ID: ${c.discordId}`)}</div>
+              </div>
+            </label>`
+            )
+            .join("");
+
+          modal._candidates = data.candidates;
+        }
+
+        modal.style.display = "flex";
+      } catch (err) {
+        console.error("[AUTO-MAP] Preview fetch error:", err);
+        showToast("Failed to fetch auto-map preview.");
+      } finally {
+        autoMapSeerrBtn.disabled = false;
+        autoMapSeerrBtn.innerHTML = originalHtml;
+      }
+    });
+  }
+
+  // Auto-Map modal save/cancel
+  const autoMapSaveBtn = document.getElementById("auto-map-save-btn");
+  const autoMapCancelBtn = document.getElementById("auto-map-cancel-btn");
+  const autoMapModal = document.getElementById("auto-map-modal");
+
+  function closeAutoMapModal() {
+    autoMapModal.style.display = "none";
+    autoMapModal._candidates = null;
+  }
+
+  if (autoMapCancelBtn) {
+    autoMapCancelBtn.addEventListener("click", closeAutoMapModal);
+  }
+
+  if (autoMapModal) {
+    autoMapModal.addEventListener("click", (e) => {
+      if (e.target === autoMapModal) closeAutoMapModal();
+    });
+  }
+
+  if (autoMapSaveBtn) {
+    autoMapSaveBtn.addEventListener("click", async () => {
+      const candidates = autoMapModal._candidates || [];
+      const checked = Array.from(
+        document.querySelectorAll(".auto-map-checkbox:checked")
+      );
+      const selected = checked.map((cb) => candidates[parseInt(cb.dataset.index, 10)]).filter(Boolean);
+
+      if (selected.length === 0) {
+        showToast("No mappings selected.");
+        return;
+      }
+
+      autoMapSaveBtn.disabled = true;
+      autoMapSaveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+      try {
+        const res = await fetch("/api/user-mappings/auto-map", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mappings: selected }),
+        });
+        if (!res.ok) {
+          console.error("[AUTO-MAP] Save fetch returned", res.status);
+          showToast(`Error: Server returned ${res.status}`);
+          return;
+        }
+        const result = await res.json();
+
+        if (result.success) {
+          closeAutoMapModal();
+          showToast(`${result.saved} mapping${result.saved !== 1 ? "s" : ""} saved!`);
+          await loadMappings();
+        } else {
+          showToast(`Error: ${result.message || "Unknown error"}`);
+        }
+      } catch (err) {
+        console.error("[AUTO-MAP] Save error:", err);
+        showToast("Failed to save mappings.");
+      } finally {
+        autoMapSaveBtn.disabled = false;
+        autoMapSaveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Save Mappings';
+      }
+    });
+  }
+
+  // Sync with Seerr button
+  const syncSeerrBtn = document.getElementById("sync-seerr-btn");
+  const syncSeerrModal = document.getElementById("sync-seerr-modal");
+  const syncSeerrRemoveBtn = document.getElementById("sync-seerr-remove-btn");
+  const syncSeerrCancelBtn = document.getElementById("sync-seerr-cancel-btn");
+  let syncAbortController = null;
+
+  function closeSyncModal() {
+    if (syncAbortController) {
+      syncAbortController.abort();
+      syncAbortController = null;
+    }
+    syncSeerrModal.style.display = "none";
+    syncSeerrModal._stale = null;
+  }
+
+  if (syncSeerrCancelBtn) syncSeerrCancelBtn.addEventListener("click", closeSyncModal);
+  if (syncSeerrModal) {
+    syncSeerrModal.addEventListener("click", (e) => {
+      if (e.target === syncSeerrModal) closeSyncModal();
+    });
+  }
+
+  if (syncSeerrBtn) {
+    syncSeerrBtn.addEventListener("click", async () => {
+      syncSeerrBtn.disabled = true;
+      const originalHtml = syncSeerrBtn.innerHTML;
+      syncSeerrBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking...';
+
+      try {
+        const res = await fetch("/api/seerr/sync-preview");
+        if (!res.ok) {
+          console.error("[SYNC] Preview fetch returned", res.status);
+          showToast(`Error: Server returned ${res.status}`);
+          return;
+        }
+        const data = await res.json();
+
+        if (!data.success) {
+          showToast(`Error: ${data.message || "Unknown error"}`);
+          return;
+        }
+
+        const list = document.getElementById("sync-seerr-list");
+        const empty = document.getElementById("sync-seerr-empty");
+
+        if (data.stale.length === 0) {
+          list.style.display = "none";
+          empty.style.display = "block";
+          syncSeerrRemoveBtn.style.display = "none";
+        } else {
+          list.style.display = "block";
+          empty.style.display = "none";
+          syncSeerrRemoveBtn.style.display = "";
+
+          const reasonLabel = (entry) => {
+            if (entry.reason === "seerr_user_not_found") return "Seerr user no longer exists";
+            if (entry.reason === "discord_unlinked") return "Discord unlinked in Seerr";
+            if (entry.reason === "discord_id_changed") return "Discord ID changed in Seerr";
+            return "Out of sync";
+          };
+
+          list.innerHTML = data.stale
+            .map(
+              (s, i) => `
+            <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--surface1); cursor: pointer;">
+              <input type="checkbox" class="sync-remove-checkbox" data-index="${i}" checked style="width: 16px; height: 16px; flex-shrink: 0; cursor: pointer;">
+              <div style="position: relative; width: 36px; height: 36px; flex-shrink: 0;">
+                <img id="sync-discord-avatar-${i}" src="" style="width:36px;height:36px;border-radius:50%;position:absolute;display:none;">
+                <div id="sync-discord-avatar-placeholder-${i}" style="width:36px;height:36px;border-radius:50%;background:var(--surface1);display:flex;align-items:center;justify-content:center;position:absolute;">
+                  <i class="bi bi-person" style="font-size:1.1rem;color:var(--subtext0);"></i>
+                </div>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 500; color: var(--text);">${escapeHtml(s.discordUsername ? `@${s.discordUsername}` : s.discordId)}</div>
+                <div id="sync-seerr-name-${i}" style="font-size: 0.8rem; color: var(--subtext0);">${escapeHtml(s.seerrDisplayName || `Seerr ID ${s.seerrUserId}`)}</div>
+                <div style="font-size: 0.75rem; color: var(--red); margin-top: 0.1rem;">${reasonLabel(s)}</div>
+              </div>
+            </label>`
+            )
+            .join("");
+
+          syncSeerrModal._stale = data.stale;
+
+          // Resolve Discord avatars in the background (aborted on modal close).
+          // Promises are intentionally fire-and-forget; failures only affect display enrichment.
+          if (syncAbortController) syncAbortController.abort();
+          syncAbortController = new AbortController();
+          const { signal } = syncAbortController;
+
+          data.stale.forEach(async (s, i) => {
+            if (!s.discordId) return;
+            try {
+              const r = await fetch(`/api/discord-user/${encodeURIComponent(s.discordId)}`, { signal });
+              if (!r.ok) {
+                console.warn("[SYNC] Discord user lookup failed", s.discordId, r.status);
+                return;
+              }
+              const u = await r.json();
+              if (!u.success) {
+                console.warn("[SYNC] Discord user lookup returned success=false", s.discordId, u.message);
+                return;
+              }
+              const nameEl = document.getElementById(`sync-seerr-name-${i}`);
+              const avatarEl = document.getElementById(`sync-discord-avatar-${i}`);
+              const placeholderEl = document.getElementById(`sync-discord-avatar-placeholder-${i}`);
+              if (nameEl) nameEl.textContent = s.seerrDisplayName || `Seerr ID ${s.seerrUserId}`;
+              const label = document.querySelector(`.sync-remove-checkbox[data-index="${i}"]`)?.closest("label");
+              if (label) {
+                const nameDiv = label.querySelector("div[style*='font-weight']");
+                if (nameDiv) nameDiv.textContent = `@${u.username}${u.displayName !== u.username ? ` · ${u.displayName}` : ""}`;
+              }
+              if (avatarEl && u.avatar && isSafeAvatarUrl(u.avatar)) {
+                avatarEl.src = u.avatar;
+                avatarEl.style.display = "block";
+                if (placeholderEl) placeholderEl.style.display = "none";
+              }
+            } catch (e) {
+              if (e.name !== "AbortError") console.warn("[SYNC] Could not resolve Discord user", s.discordId, e);
+            }
+          });
+        }
+
+        syncSeerrModal.style.display = "flex";
+      } catch (err) {
+        console.error("[SYNC] Preview fetch error:", err);
+        showToast("Failed to fetch sync preview.");
+      } finally {
+        syncSeerrBtn.disabled = false;
+        syncSeerrBtn.innerHTML = originalHtml;
+      }
+    });
+  }
+
+  if (syncSeerrRemoveBtn) {
+    syncSeerrRemoveBtn.addEventListener("click", async () => {
+      const stale = syncSeerrModal._stale || [];
+      const checked = Array.from(document.querySelectorAll(".sync-remove-checkbox:checked"));
+      const selected = checked.map((cb) => stale[parseInt(cb.dataset.index, 10)]).filter(Boolean);
+
+      if (selected.length === 0) {
+        showToast("No mappings selected.");
+        return;
+      }
+
+      syncSeerrRemoveBtn.disabled = true;
+      syncSeerrRemoveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Removing...';
+
+      try {
+        const res = await fetch("/api/user-mappings/sync-remove", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ discordIds: selected.map((s) => s.discordId) }),
+        });
+        if (!res.ok) {
+          let serverMsg = `Server returned ${res.status}`;
+          try {
+            const errBody = await res.json();
+            if (errBody?.message) serverMsg = errBody.message;
+          } catch (_) { /* best effort */ }
+          console.error("[SYNC] Remove fetch returned", res.status, serverMsg);
+          showToast(`Error: ${serverMsg}`);
+          return;
+        }
+        const result = await res.json();
+
+        if (result.success) {
+          closeSyncModal();
+          showToast(`${result.removed} mapping${result.removed !== 1 ? "s" : ""} removed!`);
+          await loadMappings();
+        } else {
+          showToast(`Error: ${result.message || "Unknown error"}`);
+        }
+      } catch (err) {
+        console.error("[SYNC] Remove error:", err);
+        showToast("Failed to remove mappings.");
+      } finally {
+        syncSeerrRemoveBtn.disabled = false;
+        syncSeerrRemoveBtn.innerHTML = '<i class="bi bi-trash"></i> Remove Selected';
       }
     });
   }
@@ -2911,7 +3256,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           ? "allowlist"
           : "blocklist";
         const roleColor =
-          role.color && role.color !== "#000000" ? role.color : "#b8bdc2";
+          role.color && /^#[0-9a-fA-F]{6}$/.test(role.color) && role.color !== "#000000"
+            ? role.color
+            : "#b8bdc2";
 
         return `
         <label class="role-item">
@@ -3028,10 +3375,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         .map(
           (entry) => `
         <div class="log-entry">
-          <span class="log-timestamp">${entry.timestamp}</span>
-          <span class="log-level ${
+          <span class="log-timestamp">${escapeHtml(entry.timestamp)}</span>
+          <span class="log-level ${escapeHtml(
             entry.level
-          }">${entry.level.toUpperCase()}</span>
+          )}">${escapeHtml(entry.level.toUpperCase())}</span>
           <span class="log-message">${escapeHtml(entry.message)}</span>
         </div>
       `
