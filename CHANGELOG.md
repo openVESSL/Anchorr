@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ✨ Added
 
-- **Auto-Map from Seerr**: New button in the User Mapping section that detects Seerr users who have linked their Discord account and lets you map them in one click. Shows a preview with checkboxes before saving — Discord usernames are resolved automatically via the bot if it's running
+- **Auto-Map from Seerr**: New button in the User Mapping section that detects Seerr users who have linked their Discord account and lets you map them in one click. Shows a preview with checkboxes before saving — Discord usernames are resolved automatically via the bot if it's running. A companion **Sync with Seerr** button checks existing mappings against Seerr and surfaces any that are stale (Discord unlinked, ID changed, or Seerr user deleted) so they can be removed in bulk
 
 ### 🔒 Security
 

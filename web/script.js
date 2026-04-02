@@ -2320,7 +2320,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Display mappings (with avatars if members loaded)
       displayMappings();
-    } catch (error) {}
+    } catch (error) {
+      console.error("[MAPPINGS] Failed to reload mappings:", error);
+      showToast("Mappings updated, but failed to refresh the list. Please reload the page.");
+    }
   }
 
   // Update mappings that have missing metadata
@@ -2734,6 +2737,189 @@ document.addEventListener("DOMContentLoaded", async () => {
       } finally {
         autoMapSaveBtn.disabled = false;
         autoMapSaveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Save Mappings';
+      }
+    });
+  }
+
+  // Sync with Seerr button
+  const syncSeerrBtn = document.getElementById("sync-seerr-btn");
+  const syncSeerrModal = document.getElementById("sync-seerr-modal");
+  const syncSeerrRemoveBtn = document.getElementById("sync-seerr-remove-btn");
+  const syncSeerrCancelBtn = document.getElementById("sync-seerr-cancel-btn");
+  let syncAbortController = null;
+
+  function closeSyncModal() {
+    if (syncAbortController) {
+      syncAbortController.abort();
+      syncAbortController = null;
+    }
+    syncSeerrModal.style.display = "none";
+    syncSeerrModal._stale = null;
+  }
+
+  if (syncSeerrCancelBtn) syncSeerrCancelBtn.addEventListener("click", closeSyncModal);
+  if (syncSeerrModal) {
+    syncSeerrModal.addEventListener("click", (e) => {
+      if (e.target === syncSeerrModal) closeSyncModal();
+    });
+  }
+
+  if (syncSeerrBtn) {
+    syncSeerrBtn.addEventListener("click", async () => {
+      syncSeerrBtn.disabled = true;
+      const originalHtml = syncSeerrBtn.innerHTML;
+      syncSeerrBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Checking...';
+
+      try {
+        const res = await fetch("/api/seerr/sync-preview");
+        if (!res.ok) {
+          console.error("[SYNC] Preview fetch returned", res.status);
+          showToast(`Error: Server returned ${res.status}`);
+          return;
+        }
+        const data = await res.json();
+
+        if (!data.success) {
+          showToast(`Error: ${data.message || "Unknown error"}`);
+          return;
+        }
+
+        const list = document.getElementById("sync-seerr-list");
+        const empty = document.getElementById("sync-seerr-empty");
+
+        if (data.stale.length === 0) {
+          list.style.display = "none";
+          empty.style.display = "block";
+          syncSeerrRemoveBtn.style.display = "none";
+        } else {
+          list.style.display = "block";
+          empty.style.display = "none";
+          syncSeerrRemoveBtn.style.display = "";
+
+          const reasonLabel = (entry) => {
+            if (entry.reason === "seerr_user_not_found") return "Seerr user no longer exists";
+            if (entry.reason === "discord_unlinked") return "Discord unlinked in Seerr";
+            if (entry.reason === "discord_id_changed") return "Discord ID changed in Seerr";
+            return "Out of sync";
+          };
+
+          list.innerHTML = data.stale
+            .map(
+              (s, i) => `
+            <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--surface1); cursor: pointer;">
+              <input type="checkbox" class="sync-remove-checkbox" data-index="${i}" checked style="width: 16px; height: 16px; flex-shrink: 0; cursor: pointer;">
+              <div style="position: relative; width: 36px; height: 36px; flex-shrink: 0;">
+                <img id="sync-discord-avatar-${i}" src="" style="width:36px;height:36px;border-radius:50%;position:absolute;display:none;">
+                <div id="sync-discord-avatar-placeholder-${i}" style="width:36px;height:36px;border-radius:50%;background:var(--surface1);display:flex;align-items:center;justify-content:center;position:absolute;">
+                  <i class="bi bi-person" style="font-size:1.1rem;color:var(--subtext0);"></i>
+                </div>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 500; color: var(--text);">${escapeHtml(s.discordUsername ? `@${s.discordUsername}` : s.discordId)}</div>
+                <div id="sync-seerr-name-${i}" style="font-size: 0.8rem; color: var(--subtext0);">${escapeHtml(s.seerrDisplayName || `Seerr ID ${s.seerrUserId}`)}</div>
+                <div style="font-size: 0.75rem; color: var(--red); margin-top: 0.1rem;">${reasonLabel(s)}</div>
+              </div>
+            </label>`
+            )
+            .join("");
+
+          syncSeerrModal._stale = data.stale;
+
+          // Resolve Discord avatars in the background (aborted on modal close).
+          // Promises are intentionally fire-and-forget; failures only affect display enrichment.
+          if (syncAbortController) syncAbortController.abort();
+          syncAbortController = new AbortController();
+          const { signal } = syncAbortController;
+
+          data.stale.forEach(async (s, i) => {
+            if (!s.discordId) return;
+            try {
+              const r = await fetch(`/api/discord-user/${encodeURIComponent(s.discordId)}`, { signal });
+              if (!r.ok) {
+                console.warn("[SYNC] Discord user lookup failed", s.discordId, r.status);
+                return;
+              }
+              const u = await r.json();
+              if (!u.success) {
+                console.warn("[SYNC] Discord user lookup returned success=false", s.discordId, u.message);
+                return;
+              }
+              const nameEl = document.getElementById(`sync-seerr-name-${i}`);
+              const avatarEl = document.getElementById(`sync-discord-avatar-${i}`);
+              const placeholderEl = document.getElementById(`sync-discord-avatar-placeholder-${i}`);
+              if (nameEl) nameEl.textContent = s.seerrDisplayName || `Seerr ID ${s.seerrUserId}`;
+              const label = document.querySelector(`.sync-remove-checkbox[data-index="${i}"]`)?.closest("label");
+              if (label) {
+                const nameDiv = label.querySelector("div[style*='font-weight']");
+                if (nameDiv) nameDiv.textContent = `@${u.username}${u.displayName !== u.username ? ` · ${u.displayName}` : ""}`;
+              }
+              if (avatarEl && u.avatar && isSafeAvatarUrl(u.avatar)) {
+                avatarEl.src = u.avatar;
+                avatarEl.style.display = "block";
+                if (placeholderEl) placeholderEl.style.display = "none";
+              }
+            } catch (e) {
+              if (e.name !== "AbortError") console.warn("[SYNC] Could not resolve Discord user", s.discordId, e);
+            }
+          });
+        }
+
+        syncSeerrModal.style.display = "flex";
+      } catch (err) {
+        console.error("[SYNC] Preview fetch error:", err);
+        showToast("Failed to fetch sync preview.");
+      } finally {
+        syncSeerrBtn.disabled = false;
+        syncSeerrBtn.innerHTML = originalHtml;
+      }
+    });
+  }
+
+  if (syncSeerrRemoveBtn) {
+    syncSeerrRemoveBtn.addEventListener("click", async () => {
+      const stale = syncSeerrModal._stale || [];
+      const checked = Array.from(document.querySelectorAll(".sync-remove-checkbox:checked"));
+      const selected = checked.map((cb) => stale[parseInt(cb.dataset.index, 10)]).filter(Boolean);
+
+      if (selected.length === 0) {
+        showToast("No mappings selected.");
+        return;
+      }
+
+      syncSeerrRemoveBtn.disabled = true;
+      syncSeerrRemoveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Removing...';
+
+      try {
+        const res = await fetch("/api/user-mappings/sync-remove", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ discordIds: selected.map((s) => s.discordId) }),
+        });
+        if (!res.ok) {
+          let serverMsg = `Server returned ${res.status}`;
+          try {
+            const errBody = await res.json();
+            if (errBody?.message) serverMsg = errBody.message;
+          } catch (_) { /* best effort */ }
+          console.error("[SYNC] Remove fetch returned", res.status, serverMsg);
+          showToast(`Error: ${serverMsg}`);
+          return;
+        }
+        const result = await res.json();
+
+        if (result.success) {
+          closeSyncModal();
+          showToast(`${result.removed} mapping${result.removed !== 1 ? "s" : ""} removed!`);
+          await loadMappings();
+        } else {
+          showToast(`Error: ${result.message || "Unknown error"}`);
+        }
+      } catch (err) {
+        console.error("[SYNC] Remove error:", err);
+        showToast("Failed to remove mappings.");
+      } finally {
+        syncSeerrRemoveBtn.disabled = false;
+        syncSeerrRemoveBtn.innerHTML = '<i class="bi bi-trash"></i> Remove Selected';
       }
     });
   }

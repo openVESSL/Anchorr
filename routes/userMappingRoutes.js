@@ -154,6 +154,59 @@ router.post("/user-mappings/auto-map", authenticateToken, async (req, res) => {
   res.json({ success: true, saved, skipped });
 });
 
+router.post("/user-mappings/sync-remove", authenticateToken, (req, res) => {
+  const { discordIds } = req.body;
+
+  if (!Array.isArray(discordIds) || discordIds.length === 0) {
+    return res.status(400).json({ success: false, message: "No Discord IDs provided." });
+  }
+
+  if (discordIds.length > 500) {
+    return res.status(400).json({ success: false, message: "Too many IDs (max 500)." });
+  }
+
+  let removed = 0;
+  let skipped = 0;
+  let errored = 0;
+
+  for (const id of discordIds) {
+    if (typeof id !== "string" || !/^\d{17,20}$/.test(id)) {
+      skipped++;
+      continue;
+    }
+    try {
+      const deleted = deleteUserMapping(id);
+      if (deleted) {
+        removed++;
+      } else {
+        skipped++;
+      }
+    } catch (err) {
+      logger.error(`[SYNC-REMOVE] Failed to delete mapping for ${id}:`, err.message);
+      errored++;
+      skipped++;
+    }
+  }
+
+  if (removed > 0) {
+    const envLoaded = loadConfigToEnv();
+    if (!envLoaded) {
+      logger.error("[SYNC-REMOVE] loadConfigToEnv failed after deleting mappings — bot env may be stale");
+      return res.status(500).json({
+        success: false,
+        message: `Deleted ${removed} mapping(s) from disk but failed to reload config. Restart the bot or check disk permissions.`,
+      });
+    }
+  }
+
+  if (errored > 0) {
+    logger.warn(`[SYNC-REMOVE] ${errored} deletion(s) failed with errors`);
+  }
+
+  logger.info(`[SYNC-REMOVE] Removed ${removed} mappings, skipped ${skipped}`);
+  res.json({ success: true, removed, skipped, errored });
+});
+
 router.delete("/user-mappings/:discordUserId", authenticateToken, (req, res) => {
   const { discordUserId } = req.params;
 

@@ -234,4 +234,82 @@ router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
   }
 });
 
+router.get("/seerr/sync-preview", authenticateToken, async (_req, res) => {
+  const seerrUrl = process.env.SEERR_URL;
+  const apiKey = process.env.SEERR_API_KEY;
+
+  if (!seerrUrl || !apiKey) {
+    return res.status(400).json({ success: false, message: "Seerr not configured." });
+  }
+
+  try {
+    const baseUrl = getSeerrApiUrl(seerrUrl);
+    const existingMappings = getUserMappings();
+
+    if (existingMappings.length === 0) {
+      return res.json({ success: true, stale: [] });
+    }
+
+    const stale = [];
+    const BATCH_SIZE = 5;
+
+    for (let i = 0; i < existingMappings.length; i += BATCH_SIZE) {
+      const batch = existingMappings.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(async (mapping) => {
+          const settingsRes = await axios.get(
+            `${baseUrl}/user/${mapping.seerrUserId}/settings/notifications`,
+            { headers: { "X-Api-Key": apiKey }, timeout: TIMEOUTS.SEERR_API }
+          );
+          return { mapping, currentDiscordId: settingsRes.data?.discordId || null };
+        })
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        const mapping = batch[j];
+
+        if (result.status !== "fulfilled") {
+          const status = result.reason?.response?.status;
+          if (status === 404) {
+            // Seerr user no longer exists — mapping is stale
+            stale.push({
+              discordId: mapping.discordUserId,
+              seerrUserId: mapping.seerrUserId,
+              seerrDisplayName: mapping.seerrDisplayName || null,
+              discordUsername: mapping.discordUsername || null,
+              discordDisplayName: mapping.discordDisplayName || null,
+              currentSeerrDiscordId: null,
+              reason: "seerr_user_not_found",
+            });
+          } else {
+            // Transient error (timeout, 500, 429) — skip to avoid false positives
+            logger.warn(`[SYNC] Could not check mapping for Seerr user ${mapping.seerrUserId}: ${result.reason?.message}`);
+          }
+          continue;
+        }
+
+        const { currentDiscordId } = result.value;
+        if (currentDiscordId !== mapping.discordUserId) {
+          stale.push({
+            discordId: mapping.discordUserId,
+            seerrUserId: mapping.seerrUserId,
+            seerrDisplayName: mapping.seerrDisplayName || null,
+            discordUsername: mapping.discordUsername || null,
+            discordDisplayName: mapping.discordDisplayName || null,
+            currentSeerrDiscordId: currentDiscordId,
+            reason: currentDiscordId ? "discord_id_changed" : "discord_unlinked",
+          });
+        }
+      }
+    }
+
+    logger.info(`[SYNC] Found ${stale.length} stale mappings`);
+    res.json({ success: true, stale });
+  } catch (err) {
+    logger.error("[SYNC] Preview failed:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch sync preview — check server logs." });
+  }
+});
+
 export default router;
