@@ -339,6 +339,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       
       updateWebhookUrl();
     } catch (error) {
+      console.error("[Anchorr] fetchConfig failed:", error);
       showToast("Error fetching configuration.");
     }
   }

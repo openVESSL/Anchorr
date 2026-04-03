@@ -166,7 +166,9 @@ function verifyVolumeConfiguration() {
       logger.error(`   On Unraid: set the host path permissions to 777 in the share settings.`);
       process.exit(1);
     } else {
-      logger.error(`❌ Error verifying volume configuration:`, error);
+      logger.error(`❌ CRITICAL: Cannot write to ${configDir} — filesystem error (${error.code || "unknown"}).`);
+      logger.error(`   Check volume mount and filesystem health.`);
+      process.exit(1);
     }
   }
 }
