@@ -19,7 +19,7 @@ services:
     #   chmod 777 ./anchorr-data
     labels:
       - "com.example.description=Discord bot for Jellyfin media requests via Seerr"
-      - "com.example.version=1.4.5"
+      - "com.example.version=1.4.9"
       - "org.opencontainers.image.title=Anchorr"
       - "org.opencontainers.image.description=Discord bot for requesting media and Jellyfin notifications"
       - "org.unraid.icon=https://raw.githubusercontent.com/nairdahh/anchorr/main/assets/logo.png"
