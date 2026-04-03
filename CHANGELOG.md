@@ -24,7 +24,7 @@ The container now runs as a non-root user (`app`). If your host-side config dire
 
 ```bash
 # Run this on the Docker host before restarting the container
-chmod 777 ./config
+chmod 777 ./anchorr-data
 ```
 
 On **Unraid**: open the share settings for your appdata path and set permissions to `777`, or run the above from the terminal.
