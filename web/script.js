@@ -303,6 +303,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
       
+      // Sync debounce seconds display after config load (MutationObserver doesn't fire on .value assignments)
+      const _msField = document.getElementById("WEBHOOK_DEBOUNCE_MS");
+      const _secField = document.getElementById("WEBHOOK_DEBOUNCE_SECONDS");
+      if (_msField && _secField) {
+        const _ms = parseInt(_msField.value);
+        if (!isNaN(_ms) && _ms > 0) _secField.value = Math.round(_ms / 1000);
+      }
+
       // Sync app-language selector with LANGUAGE config value
       if (config.LANGUAGE) {
         const appLanguageSelect = document.getElementById('app-language');
@@ -331,6 +339,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       
       updateWebhookUrl();
     } catch (error) {
+      console.error("[Anchorr] fetchConfig failed:", error);
       showToast("Error fetching configuration.");
     }
   }
@@ -3683,4 +3692,92 @@ document.addEventListener("DOMContentLoaded", async () => {
   setTimeout(() => {
     initializeHeaderVisibility();
   }, 100);
+
+  // Initialize color picker (guarded: Coloris loads from CDN and may be unavailable)
+  try {
+    if (typeof Coloris === "function") {
+      Coloris({
+        el: "[data-coloris]",
+        theme: "large",
+        themeMode: "dark",
+        format: "hex",
+        swatches: [
+          "#cba6f7", // Mauve
+          "#89b4fa", // Blue
+          "#a6e3a1", // Green
+          "#ef9f76", // Peach
+          "#f38ba8", // Red
+          "#f9e2af", // Yellow
+        ],
+      });
+    } else {
+      console.error("[Anchorr] Coloris failed to load — color pickers will not work.");
+    }
+  } catch (e) {
+    console.error("[Anchorr] Coloris initialization failed:", e);
+  }
+
+  // Debounce seconds spinner — syncs the display input (seconds) with the hidden ms field
+  const secondsInput = document.getElementById("WEBHOOK_DEBOUNCE_SECONDS");
+  const msInput = document.getElementById("WEBHOOK_DEBOUNCE_MS");
+  const upArrow = document.getElementById("debounce-up");
+  const downArrow = document.getElementById("debounce-down");
+
+  if (secondsInput && msInput) {
+    secondsInput.addEventListener("input", function () {
+      let seconds = parseInt(this.value) || 60;
+      if (seconds < 1) seconds = 1;
+      if (seconds > 600) seconds = 600;
+      this.value = seconds;
+      msInput.value = seconds * 1000;
+    });
+
+    let repeatInterval = null;
+    let repeatTimeout = null;
+
+    const startRepeat = function (direction) {
+      const increment = function () {
+        let current = parseInt(secondsInput.value) || 60;
+        if (direction === "up" && current < 600) {
+          secondsInput.value = current + 1;
+          msInput.value = (current + 1) * 1000;
+        } else if (direction === "down" && current > 1) {
+          secondsInput.value = current - 1;
+          msInput.value = (current - 1) * 1000;
+        }
+      };
+      increment();
+      repeatTimeout = setTimeout(function () {
+        repeatInterval = setInterval(increment, 50);
+      }, 300);
+    };
+
+    const stopRepeat = function () {
+      if (repeatTimeout) {
+        clearTimeout(repeatTimeout);
+        repeatTimeout = null;
+      }
+      if (repeatInterval) {
+        clearInterval(repeatInterval);
+        repeatInterval = null;
+      }
+    };
+
+    if (upArrow) {
+      upArrow.addEventListener("mousedown", () => startRepeat("up"));
+      upArrow.addEventListener("mouseup", stopRepeat);
+      upArrow.addEventListener("mouseleave", stopRepeat);
+      upArrow.addEventListener("touchstart", (e) => { e.preventDefault(); startRepeat("up"); });
+      upArrow.addEventListener("touchend", stopRepeat);
+    }
+
+    if (downArrow) {
+      downArrow.addEventListener("mousedown", () => startRepeat("down"));
+      downArrow.addEventListener("mouseup", stopRepeat);
+      downArrow.addEventListener("mouseleave", stopRepeat);
+      downArrow.addEventListener("touchstart", (e) => { e.preventDefault(); startRepeat("down"); });
+      downArrow.addEventListener("touchend", stopRepeat);
+    }
+
+  }
 });

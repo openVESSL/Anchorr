@@ -2935,3 +2935,50 @@ body:not(.auth-mode) .hero.collapsed {
     transform: scale(1) translateY(0);
   }
 }
+
+/* Debounce seconds spinner widget */
+#WEBHOOK_DEBOUNCE_SECONDS::-webkit-outer-spin-button,
+#WEBHOOK_DEBOUNCE_SECONDS::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.debounce-arrows {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+}
+.debounce-arrow {
+  width: 24px;
+  height: 24px;
+  background-color: var(--surface1);
+  border: 1px solid var(--surface2);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.debounce-arrow:hover {
+  background-color: var(--surface2);
+  border-color: var(--mauve);
+}
+.debounce-arrow:active {
+  background-color: var(--mauve);
+  transform: scale(0.95);
+}
+.debounce-arrow svg {
+  width: 12px;
+  height: 12px;
+  fill: var(--text);
+}
+.debounce-arrow:hover svg {
+  fill: var(--mauve);
+}
+.debounce-arrow:active svg {
+  fill: var(--crust);
+}
