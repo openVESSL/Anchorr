@@ -20,14 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 The container now runs as a non-root user (`app`). If your host-side config directory was created by a previous (root-running) container, it will be owned by `root` and the container will fail to write `config.json`.
 
-**Fix:**
+**Fix — run this on the Docker host for the directory you mapped to `/usr/src/app/config`:**
 
 ```bash
-# Run this on the Docker host before restarting the container
-chmod 777 ./anchorr-data
+chmod 777 /path/to/your/config
 ```
 
-On **Unraid**: open the share settings for your appdata path and set permissions to `777`, or run the above from the terminal.
+On **Unraid**: open the share settings for your appdata path and set permissions to `777`.
 
 ---
 

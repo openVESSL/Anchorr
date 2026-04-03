@@ -15,8 +15,8 @@ services:
       # Change "./anchorr-data" to your preferred path
       - ./anchorr-data:/usr/src/app/config
     # The container runs as a non-root user.
-    # If the host directory (./anchorr-data) is not writable by the container user, run:
-    #   chmod 777 ./anchorr-data
+    # If the host directory is not writable by the container user, run:
+    #   chmod 777 ./anchorr-data   (or your configured host path)
     labels:
       - "com.example.description=Discord bot for Jellyfin media requests via Seerr"
       - "com.example.version=1.4.9"
