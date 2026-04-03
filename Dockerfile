@@ -43,7 +43,7 @@ ENV NODE_ENV=production
 
 # Create config directory inside the app for persistent storage
 # This keeps config with the application and avoids permission issues
-RUN mkdir -p /usr/src/app/config && chmod 777 /usr/src/app/config
+RUN mkdir -p /usr/src/app/config && chown app:app /usr/src/app/config && chmod 755 /usr/src/app/config
 
 # Declare config directory as a persistent volume
 # This ensures data persists when container is recreated/updated

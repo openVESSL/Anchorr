@@ -161,12 +161,10 @@ function verifyVolumeConfiguration() {
     );
   } catch (error) {
     if (error.code === "EACCES") {
-      logger.error(
-        `❌ CRITICAL: Cannot write to ${configDir} - check Docker volume permissions`
-      );
-      logger.error(`   On Unraid: Ensure host path is mapped to /config`);
-      logger.error(`   On Docker: Verify volume mount in docker-compose.yml`);
-      logger.error(`   Current config path: ${CONFIG_PATH}`);
+      logger.error(`❌ CRITICAL: Cannot write to ${configDir} — volume permissions are incorrect.`);
+      logger.error(`   Fix: run "chmod 777 ./anchorr-data" on the Docker host, then restart.`);
+      logger.error(`   On Unraid: set the host path permissions to 777 in the share settings.`);
+      process.exit(1);
     } else {
       logger.error(`❌ Error verifying volume configuration:`, error);
     }
@@ -192,8 +190,10 @@ function configureWebServer() {
       [
         "default-src 'self'",
         "script-src 'self' cdn.jsdelivr.net",
-        "style-src 'self' cdnjs.cloudflare.com cdn.jsdelivr.net",
-        "font-src cdnjs.cloudflare.com",
+        // 'unsafe-inline' is required for the ~200 inline style attributes in index.html.
+        // script-src has no 'unsafe-inline', which is where CSP protection matters most.
+        "style-src 'self' 'unsafe-inline' cdnjs.cloudflare.com cdn.jsdelivr.net",
+        "font-src cdnjs.cloudflare.com cdn.jsdelivr.net",
         // img-src is permissive for http/https because Discord and Seerr avatars
         // can come from any user-configured origin; isSafeAvatarUrl() validates these client-side
         "img-src 'self' https: http: data:",

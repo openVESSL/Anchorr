@@ -303,6 +303,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
       
+      // Sync debounce seconds display after config load (MutationObserver doesn't fire on .value assignments)
+      const _msField = document.getElementById("WEBHOOK_DEBOUNCE_MS");
+      const _secField = document.getElementById("WEBHOOK_DEBOUNCE_SECONDS");
+      if (_msField && _secField) {
+        const _ms = parseInt(_msField.value);
+        if (!isNaN(_ms) && _ms > 0) _secField.value = Math.round(_ms / 1000);
+      }
+
       // Sync app-language selector with LANGUAGE config value
       if (config.LANGUAGE) {
         const appLanguageSelect = document.getElementById('app-language');
@@ -3684,21 +3692,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     initializeHeaderVisibility();
   }, 100);
 
-  // Initialize color picker
-  Coloris({
-    el: "[data-coloris]",
-    theme: "large",
-    themeMode: "dark",
-    format: "hex",
-    swatches: [
-      "#cba6f7", // Mauve
-      "#89b4fa", // Blue
-      "#a6e3a1", // Green
-      "#ef9f76", // Peach
-      "#f38ba8", // Red
-      "#f9e2af", // Yellow
-    ],
-  });
+  // Initialize color picker (guarded: Coloris loads from CDN and may be unavailable)
+  try {
+    if (typeof Coloris === "function") {
+      Coloris({
+        el: "[data-coloris]",
+        theme: "large",
+        themeMode: "dark",
+        format: "hex",
+        swatches: [
+          "#cba6f7", // Mauve
+          "#89b4fa", // Blue
+          "#a6e3a1", // Green
+          "#ef9f76", // Peach
+          "#f38ba8", // Red
+          "#f9e2af", // Yellow
+        ],
+      });
+    } else {
+      console.error("[Anchorr] Coloris failed to load — color pickers will not work.");
+    }
+  } catch (e) {
+    console.error("[Anchorr] Coloris initialization failed:", e);
+  }
 
   // Debounce seconds spinner — syncs the display input (seconds) with the hidden ms field
   const secondsInput = document.getElementById("WEBHOOK_DEBOUNCE_SECONDS");
@@ -3762,15 +3778,5 @@ document.addEventListener("DOMContentLoaded", async () => {
       downArrow.addEventListener("touchend", stopRepeat);
     }
 
-    const updateSecondsFromMs = function () {
-      const ms = parseInt(msInput.value);
-      if (!isNaN(ms) && ms > 0) {
-        secondsInput.value = Math.round(ms / 1000);
-      }
-    };
-
-    const observer = new MutationObserver(updateSecondsFromMs);
-    observer.observe(msInput, { attributes: true, attributeFilter: ["value"] });
-    updateSecondsFromMs();
   }
 });
