@@ -14,10 +14,9 @@ services:
       # The directory ./anchorr-data will be created automatically by Docker
       # Change "./anchorr-data" to your preferred path
       - ./anchorr-data:/usr/src/app/config
-    # Run as root to ensure write permissions (safe for localhost deployment)
-    # Running as root allows Docker to create the directory automatically with correct permissions
-    # For non-root: uncomment below, manually create ./anchorr-data, and set to your user/group ID
-    # user: "1000:1000"
+    # The container runs as a non-root user.
+    # If the host directory (./anchorr-data) is not writable by the container user, run:
+    #   chmod 777 ./anchorr-data
     labels:
       - "com.example.description=Discord bot for Jellyfin media requests via Seerr"
       - "com.example.version=1.4.5"

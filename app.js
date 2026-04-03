@@ -187,6 +187,21 @@ function configureWebServer() {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-XSS-Protection", "1; mode=block");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "script-src 'self' cdn.jsdelivr.net",
+        "style-src 'self' cdnjs.cloudflare.com cdn.jsdelivr.net",
+        "font-src cdnjs.cloudflare.com",
+        // img-src is permissive for http/https because Discord and Seerr avatars
+        // can come from any user-configured origin; isSafeAvatarUrl() validates these client-side
+        "img-src 'self' https: http: data:",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'self'",
+      ].join("; ")
+    );
     next();
   });
 

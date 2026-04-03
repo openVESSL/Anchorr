@@ -11,15 +11,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 # copy source
 COPY . .
 
-# create non-root user (optional, for security)
+# create non-root user
 RUN addgroup -S app && adduser -S -G app app && \
     chown -R app:app /usr/src/app && \
     chmod -R 755 /usr/src/app
-
-# For localhost/local network deployment, running as root is acceptable
-# This ensures config.json can always be written to mounted volumes
-# If you need non-root, use: USER app and ensure proper volume permissions
-# USER app
 
 EXPOSE 8282
 
@@ -53,5 +48,11 @@ RUN mkdir -p /usr/src/app/config && chmod 777 /usr/src/app/config
 # Declare config directory as a persistent volume
 # This ensures data persists when container is recreated/updated
 VOLUME ["/usr/src/app/config"]
+
+# Switch to non-root user for runtime
+# Volume mounts need to allow writes by uid/gid of the app user.
+# On Docker: chown the host directory or use `userns-remap`.
+# On Unraid: set the host path permissions to 777 or match the container user.
+USER app
 
 CMD ["node", "app.js"]
