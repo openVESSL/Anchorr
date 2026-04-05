@@ -38,69 +38,6 @@ import { SENSITIVE_FIELDS, isMaskedValue } from "./utils/configSanitize.js";
 
 // --- Helper Functions ---
 // --- CONFIGURATION ---
-const ENV_PATH = path.join(process.cwd(), ".env");
-
-function parseEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return {};
-  }
-
-  try {
-    const content = fs.readFileSync(filePath, "utf-8");
-    const envVars = {};
-
-    content.split("\n").forEach((line) => {
-      line = line.trim();
-      // Skip empty lines and comments
-      if (!line || line.startsWith("#")) return;
-
-      const [key, ...valueParts] = line.split("=");
-      const trimmedKey = key.trim();
-      const trimmedValue = valueParts.join("=").trim();
-
-      // Remove quotes if present
-      const cleanValue = trimmedValue.replace(/^["']|["']$/g, "");
-
-      if (trimmedKey && cleanValue) {
-        envVars[trimmedKey] = cleanValue;
-      }
-    });
-
-    return envVars;
-  } catch (error) {
-    logger.error("Error reading or parsing .env file:", error);
-    return {};
-  }
-}
-
-function migrateEnvToConfig() {
-  // Check if .env exists and config.json doesn't
-  if (fs.existsSync(ENV_PATH) && !fs.existsSync(CONFIG_PATH)) {
-    logger.info(
-      "🔄 Detected .env file. Migrating environment variables to config.json..."
-    );
-
-    const envVars = parseEnvFile(ENV_PATH);
-    const migratedConfig = { ...configTemplate };
-
-    // Map .env variables to config
-    for (const [key, value] of Object.entries(envVars)) {
-      if (key in migratedConfig) {
-        migratedConfig[key] = value;
-      }
-    }
-
-    // Save migrated config using centralized writeConfig
-    if (writeConfig(migratedConfig)) {
-      logger.info("✅ Migration successful! config.json created from .env");
-      logger.info(
-        "📝 You can now delete the .env file as it's no longer needed."
-      );
-    } else {
-      logger.error("❌ Error saving migrated config - check permissions");
-    }
-  }
-}
 
 function loadConfig() {
   logger.debug("[LOADCONFIG] Checking CONFIG_PATH:", CONFIG_PATH);
@@ -124,7 +61,10 @@ function loadConfig() {
       process.env.DISCORD_TOKEN ? "SET" : "UNDEFINED"
     );
   } else {
-    logger.debug("[LOADCONFIG] Config file does not exist or failed to load");
+    logger.warn("[LOADCONFIG] No config.json found — the bot cannot start correctly.");
+    if (fs.existsSync(path.join(__dirname, ".env"))) {
+      logger.warn("[LOADCONFIG] A .env file was detected. Anchorr no longer reads .env — configure the bot via the web dashboard at http://localhost:8282");
+    }
   }
 
   return success;
@@ -1063,9 +1003,6 @@ function configureWebServer() {
 }
 
 // --- INITIALIZE AND START SERVER ---
-// First, check for .env migration before anything else
-migrateEnvToConfig();
-
 logger.info("Initializing web server...");
 configureWebServer();
 logger.info("Web server configured successfully");

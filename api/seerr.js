@@ -130,7 +130,8 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
  * @param {Array} requestedSeasons - Season numbers or ['all']
  * @param {string} seerrUrl - Seerr API URL
  * @param {string} apiKey - Seerr API key
- * @returns {Promise<Object>} Status object
+ * @returns {Promise<Object>} Status object { exists, available, status?, data? }
+ * @throws {Error} For network errors, authentication failures, or 5xx responses
  */
 export async function checkMediaStatus(
   tmdbId,
@@ -215,12 +216,13 @@ export async function checkMediaStatus(
       data: response.data,
     };
   } catch (err) {
-    // If 404, media doesn't exist in Seerr
+    // If 404, media doesn't exist in Seerr — this is an expected state, not an error
     if (err.response && err.response.status === 404) {
       return { exists: false, available: false };
     }
-    logger.warn("Error checking media status:", err?.message || err);
-    return { exists: false, available: false };
+    // For all other errors (network, auth, 5xx) propagate so callers can surface them
+    logger.error("Error checking media status:", err?.message || err);
+    throw err;
   }
 }
 
@@ -396,10 +398,12 @@ export async function sendRequest({
     logger.debug(`[SEERR] Using tags: ${payload.tags.join(", ")}`);
   }
 
-  // CRITICAL: Logic to handle auto-approval vs pending status
-  // Seerr will auto-approve requests if serverId/profileId are provided,
-  // regardless of the isAutoApproved flag. Therefore, we MUST NOT send these
-  // fields unless we explicitly want auto-approval.
+  // Auto-approval is controlled by the isAutoApproved flag AND the x-api-user header
+  // (set below). When isAutoApproved is false, we explicitly set payload.isAutoApproved = false
+  // and send x-api-user so the request runs under the mapped user's permissions.
+  // serverId/profileId are included in both branches because Seerr requires them
+  // for TV show requests to work correctly — the pending/approved outcome is determined
+  // by the combination of isAutoApproved and x-api-user, not by omitting server fields.
 
   if (isAutoApproved === true) {
     // User wants auto-approval - send all details

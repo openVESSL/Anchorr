@@ -103,10 +103,6 @@ export function validateBody(schema) {
         message: detail.message,
       }));
 
-      // Log validation errors for debugging
-      // console.error("Validation failed:", JSON.stringify(errors, null, 2));
-      // console.error("Received body:", JSON.stringify(req.body, null, 2));
-
       return res.status(400).json({
         success: false,
         message: "Validation failed",

@@ -59,7 +59,10 @@ export async function sendDailyRandomPick(client) {
       return;
     }
 
-    const channel = await client.channels.fetch(channelId).catch(() => null);
+    const channel = await client.channels.fetch(channelId).catch((err) => {
+      logger.error(`[DAILY PICK] Failed to fetch channel ${channelId}:`, err);
+      return null;
+    });
     if (!channel) {
       logger.warn(`Daily Random Pick channel not found: ${channelId}`);
       return;
