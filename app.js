@@ -101,14 +101,14 @@ function verifyVolumeConfiguration() {
     );
   } catch (error) {
     if (error.code === "EACCES") {
-      logger.error(
-        `❌ CRITICAL: Cannot write to ${configDir} - check Docker volume permissions`
-      );
-      logger.error(`   On Unraid: Ensure host path is mapped to /config`);
-      logger.error(`   On Docker: Verify volume mount in docker-compose.yml`);
-      logger.error(`   Current config path: ${CONFIG_PATH}`);
+      logger.error(`❌ CRITICAL: Cannot write to ${configDir} — volume permissions are incorrect.`);
+      logger.error(`   Fix: run "chmod 777 ./anchorr-data" on the Docker host, then restart.`);
+      logger.error(`   On Unraid: set the host path permissions to 777 in the share settings.`);
+      process.exit(1);
     } else {
-      logger.error(`❌ Error verifying volume configuration:`, error);
+      logger.error(`❌ CRITICAL: Cannot write to ${configDir} — filesystem error (${error.code || "unknown"}).`);
+      logger.error(`   Check volume mount and filesystem health.`);
+      process.exit(1);
     }
   }
 }
@@ -127,6 +127,24 @@ function configureWebServer() {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-XSS-Protection", "1; mode=block");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "script-src 'self' cdn.jsdelivr.net",
+        // TODO: Remove 'unsafe-inline' from style-src once the ~200 inline style=""
+        // attributes in web/index.html are moved to web/style.css or covered by a nonce.
+        // script-src intentionally has no 'unsafe-inline', which is where CSP matters most.
+        "style-src 'self' 'unsafe-inline' cdnjs.cloudflare.com cdn.jsdelivr.net",
+        "font-src cdnjs.cloudflare.com cdn.jsdelivr.net",
+        // img-src is permissive for http/https because Discord and Seerr avatars
+        // can come from any user-configured origin; isSafeAvatarUrl() validates these client-side
+        "img-src 'self' https: http: data:",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'self'",
+      ].join("; ")
+    );
     next();
   });
 

@@ -211,7 +211,7 @@ export const login = async (req, res) => {
 
   res.cookie("auth_token", token, {
     httpOnly: true,
-    secure: req.secure || req.headers["x-forwarded-proto"] === "https",
+    secure: req.secure,
     sameSite: "strict",
     maxAge: AUTH_TOKEN_MAX_AGE_MS,
   });
@@ -257,7 +257,7 @@ export const register = async (req, res) => {
 
     res.cookie("auth_token", token, {
       httpOnly: true,
-      secure: req.secure || req.headers["x-forwarded-proto"] === "https",
+      secure: req.secure,
       sameSite: "strict",
       maxAge: AUTH_TOKEN_MAX_AGE_MS,
     });
