@@ -6,10 +6,12 @@ WORKDIR /usr/src/app
 
 # install app dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force && apk add --no-cache su-exec
 
 # copy source
 COPY . .
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # create non-root user
 RUN addgroup -S app && adduser -S -G app app && \
@@ -49,10 +51,6 @@ RUN mkdir -p /usr/src/app/config && chown app:app /usr/src/app/config && chmod 7
 # This ensures data persists when container is recreated/updated
 VOLUME ["/usr/src/app/config"]
 
-# Switch to non-root user for runtime
-# Volume mounts need to allow writes by uid/gid of the app user.
-# On Docker: chown the host directory or use `userns-remap`.
-# On Unraid: set the host path permissions to 777 or match the container user.
-USER app
-
+# Entrypoint runs as root, fixes volume ownership, then drops to the app user
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "app.js"]
