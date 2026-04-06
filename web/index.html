@@ -33,11 +33,7 @@
               </a>
             </li>
             <li>
-              <a
-                href="https://github.com/nairdahh/Anchorr"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href="https://github.com/nairdahh/Anchorr" target="_blank" rel="noopener noreferrer">
                 <i class="bi bi-github nav-icon" aria-hidden="true"></i>
                 <span>GitHub</span>
               </a>
@@ -56,7 +52,6 @@
       <header id="main-hero" class="hero full-screen no-animate">
         <div class="container">
           <div class="hero-aurora"></div>
-          <!-- Hide Header Button -->
           <button id="hide-header-btn" class="hide-header-btn" title="Hide header" data-i18n="ui.hide_header" data-i18n-attr="title">
             <i class="bi bi-chevron-up"></i>
           </button>
@@ -65,33 +60,29 @@
               <!-- Auth Text -->
               <div id="hero-text-auth">
                 <h1 class="hero-title">Anchorr</h1>
-                <p class="hero-subtitle">
-                  Secure, self-hosted bridge for your media server.
-                </p>
+                <p class="hero-subtitle">Secure, self-hosted bridge for your media server.</p>
               </div>
 
               <!-- Dashboard Text -->
               <div id="hero-text-dashboard" style="display: none;">
                 <h1 class="hero-title" data-i18n="dashboard.title">Anchorr Configuration</h1>
                 <p class="hero-subtitle">
-                  <span data-i18n="dashboard.subtitle">Anchorr needs to be connect with your Discord bot and with your
-                  Jellyfin and Seerr instances.</span>
+                  <span data-i18n="dashboard.subtitle">Anchorr needs to be connect with your Discord bot and with your Jellyfin and Seerr instances.</span>
                   <br />
-                  <span data-i18n="dashboard.subtitle_detail">Below is a step-by-step walkthrough to help you set up
-                  everything you need to get started!</span>
+                  <span data-i18n="dashboard.subtitle_detail">Below is a step-by-step walkthrough to help you set up everything you need to get started!</span>
                 </p>
               </div>
-              
+
               <!-- Auth Forms Container -->
               <div id="auth-container-wrapper" class="auth-container">
                 <!-- Language Selection (shown during auth) -->
-                <div class="language-selector-auth" style="margin-bottom: 1.5rem; text-align: center;">
-                  <label for="auth-language" style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--subtext0);">Language / Sprache</label>
-                  <select id="auth-language" style="width: 100%; max-width: 200px; background-color: var(--surface0); border: 1px solid var(--surface1); color: var(--text); padding: 0.5rem; border-radius: 8px; font-size: 0.9rem;">
+                <div class="d-flex flex-column align-center mb-1" style="text-align: center;">
+                  <label for="auth-language" class="text-xs text-subtext mb-half" style="display: block;">Language / Sprache</label>
+                  <select id="auth-language" class="select-md" style="width: 100%; max-width: 200px;">
                     <!-- Languages will be populated dynamically -->
                   </select>
                 </div>
-                
+
                 <!-- Login Form -->
                 <form id="login-form" class="auth-form">
                   <div class="form-group">
@@ -139,16 +130,8 @@
       <main id="dashboard-content" class="page-content" style="flex-grow: 1; display: none;">
         <section id="setup" class="setup-section">
           <div class="container">
-            <div
-              class="dashboard-header"
-            >
-              <h2
-                class="dashboard-title"
-                id="dashboard-title"
-                data-i18n="config.title"
-              >
-                Configuration
-              </h2>
+            <div class="dashboard-header">
+              <h2 class="dashboard-title" id="dashboard-title" data-i18n="config.title">Configuration</h2>
               <button type="button" id="bot-control-btn" class="btn btn-status btn-danger">
                 <i class="bi bi-play-fill"></i>
                 <span id="bot-control-text" data-i18n="config.start_bot">Start Bot</span>
@@ -156,105 +139,96 @@
             </div>
 
             <div class="dashboard-layout">
+              <!-- Sidebar -->
               <div class="dashboard-sidebar">
                 <nav class="dashboard-nav">
-                  <a href="#" class="nav-item active" data-target="discord" data-i18n="config.nav_discord">1. Discord</a>
-                  <a href="#" class="nav-item" data-target="seerr" data-i18n="config.nav_seerr">2. Seerr</a>
-                  <a href="#" class="nav-item" data-target="media" data-i18n="config.nav_media">3. Media Databases</a>
-                  <a href="#" class="nav-item" data-target="jellyfin" data-i18n="config.nav_jellyfin">4. Jellyfin Notifications</a>
-                  <a href="#" class="nav-item" data-target="mappings" data-i18n="config.nav_mappings">5. User Mapping</a>
-                  <a href="#" class="nav-item" data-target="roles" data-i18n="config.nav_roles">6. Role Permissions</a>
-                  <a href="#" class="nav-item" data-target="misc" data-i18n="config.nav_misc">7. Miscellaneous</a>
+                  <a href="#" class="nav-item active" data-target="discord">
+                    <i class="bi bi-discord nav-item-icon"></i>
+                    <span data-i18n="config.nav_discord">Discord</span>
+                  </a>
+                  <a href="#" class="nav-item" data-target="seerr">
+                    <i class="bi bi-film nav-item-icon"></i>
+                    <span data-i18n="config.nav_seerr">Seerr</span>
+                  </a>
+                  <a href="#" class="nav-item" data-target="media">
+                    <i class="bi bi-database nav-item-icon"></i>
+                    <span data-i18n="config.nav_media">Media Databases</span>
+                  </a>
+                  <a href="#" class="nav-item" data-target="jellyfin">
+                    <i class="bi bi-bell nav-item-icon"></i>
+                    <span data-i18n="config.nav_jellyfin">Jellyfin Notifications</span>
+                  </a>
+                  <a href="#" class="nav-item" data-target="mappings">
+                    <i class="bi bi-people nav-item-icon"></i>
+                    <span data-i18n="config.nav_mappings">User Mapping</span>
+                  </a>
+                  <a href="#" class="nav-item" data-target="roles">
+                    <i class="bi bi-shield nav-item-icon"></i>
+                    <span data-i18n="config.nav_roles">Role Permissions</span>
+                  </a>
+                  <a href="#" class="nav-item" data-target="misc">
+                    <i class="bi bi-gear nav-item-icon"></i>
+                    <span data-i18n="config.nav_misc">Miscellaneous</span>
+                  </a>
                   <button type="submit" form="config-form" class="btn btn-primary" data-i18n="config.save_button">Save Settings</button>
                 </nav>
               </div>
 
-
+              <!-- Main content -->
               <div class="dashboard-content">
                 <form id="config-form">
-                  <!-- Discord Pane -->
+
+                  <!-- ======================== -->
+                  <!-- Discord Pane             -->
+                  <!-- ======================== -->
                   <div id="config-pane-discord" class="config-pane active">
                     <fieldset>
                       <legend data-i18n="config.discord_section">Discord Settings</legend>
-                      
-                      <!-- Discord Bot Setup Instructions -->
+
                       <div class="setup-instructions-box">
                         <p class="setup-instructions-intro" data-i18n="config.discord_instructions_intro">
-                          First, you need to create a Discord application for the bot. Access 
-                          <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer">Discord Developer Portal</a> 
+                          First, you need to create a Discord application for the bot. Access
+                          <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer">Discord Developer Portal</a>
                           and log in. Create a new application, then:
                         </p>
                         <ol class="setup-instructions-list">
-                          <li data-i18n="config.discord_instructions_1">
-                            Go to <strong>"Bot"</strong> in the sidebar and click <strong>"Add Bot"</strong>
-                          </li>
-                          <li data-i18n="config.discord_instructions_2">
-                            In the <strong>"Bot"</strong> section, scroll down to <strong>"Privileged Gateway Intents"</strong> and enable <code>SERVER MEMBERS INTENT</code> (required for user mappings feature)
-                          </li>
-                          <li data-i18n="config.discord_instructions_3">
-                            Go to <strong>"OAuth2"</strong> → <strong>"URL Generator"</strong>
-                          </li>
-                          <li data-i18n="config.discord_instructions_4">
-                            Select scopes: <code>bot</code> and <code>applications.commands</code>
-                          </li>
-                          <li data-i18n="config.discord_instructions_5">
-                            Select permissions: <code>Send Messages</code> and <code>Embed Links</code>
-                          </li>
-                          <li data-i18n="config.discord_instructions_6">
-                            Copy the generated URL, open it in your browser, and authorize the bot on your Discord server
-                          </li>
-                          <li data-i18n="config.discord_instructions_7">
-                            Come back here and fill in the <strong>Discord Bot Token</strong> and <strong>Bot Client ID</strong> below, <strong>save your settings</strong>, <strong>start the bot</strong>, and then select your server and notification channel from the dropdowns
-                          </li>
+                          <li data-i18n="config.discord_instructions_1">Go to <strong>"Bot"</strong> in the sidebar and click <strong>"Add Bot"</strong></li>
+                          <li data-i18n="config.discord_instructions_2">In the <strong>"Bot"</strong> section, scroll down to <strong>"Privileged Gateway Intents"</strong> and enable <code>SERVER MEMBERS INTENT</code> (required for user mappings feature)</li>
+                          <li data-i18n="config.discord_instructions_3">Go to <strong>"OAuth2"</strong> → <strong>"URL Generator"</strong></li>
+                          <li data-i18n="config.discord_instructions_4">Select scopes: <code>bot</code> and <code>applications.commands</code></li>
+                          <li data-i18n="config.discord_instructions_5">Select permissions: <code>Send Messages</code> and <code>Embed Links</code></li>
+                          <li data-i18n="config.discord_instructions_6">Copy the generated URL, open it in your browser, and authorize the bot on your Discord server</li>
+                          <li data-i18n="config.discord_instructions_7">Come back here and fill in the <strong>Discord Bot Token</strong> and <strong>Bot Client ID</strong> below, <strong>save your settings</strong>, <strong>start the bot</strong>, and then select your server and notification channel from the dropdowns</li>
                         </ol>
                       </div>
 
                       <div class="form-group">
                         <label for="DISCORD_TOKEN" data-i18n="config.discord_token">Discord Bot Token</label>
-                        <input
-                          type="password"
-                          id="DISCORD_TOKEN"
-                          name="DISCORD_TOKEN"
-                          placeholder="MTQyNTkwNT**********************GHh1xM..."
-                        />
+                        <input type="password" id="DISCORD_TOKEN" name="DISCORD_TOKEN" placeholder="MTQyNTkwNT**********************GHh1xM..." />
                         <div class="form-text" data-i18n="config.discord_token_help">
                           The secret token of your bot from the
-                          <a
-                            href="https://discord.com/developers/applications"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            >Discord Developer Portal</a
-                          >
-                          -&gt; Bot -&gt; Reset Token
-                        </div>
-                      </div>
-                      <div class="form-group">
-                        <label for="BOT_ID" data-i18n="config.bot_id">Bot Client ID</label>
-                        <input
-                          type="text"
-                          id="BOT_ID"
-                          name="BOT_ID"
-                          placeholder="1455304670023657132"
-                        />
-                        <div class="form-text" data-i18n="config.bot_id_help">
-                          The application's client ID from the
-                          <a
-                            href="https://discord.com/developers/applications"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            >Discord Developer Portal</a
-                          >
-                          -&gt; OAuth2 -&gt; Client ID
+                          <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer">Discord Developer Portal</a>
+                          → Bot → Reset Token
                         </div>
                       </div>
 
-                      <!-- Important Note Box -->
-                      <div class="setup-instructions-box" style="background: linear-gradient(135deg, rgba(203, 166, 247, 0.1) 0%, rgba(137, 180, 250, 0.1) 100%); border-left: 4px solid var(--mauve); margin: 1.5rem 0;">
-                        <p style="margin: 0; font-weight: 600; color: var(--mauve); display: flex; align-items: center; gap: 0.5rem;">
+                      <div class="form-group">
+                        <label for="BOT_ID" data-i18n="config.bot_id">Bot Client ID</label>
+                        <input type="text" id="BOT_ID" name="BOT_ID" placeholder="1455304670023657132" />
+                        <div class="form-text" data-i18n="config.bot_id_help">
+                          The application's client ID from the
+                          <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer">Discord Developer Portal</a>
+                          → OAuth2 → Client ID
+                        </div>
+                      </div>
+
+                      <!-- Next Steps info box -->
+                      <div class="info-box info-box--blue mt-section mb-section">
+                        <p class="info-box-title text-mauve">
                           <i class="bi bi-info-circle-fill"></i>
                           <span data-i18n="config.next_steps_title">Next Steps</span>
                         </p>
-                        <ol style="margin: 0.75rem 0 0 0; padding-left: 1.5rem; line-height: 1.8;">
+                        <ol class="mb-0 line-height-lg" style="padding-left: 1.5rem;">
                           <li data-i18n="config.next_step_1">Click <strong>Save Settings</strong> button at the bottom of the sidebar</li>
                           <li data-i18n="config.next_step_2">Click the <strong>Start Bot</strong> button at the top of the page</li>
                           <li data-i18n="config.next_step_3">Once the bot is running, the dropdowns below will automatically populate with your servers and channels</li>
@@ -263,10 +237,7 @@
 
                       <div class="form-group">
                         <label for="GUILD_ID" data-i18n="config.discord_server">Discord Server</label>
-                        <select 
-                          id="GUILD_ID" 
-                          name="GUILD_ID"
-                          style="width: 100%; background-color: var(--background); border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
+                        <select id="GUILD_ID" name="GUILD_ID">
                           <option value="" data-i18n="config.loading_servers">Loading servers...</option>
                         </select>
                         <div class="form-text" data-i18n="config.discord_server_help">
@@ -276,247 +247,166 @@
 
                       <div class="form-group">
                         <label for="JELLYFIN_CHANNEL_ID" data-i18n="config.default_channel">Default Notification Channel</label>
-                        <select
-                          id="JELLYFIN_CHANNEL_ID"
-                          name="JELLYFIN_CHANNEL_ID"
-                          style="width: 100%; background-color: var(--background); border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
+                        <select id="JELLYFIN_CHANNEL_ID" name="JELLYFIN_CHANNEL_ID">
                           <option value="" data-i18n="config.select_server_first">Select a server first...</option>
                         </select>
                         <div class="form-text" data-i18n="config.default_channel_help">
-                          Select the default Discord channel for Jellyfin notifications. You can override this per-library in Step 4. Choose a server above first.
+                          Select the default Discord channel for Jellyfin notifications. You can override this per-library in Jellyfin Notifications. Choose a server above first.
                         </div>
                       </div>
 
                     </fieldset>
                   </div>
 
-                  <!-- Seerr Pane -->
+                  <!-- ======================== -->
+                  <!-- Seerr Pane              -->
+                  <!-- ======================== -->
                   <div id="config-pane-seerr" class="config-pane">
                     <fieldset>
                       <legend data-i18n="config.seerr_section">Seerr Settings</legend>
+
                       <div class="form-group">
                         <label for="SEERR_URL" data-i18n="config.seerr_url">Seerr URL</label>
-                        <input
-                          type="text"
-                          id="SEERR_URL"
-                          name="SEERR_URL"
-                          placeholder="http://localhost:5055"
-                        />
-                        <div class="form-text" data-i18n="config.seerr_url_help">
-                          The full URL of your Seerr instance.
-                        </div>
-                      </div>
-                      <div class="form-group">
-                        <label for="SEERR_API_KEY" data-i18n="config.seerr_api_key"
-                          >Seerr API Key</label
-                        >
-                        <input
-                          type="password"
-                          id="SEERR_API_KEY"
-                          name="SEERR_API_KEY"
-                          placeholder="MTc2MjA6************************PljQTg6YpQ5Yzg2Nw=="
-                        />
-                        <div class="form-text" data-i18n="config.seerr_api_key_help">
-                          Your API key from Seerr settings
-                        </div>
-                      </div>
-                      <div class="form-group">
-                        <button type="button" id="test-seerr-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem;" data-i18n="config.test_connection">Test Connection</button>
-                        <span
-                          id="test-seerr-status"
-                          style="margin-left: 1rem;"
-                        ></span>
+                        <input type="text" id="SEERR_URL" name="SEERR_URL" placeholder="http://localhost:5055" />
+                        <div class="form-text" data-i18n="config.seerr_url_help">The full URL of your Seerr instance.</div>
                       </div>
 
-                      <!-- Default Quality Profiles Section -->
-                      <div class="form-group" style="margin-top: 2rem;">
-                        <label style="font-size: 1.1rem; font-weight: 700; color: var(--mauve);">
-                          <strong data-i18n="config.default_quality_profiles">Default Quality Profiles (Optional)</strong>
+                      <div class="form-group">
+                        <label for="SEERR_API_KEY" data-i18n="config.seerr_api_key">Seerr API Key</label>
+                        <input type="password" id="SEERR_API_KEY" name="SEERR_API_KEY" placeholder="MTc2MjA6************************PljQTg6YpQ5Yzg2Nw==" />
+                        <div class="form-text" data-i18n="config.seerr_api_key_help">Your API key from Seerr settings</div>
+                      </div>
+
+                      <div class="form-group d-flex align-center">
+                        <button type="button" id="test-seerr-btn" class="btn btn-secondary btn-sm btn-flex" data-i18n="config.test_connection">Test Connection</button>
+                        <span id="test-seerr-status" class="status-inline"></span>
+                      </div>
+
+                      <!-- Default Quality Profiles -->
+                      <div class="form-group mt-section">
+                        <label class="section-heading">
+                          <strong data-i18n="config.default_quality_profiles">Default Quality Profiles</strong>
+                          <span class="badge badge-optional">Optional</span>
                         </label>
-                        <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.default_quality_profiles_help">
+                        <div class="form-text mb-1" data-i18n="config.default_quality_profiles_help">
                           Set default quality profiles and servers for media requests. These will be used when users don't specify a profile via the <code>/request</code> command.
                         </div>
-                        
-                        <div class="form-group">
-                          <button type="button" id="load-seerr-options-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem; margin: 0;" data-i18n="config.load_profiles_servers">
-                            Load Profiles & Servers
+
+                        <div class="form-group d-flex align-center">
+                          <button type="button" id="load-seerr-options-btn" class="btn btn-secondary btn-sm btn-flex ml-0" data-i18n="config.load_profiles_servers">
+                            Load Profiles &amp; Servers
                           </button>
-                          <span id="load-seerr-options-status" style="margin-left: 1rem;"></span>
+                          <span id="load-seerr-options-status" class="status-inline"></span>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1rem;">
-                          <!-- Default Movie Quality Profile -->
+                        <div class="grid-2-auto mt-1">
                           <div class="form-group">
-                            <label for="DEFAULT_QUALITY_PROFILE_MOVIE" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.default_movie_quality">🎬 Default Movie Quality</label>
-                            <select id="DEFAULT_QUALITY_PROFILE_MOVIE" name="DEFAULT_QUALITY_PROFILE_MOVIE" style="width: 100%; background-color: #1e1e2e; border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
+                            <label for="DEFAULT_QUALITY_PROFILE_MOVIE" class="label-strong" data-i18n="config.default_movie_quality">🎬 Default Movie Quality</label>
+                            <select id="DEFAULT_QUALITY_PROFILE_MOVIE" name="DEFAULT_QUALITY_PROFILE_MOVIE">
                               <option value="" data-i18n="config.use_seerr_default">Use Seerr default</option>
                             </select>
-                            <div class="form-text" style="margin-top: 0.25rem;" data-i18n="config.default_movie_quality_help">
-                              Quality profile for movie requests (Radarr)
-                            </div>
+                            <div class="form-text mt-half" data-i18n="config.default_movie_quality_help">Quality profile for movie requests (Radarr)</div>
                           </div>
 
-                          <!-- Default TV Quality Profile -->
                           <div class="form-group">
-                            <label for="DEFAULT_QUALITY_PROFILE_TV" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.default_tv_quality">📺 Default TV Quality</label>
-                            <select id="DEFAULT_QUALITY_PROFILE_TV" name="DEFAULT_QUALITY_PROFILE_TV" style="width: 100%; background-color: #1e1e2e; border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
+                            <label for="DEFAULT_QUALITY_PROFILE_TV" class="label-strong" data-i18n="config.default_tv_quality">📺 Default TV Quality</label>
+                            <select id="DEFAULT_QUALITY_PROFILE_TV" name="DEFAULT_QUALITY_PROFILE_TV">
                               <option value="" data-i18n="config.use_seerr_default">Use Seerr default</option>
                             </select>
-                            <div class="form-text" style="margin-top: 0.25rem;" data-i18n="config.default_tv_quality_help">
-                              Quality profile for TV show requests (Sonarr)
-                            </div>
+                            <div class="form-text mt-half" data-i18n="config.default_tv_quality_help">Quality profile for TV show requests (Sonarr)</div>
                           </div>
 
-                          <!-- Default Movie Server -->
                           <div class="form-group">
-                            <label for="DEFAULT_SERVER_MOVIE" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.default_movie_server">🎬 Default Movie Server</label>
-                            <select id="DEFAULT_SERVER_MOVIE" name="DEFAULT_SERVER_MOVIE" style="width: 100%; background-color: #1e1e2e; border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
+                            <label for="DEFAULT_SERVER_MOVIE" class="label-strong" data-i18n="config.default_movie_server">🎬 Default Movie Server</label>
+                            <select id="DEFAULT_SERVER_MOVIE" name="DEFAULT_SERVER_MOVIE">
                               <option value="" data-i18n="config.use_seerr_default">Use Seerr default</option>
                             </select>
-                            <div class="form-text" style="margin-top: 0.25rem;" data-i18n="config.default_movie_server_help">
-                              Radarr server for movie requests
-                            </div>
+                            <div class="form-text mt-half" data-i18n="config.default_movie_server_help">Radarr server for movie requests</div>
                           </div>
 
-                          <!-- Default TV Server -->
                           <div class="form-group">
-                            <label for="DEFAULT_SERVER_TV" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.default_tv_server">📺 Default TV Server</label>
-                            <select id="DEFAULT_SERVER_TV" name="DEFAULT_SERVER_TV" style="width: 100%; background-color: #1e1e2e; border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
+                            <label for="DEFAULT_SERVER_TV" class="label-strong" data-i18n="config.default_tv_server">📺 Default TV Server</label>
+                            <select id="DEFAULT_SERVER_TV" name="DEFAULT_SERVER_TV">
                               <option value="" data-i18n="config.use_seerr_default">Use Seerr default</option>
                             </select>
-                            <div class="form-text" style="margin-top: 0.25rem;" data-i18n="config.default_tv_server_help">
-                              Sonarr server for TV show requests
-                            </div>
+                            <div class="form-text mt-half" data-i18n="config.default_tv_server_help">Sonarr server for TV show requests</div>
                           </div>
                         </div>
                       </div>
                     </fieldset>
                   </div>
 
-                  <!-- Media Databases Pane -->
+                  <!-- ======================== -->
+                  <!-- Media Databases Pane    -->
+                  <!-- ======================== -->
                   <div id="config-pane-media" class="config-pane">
                     <fieldset>
                       <legend data-i18n="config.media_section">Media Database Settings</legend>
+
                       <div class="form-group">
                         <label for="TMDB_API_KEY" data-i18n="config.tmdb_api_key">TMDB API Key</label>
-                        <input
-                          type="text"
-                          id="TMDB_API_KEY"
-                          name="TMDB_API_KEY"
-                          placeholder="f94a3e627b8a545201e2531b62087b47"
-                        />
+                        <input type="text" id="TMDB_API_KEY" name="TMDB_API_KEY" placeholder="f94a3e627b8a545201e2531b62087b47" />
                         <div class="form-text" data-i18n="config.tmdb_api_key_help">
-                          A 
-                          <a
-                            href="https://www.themoviedb.org/settings/api"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            >TMDB API Key</a
-                          >
-                          is required for searching and fetching
-                          movie/show details. Found in the
-                          <a
-                            href="https://www.themoviedb.org/settings/api"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            >API settings page of your TMDB account</a
-                          >
-                          after you log in.
+                          A <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">TMDB API Key</a> is required for searching and fetching movie/show details. Found in the <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">API settings page of your TMDB account</a> after you log in.
                         </div>
                       </div>
+
                       <div class="form-group">
-                        <label for="OMDB_API_KEY" data-i18n="config.omdb_api_key"
-                          >OMDb API Key (Optional)</label
-                        >
-                        <input
-                          type="text"
-                          id="OMDB_API_KEY"
-                          name="OMDB_API_KEY"
-                          placeholder="e23eb6be"
-                        />
+                        <label for="OMDB_API_KEY">
+                          <span data-i18n="config.omdb_api_key">OMDb API Key</span>
+                          <span class="badge badge-optional">Optional</span>
+                        </label>
+                        <input type="text" id="OMDB_API_KEY" name="OMDB_API_KEY" placeholder="e23eb6be" />
                         <div class="form-text" data-i18n="config.omdb_api_key_help">
-                          Optional, but recommended for richer data like ratings
-                          and directors. Create one on the
-                          <a
-                            href="https://www.omdbapi.com/apikey.aspx"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            >API Key page of OMDb</a
-                          >.
+                          Optional, but recommended for richer data like ratings and directors. Create one on the
+                          <a href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noopener noreferrer">API Key page of OMDb</a>.
                         </div>
                       </div>
                     </fieldset>
                   </div>
 
-                  <!-- Jellyfin Notifications Pane -->
+                  <!-- ======================== -->
+                  <!-- Jellyfin Pane           -->
+                  <!-- ======================== -->
                   <div id="config-pane-jellyfin" class="config-pane">
                     <fieldset>
                       <legend data-i18n="config.jellyfin_section">Jellyfin Notification Settings</legend>
+
                       <div class="form-group">
-                        <label for="JELLYFIN_BASE_URL" data-i18n="config.jellyfin_url"
-                          >Jellyfin Public URL</label
-                        >
-                        <input
-                          type="text"
-                          id="JELLYFIN_BASE_URL"
-                          name="JELLYFIN_BASE_URL"
-                          placeholder="http://jellyfin.yourdomain.com  |  http://192.168.1.1:8096"
-                        />
-                        <div class="form-text" data-i18n="config.jellyfin_url_help">
-                          The public URL of your Jellyfin server. Used for the
-                          "Watch Now" button.
-                        </div>
+                        <label for="JELLYFIN_BASE_URL" data-i18n="config.jellyfin_url">Jellyfin Public URL</label>
+                        <input type="text" id="JELLYFIN_BASE_URL" name="JELLYFIN_BASE_URL" placeholder="http://jellyfin.yourdomain.com  |  http://192.168.1.1:8096" />
+                        <div class="form-text" data-i18n="config.jellyfin_url_help">The public URL of your Jellyfin server. Used for the "Watch Now" button.</div>
                       </div>
+
                       <div class="form-group">
-                        <label for="JELLYFIN_API_KEY" data-i18n="config.jellyfin_api_key"
-                          >Jellyfin API Key</label
-                        >
-                        <input
-                          type="password"
-                          id="JELLYFIN_API_KEY"
-                          name="JELLYFIN_API_KEY"
-                          placeholder="c4b6b3c8****************e4d8f1b3c7a9"
-                        />
+                        <label for="JELLYFIN_API_KEY" data-i18n="config.jellyfin_api_key">Jellyfin API Key</label>
+                        <input type="password" id="JELLYFIN_API_KEY" name="JELLYFIN_API_KEY" placeholder="c4b6b3c8****************e4d8f1b3c7a9" />
                         <div class="form-text" data-i18n="config.jellyfin_api_key_help">
                           API key for your Jellyfin server. Generate one in Jellyfin Dashboard → Administration → API Keys. Required for loading libraries and enhanced features.
                         </div>
                       </div>
+
                       <div class="form-group">
-                        <button type="button" id="test-jellyfin-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem;" data-i18n="config.test_endpoint">Test Endpoint</button>
-                        <span
-                          id="test-jellyfin-status"
-                          style="margin-left: 1rem;"
-                        ></span>
-                        <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.test_endpoint_help">
+                        <button type="button" id="test-jellyfin-btn" class="btn btn-secondary btn-sm btn-flex" data-i18n="config.test_endpoint">Test Endpoint</button>
+                        <span id="test-jellyfin-status" class="status-inline"></span>
+                        <div class="form-text mt-half" data-i18n="config.test_endpoint_help">
                           Testing the endpoint successfully will automatically populate the Jellyfin Server ID field.
                         </div>
                       </div>
+
                       <div class="form-group">
-                        <label for="JELLYFIN_SERVER_ID" data-i18n="config.jellyfin_server_id"
-                          >Jellyfin Server ID</label
-                        >
-                        <input
-                          type="text"
-                          id="JELLYFIN_SERVER_ID"
-                          name="JELLYFIN_SERVER_ID"
-                          placeholder="c1507dcd594b404a8e668ba38f8eaa0c"
-                        />
+                        <label for="JELLYFIN_SERVER_ID" data-i18n="config.jellyfin_server_id">Jellyfin Server ID</label>
+                        <input type="text" id="JELLYFIN_SERVER_ID" name="JELLYFIN_SERVER_ID" placeholder="c1507dcd594b404a8e668ba38f8eaa0c" />
                         <div class="form-text" data-i18n="config.jellyfin_server_id_help">
-                          Used for redirecting to the correct path of your
-                          Jellyfin server media page when using the "Watch Now"
-                          button. You can find this in your Jellyfin URL when
-                          viewing the page of any movie or show from your
-                          library.
+                          Used for redirecting to the correct path of your Jellyfin server media page when using the "Watch Now" button.
                         </div>
                       </div>
 
-                      <!-- Episode Debouncing Section -->
-                      <div class="form-group" style="margin-top: 1.5rem;">
-                        <label for="WEBHOOK_DEBOUNCE_SECONDS" style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          Episode Notification Debounce
-                        </label>
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                          <div style="position: relative; display: inline-block;">
+                      <!-- Episode Notification Debounce -->
+                      <div class="form-group mt-section-sm">
+                        <label class="section-heading">Episode Notification Debounce</label>
+                        <div class="debounce-wrapper mt-half">
+                          <div class="debounce-input-group">
                             <input
                               type="number"
                               id="WEBHOOK_DEBOUNCE_SECONDS"
@@ -524,7 +414,7 @@
                               min="1"
                               max="600"
                               step="1"
-                              style="width: 60px; background-color: var(--surface0); border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem 3rem 0.75rem 1rem; border-radius: 8px; font-size: 1rem; font-weight: 500; appearance: textfield; -moz-appearance: textfield;"
+                              class="input-sm"
                             />
                             <div class="debounce-arrows">
                               <div class="debounce-arrow" id="debounce-down" title="Decrease">
@@ -535,38 +425,32 @@
                               </div>
                             </div>
                           </div>
-                          <span style="color: var(--subtext0); font-weight: 500; font-size: 1rem;">seconds <span style="opacity: 0.7; font-size: 0.9rem;">(range: 1 second - 10 minutes)</span></span>
+                          <span class="debounce-label">seconds <small>(range: 1 second – 10 minutes)</small></span>
                         </div>
                         <input type="hidden" id="WEBHOOK_DEBOUNCE_MS" name="WEBHOOK_DEBOUNCE_MS" value="60000" />
-                        <div class="form-text" style="margin-top: 0.5rem;">
+                        <div class="form-text mt-half">
                           Debounce function to determine how long to wait before sending notifications for multiple episodes/seasons, bundling them into a single notification message.
                         </div>
                       </div>
 
-                      <!-- Library Notifications Section -->
-                      <div class="form-group" style="margin-top: 2rem;">
-                        <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          <strong>Library Channel Mapping</strong>
-                        </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
+                      <!-- Library Channel Mapping -->
+                      <div class="form-group mt-section">
+                        <label class="section-heading"><strong>Library Channel Mapping</strong></label>
+                        <div class="form-text mb-1">
                           Map specific Jellyfin libraries to different Discord channels.
                           <br>
-                          <small style="color: var(--subtext0);">
+                          <small class="text-subtext">
                             Click "Fetch Libraries" to load your libraries, then select a channel for each one.
                             <br><strong>Note:</strong> Unchecked libraries will not send any notifications.
                           </small>
                         </div>
-                        <button type="button" id="fetch-libraries-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem; margin: 0 0 1rem 0; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                        <button type="button" id="fetch-libraries-btn" class="btn btn-secondary btn-sm btn-flex" style="margin: 0 0 1rem 0;">
                           <i class="bi bi-arrow-clockwise"></i> Fetch Libraries
                         </button>
-                        <span id="fetch-libraries-status" style="margin-left: 1rem;"></span>
-                        
-                        <div id="libraries-list" class="libraries-container">
-                          <!-- Populated dynamically -->
-                        </div>
+                        <span id="fetch-libraries-status" class="status-inline"></span>
+
+                        <div id="libraries-list" class="libraries-container"></div>
                         <input type="hidden" id="JELLYFIN_NOTIFICATION_LIBRARIES" name="JELLYFIN_NOTIFICATION_LIBRARIES" />
-                        
-                        <!-- Hidden inputs for episodes/seasons notify flags -->
                         <input type="hidden" id="JELLYFIN_NOTIFY_EPISODES" name="JELLYFIN_NOTIFY_EPISODES" value="" />
                         <input type="hidden" id="JELLYFIN_NOTIFY_SEASONS" name="JELLYFIN_NOTIFY_SEASONS" value="" />
                         <input type="hidden" id="JELLYFIN_EPISODE_CHANNEL_ID" name="JELLYFIN_EPISODE_CHANNEL_ID" value="" />
@@ -574,7 +458,7 @@
                       </div>
 
                       <!-- Webhook Section -->
-                      <div id="webhook-section" class="webhook-box" style="margin-top: 2rem;">
+                      <div id="webhook-section" class="webhook-box mt-section">
                         <h3 class="webhook-title">Your Jellyfin Webhook URL</h3>
                         <div class="webhook-content">
                           <p>
@@ -582,38 +466,22 @@
                           </p>
                           <div class="webhook-url-container">
                             <code id="webhook-url" class="code-block"></code>
-                            <button
-                              type="button"
-                              id="copy-webhook-btn"
-                              class="btn btn-secondary"
-                              data-i18n="jellyfin_webhook.copy_url"
-                            >Copy URL</button>
+                            <button type="button" id="copy-webhook-btn" class="btn btn-secondary" data-i18n="jellyfin_webhook.copy_url">Copy URL</button>
                           </div>
-                          <p style="margin-top: 0.75rem; font-size: 0.9rem; opacity: 0.8;">
-                            <strong data-i18n="jellyfin_webhook.note">Note:</strong> If you're running Anchorr in Docker, you may need to replace <code>localhost</code> with your server's IP address.
+                          <p class="note-text" data-i18n="jellyfin_webhook.note">
+                            <strong>Note:</strong> If you're running Anchorr in Docker, you may need to replace <code>localhost</code> with your server's IP address.
                           </p>
-                          <p style="margin-top: 1.25rem;" data-i18n="jellyfin_webhook.webhook_secret_desc">
+                          <p class="mt-1" data-i18n="jellyfin_webhook.webhook_secret_desc">
                             Your webhook secret is used to secure incoming requests. Copy it below — you'll need to add it as a custom HTTP header in the Jellyfin webhook plugin:
                           </p>
                           <div class="webhook-url-container">
-                            <input
-                              type="text"
-                              id="WEBHOOK_SECRET"
-                              readonly
-                              class="code-block"
-                              style="background: none; border: none; outline: none; width: 100%; font-family: monospace;"
-                            />
-                            <button
-                              type="button"
-                              id="copy-webhook-secret-btn"
-                              class="btn btn-secondary"
-                              data-i18n="jellyfin_webhook.copy_secret"
-                            >Copy Secret</button>
+                            <input type="text" id="WEBHOOK_SECRET" readonly class="code-block font-mono" style="background: none; border: none; outline: none; width: 100%;" />
+                            <button type="button" id="copy-webhook-secret-btn" class="btn btn-secondary" data-i18n="jellyfin_webhook.copy_secret">Copy Secret</button>
                           </div>
-                          <p style="margin-top: 1.5rem;" data-i18n="jellyfin_webhook.plugin_install">If you don't have the plugin installed, access the <strong class="emphasis-mauve">Plugins page</strong> in your <strong class="emphasis-mauve">Jellyfin Dashboard</strong>, search for <strong class="emphasis-mauve">Webhook</strong>, install it and restart the server.</p>
+                          <p class="mt-section-sm" data-i18n="jellyfin_webhook.plugin_install">If you don't have the plugin installed, access the <strong class="emphasis-mauve">Plugins page</strong> in your <strong class="emphasis-mauve">Jellyfin Dashboard</strong>, search for <strong class="emphasis-mauve">Webhook</strong>, install it and restart the server.</p>
                           <p data-i18n="jellyfin_webhook.plugin_setup">After the restart, access your <strong class="emphasis-mauve">Webhook plugin settings</strong> and <strong class="emphasis-mauve">Add Generic Destination</strong>.</p>
-                          <div class="form-text" style="margin-bottom: 1rem; padding: 0.6rem 0.9rem; background-color: var(--surface0); border-left: 3px solid var(--yellow); border-radius: 4px;" data-i18n="jellyfin_webhook.generic_destination_notice">
-                            <i class="bi bi-exclamation-triangle" style="color: var(--yellow);"></i>
+                          <div class="info-box info-box--yellow mb-1" data-i18n="jellyfin_webhook.generic_destination_notice">
+                            <i class="bi bi-exclamation-triangle icon-yellow"></i>
                             Jellyfin does not support custom headers for the <strong>Discord Destination</strong> type. If you previously used a Discord Destination, you need to <strong>delete it and recreate it as a Generic Destination</strong> — otherwise the <code>X-Webhook-Secret</code> header cannot be added and Anchorr will reject all incoming requests.
                           </div>
                           <ol style="padding-left: 1.5rem; opacity: 0.9;">
@@ -629,215 +497,202 @@
                         </div>
                       </div>
 
-                      <!-- Embed Customization Section -->
-                      <div class="form-group" style="margin-top: 2rem;">
-                        <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          <strong>Embed Customization</strong>
-                        </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
-                          Customize which elements appear in your Discord notification embeds.
-                        </div>
+                      <!-- Embed Customization -->
+                      <div class="form-group mt-section">
+                        <label class="section-heading"><strong>Embed Customization</strong></label>
+                        <div class="form-text mb-1">Customize which elements appear in your Discord notification embeds.</div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-                          <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                        <div class="grid-3-equal mt-1">
+                          <div class="switch-card form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_BACKDROP" name="EMBED_SHOW_BACKDROP" checked>
                             <label class="form-check-label" for="EMBED_SHOW_BACKDROP" style="margin-left: 0.5rem;">
                               <strong>Backdrop Image</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Large background image</div>
+                              <div class="switch-card-desc">Large background image</div>
                             </label>
                           </div>
-
-                          <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                          <div class="switch-card form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_OVERVIEW" name="EMBED_SHOW_OVERVIEW" checked>
                             <label class="form-check-label" for="EMBED_SHOW_OVERVIEW" style="margin-left: 0.5rem;">
                               <strong>Overview/Description</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Plot summary text</div>
+                              <div class="switch-card-desc">Plot summary text</div>
                             </label>
                           </div>
-
-                          <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                          <div class="switch-card form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_GENRE" name="EMBED_SHOW_GENRE" checked>
                             <label class="form-check-label" for="EMBED_SHOW_GENRE" style="margin-left: 0.5rem;">
                               <strong>Genre</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Genre field</div>
+                              <div class="switch-card-desc">Genre field</div>
                             </label>
                           </div>
-
-                          <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                          <div class="switch-card form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_RUNTIME" name="EMBED_SHOW_RUNTIME" checked>
                             <label class="form-check-label" for="EMBED_SHOW_RUNTIME" style="margin-left: 0.5rem;">
                               <strong>Runtime</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Duration field</div>
+                              <div class="switch-card-desc">Duration field</div>
                             </label>
                           </div>
-
-                          <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                          <div class="switch-card form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_RATING" name="EMBED_SHOW_RATING" checked>
                             <label class="form-check-label" for="EMBED_SHOW_RATING" style="margin-left: 0.5rem;">
                               <strong>Rating</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">IMDB/TMDB rating</div>
+                              <div class="switch-card-desc">IMDB/TMDB rating</div>
                             </label>
                           </div>
-
-                          <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                          <div class="switch-card form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_BUTTON_LETTERBOXD" name="EMBED_SHOW_BUTTON_LETTERBOXD" checked>
                             <label class="form-check-label" for="EMBED_SHOW_BUTTON_LETTERBOXD" style="margin-left: 0.5rem;">
                               <strong>Letterboxd Button</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Link to Letterboxd</div>
+                              <div class="switch-card-desc">Link to Letterboxd</div>
                             </label>
                           </div>
-
-                          <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                          <div class="switch-card form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_BUTTON_IMDB" name="EMBED_SHOW_BUTTON_IMDB" checked>
                             <label class="form-check-label" for="EMBED_SHOW_BUTTON_IMDB" style="margin-left: 0.5rem;">
                               <strong>IMDb Button</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Link to IMDb</div>
+                              <div class="switch-card-desc">Link to IMDb</div>
                             </label>
                           </div>
-
-                          <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
+                          <div class="switch-card form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_BUTTON_WATCH" name="EMBED_SHOW_BUTTON_WATCH" checked>
                             <label class="form-check-label" for="EMBED_SHOW_BUTTON_WATCH" style="margin-left: 0.5rem;">
                               <strong>Watch Now Button</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Link to Jellyfin</div>
+                              <div class="switch-card-desc">Link to Jellyfin</div>
                             </label>
                           </div>
                         </div>
                       </div>
 
-                      <!-- Notification Testing Section -->
-                      <div class="form-group" style="margin-top: 2rem;">
-                        <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
+                      <!-- Notification Testing -->
+                      <div class="form-group mt-section">
+                        <label class="section-heading">
                           <strong data-i18n="config.notification_testing_title">Notification Testing</strong>
                         </label>
-                        <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.notification_testing_help">
-                          Test your notification templates by sending sample notifications to your Discord channel. This helps you preview how different types of notifications will appear.
+                        <div class="form-text mb-1" data-i18n="config.notification_testing_help">
+                          Test your notification templates by sending sample notifications to your Discord channel.
                         </div>
-                        <div class="form-text" style="margin-bottom: 1rem; padding: 0.6rem 0.9rem; background-color: var(--surface0); border-left: 3px solid var(--mauve); border-radius: 4px;" data-i18n="jellyfin_webhook.notification_testing_info">
-                          <i class="bi bi-info-circle" style="color: var(--mauve);"></i>
+                        <div class="info-box info-box--mauve mb-1" data-i18n="jellyfin_webhook.notification_testing_info">
+                          <i class="bi bi-info-circle icon-mauve"></i>
                           These tests bypass the webhook endpoint and run internally — they work without the <code>X-Webhook-Secret</code> header. Make sure you've still copied the secret and added it to your Jellyfin webhook plugin so that real notifications from Jellyfin are accepted.
                         </div>
 
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                          <button type="button" id="test-movie-notification-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                        <div class="grid-4-auto">
+                          <button type="button" id="test-movie-notification-btn" class="btn btn-secondary btn-grid">
                             <i class="bi bi-film"></i> <span data-i18n="config.test_movie_notification">Test Movie</span>
                           </button>
-                          <button type="button" id="test-series-notification-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                          <button type="button" id="test-series-notification-btn" class="btn btn-secondary btn-grid">
                             <i class="bi bi-tv"></i> <span data-i18n="config.test_series_notification">Test Series</span>
                           </button>
-                          <button type="button" id="test-season-notification-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                          <button type="button" id="test-season-notification-btn" class="btn btn-secondary btn-grid">
                             <i class="bi bi-collection"></i> <span data-i18n="config.test_season_notification">Test Season</span>
                           </button>
-                          <button type="button" id="test-batch-seasons-notification-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                          <button type="button" id="test-batch-seasons-notification-btn" class="btn btn-secondary btn-grid">
                             <i class="bi bi-collection-fill"></i> <span data-i18n="config.test_batch_seasons_notification">Test Seasons Batch</span>
                           </button>
-                          <button type="button" id="test-episodes-notification-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                          <button type="button" id="test-episodes-notification-btn" class="btn btn-secondary btn-grid">
                             <i class="bi bi-collection-play"></i> <span data-i18n="config.test_episodes_notification">Test Episodes</span>
                           </button>
-                          <button type="button" id="test-batch-episodes-notification-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                          <button type="button" id="test-batch-episodes-notification-btn" class="btn btn-secondary btn-grid">
                             <i class="bi bi-collection-play-fill"></i> <span data-i18n="config.test_batch_episodes_notification">Test Episodes Batch</span>
                           </button>
                         </div>
-                        
-                        <div id="test-notification-status" style="margin-top: 1rem;"></div>
+
+                        <div id="test-notification-status" class="mt-1"></div>
                       </div>
                     </fieldset>
                   </div>
 
-                  <!-- Network Pane -->
-                  <!-- User Mappings Pane -->
+                  <!-- ======================== -->
+                  <!-- User Mappings Pane      -->
+                  <!-- ======================== -->
                   <div id="config-pane-mappings" class="config-pane">
                     <fieldset>
                       <legend>User Mapping</legend>
-                      <p class="form-text" style="margin-bottom: 1.5rem;">
+                      <p class="pane-description">
                         Map Discord users to their Seerr accounts. When a user makes a request from Discord, it will be associated with their Seerr account instead of the API key owner.
                       </p>
-                      
+
                       <div id="mappings-container">
-                        <div class="mappings-list" id="mappings-list">
-                          <!-- Mappings will be populated here -->
-                        </div>
-                        
-                        <div class="add-mapping-form" style="margin-top: 1.5rem;">
-                          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                            <h4 style="font-size: 1.1rem; margin: 0; color: var(--mauve); line-height: 1.4;">Add New Mapping</h4>
-                            <div style="display: flex; gap: 0.5rem;">
-                              <button type="button" id="auto-map-seerr-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
+                        <div class="mappings-list" id="mappings-list"></div>
+
+                        <div class="add-mapping-form mt-section-sm">
+                          <div class="controls-row">
+                            <h4>Add New Mapping</h4>
+                            <div class="controls-row-btns">
+                              <button type="button" id="auto-map-seerr-btn" class="btn btn-secondary btn-sm btn-flex">
                                 <i class="bi bi-magic"></i> Auto-Map from Seerr
                               </button>
-                              <button type="button" id="sync-seerr-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
+                              <button type="button" id="sync-seerr-btn" class="btn btn-secondary btn-sm btn-flex">
                                 <i class="bi bi-arrow-repeat"></i> Sync with Seerr
                               </button>
-                              <button type="button" id="refresh-all-users-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
+                              <button type="button" id="refresh-all-users-btn" class="btn btn-secondary btn-sm btn-flex">
                                 <i class="bi bi-arrow-clockwise"></i> Refresh Users
                               </button>
                             </div>
                           </div>
+
                           <div class="form-group">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                              <label for="discord-user-select" style="margin-bottom: 0;">Discord User</label>
+                            <div class="d-flex align-center justify-between mb-half">
+                              <label for="discord-user-select" class="mb-0">Discord User</label>
                             </div>
                             <div class="custom-select" id="discord-user-select">
                               <input type="text" class="custom-select-trigger" placeholder="Search Discord users..." readonly />
                               <i class="bi bi-chevron-down custom-select-chevron"></i>
                               <div class="custom-select-dropdown">
-                                <div class="custom-select-options">
-                                  <!-- Options will be populated here -->
-                                </div>
+                                <div class="custom-select-options"></div>
                               </div>
                             </div>
                             <div class="form-text">
                               Select a Discord server member, or enter their User ID manually below if they don't appear in the list.
                             </div>
-                            <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <div class="d-flex align-center gap-sm mt-half">
                               <input type="text" id="discord-user-id-manual" placeholder="Or enter Discord User ID manually..." style="flex: 1; background: var(--surface0); border: 1px solid var(--surface2); color: var(--text); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.9rem;" />
                             </div>
                           </div>
+
                           <div class="form-group">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                              <label for="seerr-user-select" style="margin-bottom: 0;">Seerr User</label>
+                            <div class="d-flex align-center justify-between mb-half">
+                              <label for="seerr-user-select" class="mb-0">Seerr User</label>
                             </div>
                             <div class="custom-select" id="seerr-user-select">
                               <input type="text" class="custom-select-trigger" placeholder="Search Seerr users..." readonly />
                               <i class="bi bi-chevron-down custom-select-chevron"></i>
                               <div class="custom-select-dropdown">
-                                <div class="custom-select-options">
-                                  <!-- Options will be populated here -->
-                                </div>
+                                <div class="custom-select-options"></div>
                               </div>
                             </div>
-                            <div class="form-text">
-                              Select the corresponding Seerr account
-                            </div>
+                            <div class="form-text">Select the corresponding Seerr account</div>
                           </div>
-                          <button type="button" id="add-mapping-btn" class="btn btn-primary" style="margin-left: 0;">Add Mapping</button>
+
+                          <button type="button" id="add-mapping-btn" class="btn btn-primary ml-0">Add Mapping</button>
                         </div>
                       </div>
                     </fieldset>
                   </div>
 
-                  <!-- Role Permissions Pane -->
+                  <!-- ======================== -->
+                  <!-- Role Permissions Pane   -->
+                  <!-- ======================== -->
                   <div id="config-pane-roles" class="config-pane">
                     <fieldset>
                       <legend>Role Permissions</legend>
-                      <p class="form-text" style="margin-bottom: 1.5rem;">
+                      <p class="pane-description">
                         Control who can use bot commands by configuring role-based permissions. If no roles are selected in the allowlist, everyone can use commands. If any role is added to the blocklist, members with that role will be blocked regardless of allowlist settings.
                       </p>
-                      
+
                       <div class="form-group">
-                        <label style="font-weight: 600; color: var(--green);">Allowlist (Allow Only These Roles)</label>
+                        <label class="label-strong text-green">Allowlist (Allow Only These Roles)</label>
                         <div id="allowlist-roles" class="role-list">
-                          <p class="form-text" style="opacity: 0.7; font-style: italic;">Loading roles...</p>
+                          <p class="form-text text-subtext" style="font-style: italic;">Loading roles...</p>
                         </div>
                         <div class="form-text">
                           If empty, all members can use commands. If roles are selected, only members with these roles can use commands.
                         </div>
                       </div>
-                      
+
                       <div class="form-group">
-                        <label style="font-weight: 600; color: var(--peach);">Blocklist (Block These Roles)</label>
+                        <label class="label-strong text-peach">Blocklist (Block These Roles)</label>
                         <div id="blocklist-roles" class="role-list">
-                          <p class="form-text" style="opacity: 0.7; font-style: italic;">Loading roles...</p>
+                          <p class="form-text text-subtext" style="font-style: italic;">Loading roles...</p>
                         </div>
                         <div class="form-text">
                           Members with these roles will never be able to use bot commands, even if they have an allowed role.
@@ -846,16 +701,18 @@
                     </fieldset>
                   </div>
 
-                  <!-- Miscellaneous Pane -->
+                  <!-- ======================== -->
+                  <!-- Miscellaneous Pane      -->
+                  <!-- ======================== -->
                   <div id="config-pane-misc" class="config-pane">
                     <fieldset>
                       <legend>Miscellaneous Settings</legend>
-                      <p class="form-text" style="margin-bottom: 1.5rem;">
+                      <p class="pane-description">
                         Optional settings to enhance your bot experience. These are extra features that can be enabled after your bot is fully configured and running.
                       </p>
-                      
+
                       <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <label class="checkbox-label">
                           <input type="checkbox" id="AUTO_START_BOT" name="AUTO_START_BOT" />
                           Auto-start bot on server boot
                         </label>
@@ -864,8 +721,8 @@
                         </div>
                       </div>
 
-                      <div class="form-group" style="margin-top: 1.5rem;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                      <div class="form-group mt-section-sm">
+                        <label class="checkbox-label">
                           <input type="checkbox" id="NOTIFY_ON_AVAILABLE" name="NOTIFY_ON_AVAILABLE" />
                           Send PM when request is available
                         </label>
@@ -874,18 +731,18 @@
                         </div>
                       </div>
 
-                      <div class="form-group" style="margin-top: 1.5rem;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                      <div class="form-group mt-section-sm">
+                        <label class="checkbox-label">
                           <input type="checkbox" id="PRIVATE_MESSAGE_MODE" name="PRIVATE_MESSAGE_MODE" />
                           Ephemeral Message Mode
                         </label>
                         <div class="form-text">
-                          When enabled, all bot responses (search and request results) are sent as ephemeral messages (only visible to the user who used the command). When disabled, successful results are visible to everyone in the channel, but warning messages (e.g., "already on Jellyfin") are always ephemeral.
+                          When enabled, all bot responses are sent as ephemeral messages (only visible to the user who used the command). When disabled, successful results are visible to everyone in the channel.
                         </div>
                       </div>
 
-                      <div class="form-group" style="margin-top: 1.5rem;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                      <div class="form-group mt-section-sm">
+                        <label class="checkbox-label">
                           <input type="checkbox" id="SEERR_AUTO_APPROVE" name="SEERR_AUTO_APPROVE" />
                           Seerr Auto-Approve Requests
                         </label>
@@ -894,272 +751,212 @@
                         </div>
                       </div>
 
-                      <!-- Daily Random Pick Section -->
-                      <div class="form-group" style="margin-top: 2rem; padding: 1rem; background-color: var(--surface0); border-radius: 8px; border-left: 4px solid var(--peach);">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 1rem;">
+                      <!-- Daily Random Pick -->
+                      <div class="form-group mt-section info-box--peach">
+                        <label class="checkbox-label mb-1">
                           <input type="checkbox" id="DAILY_RANDOM_PICK_ENABLED" name="DAILY_RANDOM_PICK_ENABLED" />
                           Enable Daily Random Pick
                         </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
+                        <div class="form-text mb-1">
                           Send a daily recommendation of random media to a Discord channel. Great for discovering hidden gems!
                         </div>
 
-                        <div class="form-group" style="margin-top: 1rem;">
-                          <label for="DAILY_RANDOM_PICK_CHANNEL_ID" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Channel</label>
-                          <select
-                            id="DAILY_RANDOM_PICK_CHANNEL_ID"
-                            name="DAILY_RANDOM_PICK_CHANNEL_ID"
-                            style="width: 100%; background-color: var(--background); border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
-                            <option value="" style="color: var(--subtext0);">Select a channel...</option>
+                        <div class="form-group mt-1">
+                          <label for="DAILY_RANDOM_PICK_CHANNEL_ID" class="label-strong">Channel</label>
+                          <select id="DAILY_RANDOM_PICK_CHANNEL_ID" name="DAILY_RANDOM_PICK_CHANNEL_ID">
+                            <option value="">Select a channel...</option>
                           </select>
-                          <div class="form-text" style="margin-top: 0.5rem;">
-                            Discord channel where daily picks will be sent
-                          </div>
+                          <div class="form-text mt-half">Discord channel where daily picks will be sent</div>
                         </div>
 
-                        <div class="form-group" style="margin-top: 1rem;">
-                          <label for="DAILY_RANDOM_PICK_INTERVAL" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Interval (minutes)</label>
-                          <input type="number" id="DAILY_RANDOM_PICK_INTERVAL" name="DAILY_RANDOM_PICK_INTERVAL" placeholder="1440" min="1" max="525600" style="width: 100%; max-width: 150px; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface1); color: var(--text); font-size: 1rem;" />
-                          <div class="form-text" style="margin-top: 0.5rem;">
-                            How often to send a random pick in minutes (default: 1440 = 24 hours)
-                          </div>
+                        <div class="form-group mt-1">
+                          <label for="DAILY_RANDOM_PICK_INTERVAL" class="label-strong">Interval (minutes)</label>
+                          <input type="number" id="DAILY_RANDOM_PICK_INTERVAL" name="DAILY_RANDOM_PICK_INTERVAL" placeholder="1440" min="1" max="525600" class="input-narrow" />
+                          <div class="form-text mt-half">How often to send a random pick in minutes (default: 1440 = 24 hours)</div>
                         </div>
 
-                        <div style="margin-top: 1rem;">
-                          <button type="button" id="test-random-pick-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <div class="mt-1">
+                          <button type="button" id="test-random-pick-btn" class="btn btn-secondary btn-flex btn-sm">
                             <i class="bi bi-shuffle"></i> Test Random Pick
                           </button>
                         </div>
                       </div>
 
-                      <!-- Discord Embed Colors Section -->
-                      <div class="form-group" style="margin-top: 2rem;">
-                        <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          <strong>Discord Embed Colors</strong>
-                        </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
-                          Customize the colors of Discord notification embeds for different content types.
-                        </div>
+                      <!-- Discord Embed Colors -->
+                      <div class="form-group mt-section">
+                        <label class="section-heading"><strong>Discord Embed Colors</strong></label>
+                        <div class="form-text mb-1">Customize the colors of Discord notification embeds for different content types.</div>
 
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                          <!-- Movie Color -->
+                        <div class="grid-colors">
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_MOVIE" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">🎬 Movies</label>
-                            <input type="text" id="EMBED_COLOR_MOVIE" name="EMBED_COLOR_MOVIE" data-coloris value="#cba6f7" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
+                            <label for="EMBED_COLOR_MOVIE" class="label-strong">🎬 Movies</label>
+                            <input type="text" id="EMBED_COLOR_MOVIE" name="EMBED_COLOR_MOVIE" data-coloris value="#cba6f7" />
                           </div>
-
-                          <!-- Series Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_SERIES" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 TV Series</label>
-                            <input type="text" id="EMBED_COLOR_SERIES" name="EMBED_COLOR_SERIES" data-coloris value="#cba6f7" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
+                            <label for="EMBED_COLOR_SERIES" class="label-strong">📺 TV Series</label>
+                            <input type="text" id="EMBED_COLOR_SERIES" name="EMBED_COLOR_SERIES" data-coloris value="#cba6f7" />
                           </div>
-
-                          <!-- Season Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_SEASON" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 Seasons</label>
-                            <input type="text" id="EMBED_COLOR_SEASON" name="EMBED_COLOR_SEASON" data-coloris value="#89b4fa" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
+                            <label for="EMBED_COLOR_SEASON" class="label-strong">📺 Seasons</label>
+                            <input type="text" id="EMBED_COLOR_SEASON" name="EMBED_COLOR_SEASON" data-coloris value="#89b4fa" />
                           </div>
-
-                          <!-- Single Episode Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_EPISODE_SINGLE" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 Single Episode</label>
-                            <input type="text" id="EMBED_COLOR_EPISODE_SINGLE" name="EMBED_COLOR_EPISODE_SINGLE" data-coloris value="#89b4fa" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
+                            <label for="EMBED_COLOR_EPISODE_SINGLE" class="label-strong">📺 Single Episode</label>
+                            <input type="text" id="EMBED_COLOR_EPISODE_SINGLE" name="EMBED_COLOR_EPISODE_SINGLE" data-coloris value="#89b4fa" />
                           </div>
-
-                          <!-- Few Episodes Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_EPISODE_FEW" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 Few Episodes (2-5)</label>
-                            <input type="text" id="EMBED_COLOR_EPISODE_FEW" name="EMBED_COLOR_EPISODE_FEW" data-coloris value="#89b4fa" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
+                            <label for="EMBED_COLOR_EPISODE_FEW" class="label-strong">📺 Few Episodes (2–5)</label>
+                            <input type="text" id="EMBED_COLOR_EPISODE_FEW" name="EMBED_COLOR_EPISODE_FEW" data-coloris value="#89b4fa" />
                           </div>
-
-                          <!-- Many Episodes Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_EPISODE_MANY" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 Many Episodes (6+)</label>
-                            <input type="text" id="EMBED_COLOR_EPISODE_MANY" name="EMBED_COLOR_EPISODE_MANY" data-coloris value="#89b4fa" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
+                            <label for="EMBED_COLOR_EPISODE_MANY" class="label-strong">📺 Many Episodes (6+)</label>
+                            <input type="text" id="EMBED_COLOR_EPISODE_MANY" name="EMBED_COLOR_EPISODE_MANY" data-coloris value="#89b4fa" />
                           </div>
-
-                          <!-- Search Result Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_SEARCH" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">🔍 Search Results</label>
-                            <input type="text" id="EMBED_COLOR_SEARCH" name="EMBED_COLOR_SEARCH" data-coloris value="#fab387" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
+                            <label for="EMBED_COLOR_SEARCH" class="label-strong">🔍 Search Results</label>
+                            <input type="text" id="EMBED_COLOR_SEARCH" name="EMBED_COLOR_SEARCH" data-coloris value="#fab387" />
                           </div>
-
-                          <!-- Request Success Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_SUCCESS" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">✅ Request Success</label>
-                            <input type="text" id="EMBED_COLOR_SUCCESS" name="EMBED_COLOR_SUCCESS" data-coloris value="#a6e3a1" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
+                            <label for="EMBED_COLOR_SUCCESS" class="label-strong">✅ Request Success</label>
+                            <input type="text" id="EMBED_COLOR_SUCCESS" name="EMBED_COLOR_SUCCESS" data-coloris value="#a6e3a1" />
                           </div>
                         </div>
                       </div>
 
-                      <!-- App Settings Section -->
-                      <div class="form-group" style="margin-top: 2rem;">
-                        <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          <strong>App Settings</strong>
-                        </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
-                          General application settings for Anchorr.
-                        </div>
+                      <!-- App Settings -->
+                      <div class="form-group mt-section">
+                        <label class="section-heading"><strong>App Settings</strong></label>
+                        <div class="form-text mb-1">General application settings for Anchorr.</div>
 
                         <div class="form-group">
-                          <label for="app-language" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Language</label>
-                          <select id="app-language" name="LANGUAGE" style="width: 100%; max-width: 300px; background-color: #1e1e2e; border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
-                            <!-- Languages will be populated dynamically -->
-                          </select>
-                          <div class="form-text" style="margin-top: 0.5rem;">
-                            Select the language for the Anchorr dashboard interface.
-                          </div>
+                          <label for="app-language" class="label-strong">Language</label>
+                          <select id="app-language" name="LANGUAGE" class="select-md"></select>
+                          <div class="form-text mt-half">Select the language for the Anchorr dashboard interface.</div>
                         </div>
                       </div>
                     </fieldset>
                   </div>
 
+                  <!-- Sticky Save Bar -->
+                  <div class="sticky-save">
+                    <button type="submit" class="btn btn-primary" data-i18n="config.save_button">Save Settings</button>
+                  </div>
+
                 </form>
               </div>
-          </div>
+            </div>
 
-          <!-- About Page (Independent) -->
-          <div id="about-page" class="about-page" style="display: none;">
-            <div class="about-content">
-              <h2 data-i18n="about.title">About Anchorr</h2>
-              <p class="about-description" data-i18n="about.description">
-                <strong class="anchor-highlight">Anchorr</strong> is a self-hosted, lightweight bridge that connects your <strong style="color: var(--blue);">Jellyfin</strong> media server with <strong style="color: var(--blue);">Discord</strong>. It notifies you on a dedicated channel when new media is added to your library, and with <strong style="color: var(--blue);">Seerr</strong> integration, you can search and request movies and shows directly from Discord.
-              </p>
+            <!-- About Page -->
+            <div id="about-page" class="about-page" style="display: none;">
+              <div class="about-content">
+                <h2 data-i18n="about.title">About Anchorr</h2>
+                <p class="about-description" data-i18n="about.description">
+                  <strong class="anchor-highlight">Anchorr</strong> is a self-hosted, lightweight bridge that connects your <strong style="color: var(--blue);">Jellyfin</strong> media server with <strong style="color: var(--blue);">Discord</strong>. It notifies you on a dedicated channel when new media is added to your library, and with <strong style="color: var(--blue);">Seerr</strong> integration, you can search and request movies and shows directly from Discord.
+                </p>
 
-              <div class="features-list">
-                <h3 class="features-title" data-i18n="about.features_title">Features</h3>
-                <ul>
-                  <li><i class="bi bi-search"></i><div data-i18n="about.feature_search"><code>/search &lt;title&gt;</code> Search for a movie or show with auto-suggestions. An embed with detailed information is shown, from which you can request the media. For <strong style="color: var(--blue);">TV shows</strong>, you have the option to select the desired seasons for the request.</div></li>
-                  <li><i class="bi bi-send-fill"></i><div data-i18n="about.feature_request"><code>/request &lt;title&gt;</code> Instantly send a request for your chosen movie or show directly to <strong style="color: var(--blue);">Seerr</strong>. For <strong style="color: var(--blue);">TV shows</strong>, this automatically requests all seasons.</div></li>
-                  <li><i class="bi bi-bell-fill"></i><div data-i18n="about.feature_notifications">Receive beautifully formatted notifications on your selected <strong style="color: var(--blue);">Discord</strong> channel whenever new media is added to your <strong style="color: var(--blue);">Jellyfin</strong> library.</div></li>
-                  <li><i class="bi bi-film"></i><div data-i18n="about.feature_databases">Using the <strong style="color: var(--blue);">TMDB</strong> and <strong style="color: var(--blue);">OMDb</strong> databases, <strong style="color: var(--blue);">Discord</strong> messages get a beautiful and well-structured look, with essential information about the requested or added media content.</div></li>
-                  <li><i class="bi bi-sliders"></i><div data-i18n="about.feature_permissions">Control permissions with <strong style="color: var(--blue);">role-based access</strong> (allowlist/blocklist), route notifications to different channels by <strong style="color: var(--blue);">Jellyfin library</strong>, and link users to <strong style="color: var(--blue);">Seerr</strong> accounts for accurate request tracking.</div></li>
-                  <li><i class="bi bi-chat-left-dots"></i><div data-i18n="about.feature_direct_messages">Get <strong style="color: var(--blue);">direct messages</strong> on <strong style="color: var(--blue);">Discord</strong> when requested content becomes available in your library. Never miss when your requests are ready!</div></li>
-                </ul>
-              </div>
-
-              <div class="about-cards">
-                <div class="about-card support-card">
-                  <i class="bi bi-heart-fill"></i>
-                  <h3 data-i18n="about.support_title">Support the Project</h3>
-                  <p data-i18n="about.support_description">If you find Anchorr useful, consider supporting its development. Every coffee helps fuel late-night coding sessions!</p>
-                  <a href="https://ko-fi.com/nairdah" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" data-i18n="about.buy_coffee">Buy me a Coffee</a>
+                <div class="features-list">
+                  <h3 class="features-title" data-i18n="about.features_title">Features</h3>
+                  <ul>
+                    <li><i class="bi bi-search"></i><div data-i18n="about.feature_search"><code>/search &lt;title&gt;</code> Search for a movie or show with auto-suggestions. An embed with detailed information is shown, from which you can request the media. For <strong style="color: var(--blue);">TV shows</strong>, you have the option to select the desired seasons for the request.</div></li>
+                    <li><i class="bi bi-send-fill"></i><div data-i18n="about.feature_request"><code>/request &lt;title&gt;</code> Instantly send a request for your chosen movie or show directly to <strong style="color: var(--blue);">Seerr</strong>. For <strong style="color: var(--blue);">TV shows</strong>, this automatically requests all seasons.</div></li>
+                    <li><i class="bi bi-bell-fill"></i><div data-i18n="about.feature_notifications">Receive beautifully formatted notifications on your selected <strong style="color: var(--blue);">Discord</strong> channel whenever new media is added to your <strong style="color: var(--blue);">Jellyfin</strong> library.</div></li>
+                    <li><i class="bi bi-film"></i><div data-i18n="about.feature_databases">Using the <strong style="color: var(--blue);">TMDB</strong> and <strong style="color: var(--blue);">OMDb</strong> databases, <strong style="color: var(--blue);">Discord</strong> messages get a beautiful and well-structured look, with essential information about the requested or added media content.</div></li>
+                    <li><i class="bi bi-sliders"></i><div data-i18n="about.feature_permissions">Control permissions with <strong style="color: var(--blue);">role-based access</strong> (allowlist/blocklist), route notifications to different channels by <strong style="color: var(--blue);">Jellyfin library</strong>, and link users to <strong style="color: var(--blue);">Seerr</strong> accounts for accurate request tracking.</div></li>
+                    <li><i class="bi bi-chat-left-dots"></i><div data-i18n="about.feature_direct_messages">Get <strong style="color: var(--blue);">direct messages</strong> on <strong style="color: var(--blue);">Discord</strong> when requested content becomes available in your library. Never miss when your requests are ready!</div></li>
+                  </ul>
                 </div>
-                <div class="about-card contribute-card">
-                  <i class="bi bi-github"></i>
-                  <h3 data-i18n="about.contribute_title">Contribute</h3>
-                  <p data-i18n="about.contribute_description">Anchorr is open-source! If you're a developer, your contributions are welcome. Check out the project on GitHub to get started.</p>
-                  <a href="https://github.com/nairdahh/Anchorr" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" data-i18n="about.view_github">View on GitHub</a>
-                </div>
-              </div>
 
-              <div class="dev-footer">
-                <div class="dev-footer-left">
-                  <a href="https://nairdah.me/" target="_blank" rel="noopener noreferrer">
-                    <img src="/assets/openvessl_logo.png" alt="OpenVessl logo" class="dev-avatar">
-                  </a>
-                  <div class="dev-info">
-                    <span>Created & Maintained by <a href="https://nairdah.me/" target="_blank" rel="noopener noreferrer" class="dev-link">nairdah</a> & <a href="https://github.com/retardgerman" target="_blank" rel="noopener noreferrer" class="dev-link">retardgerman</a></span>
+                <div class="about-cards">
+                  <div class="about-card support-card">
+                    <i class="bi bi-heart-fill"></i>
+                    <h3 data-i18n="about.support_title">Support the Project</h3>
+                    <p data-i18n="about.support_description">If you find Anchorr useful, consider supporting its development. Every coffee helps fuel late-night coding sessions!</p>
+                    <a href="https://ko-fi.com/nairdah" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" data-i18n="about.buy_coffee">Buy me a Coffee</a>
+                  </div>
+                  <div class="about-card contribute-card">
+                    <i class="bi bi-github"></i>
+                    <h3 data-i18n="about.contribute_title">Contribute</h3>
+                    <p data-i18n="about.contribute_description">Anchorr is open-source! If you're a developer, your contributions are welcome. Check out the project on GitHub to get started.</p>
+                    <a href="https://github.com/nairdahh/Anchorr" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" data-i18n="about.view_github">View on GitHub</a>
                   </div>
                 </div>
-                <div class="dev-footer-right">
-                  <p>Thank you for using Anchorr!<br>Please contact me for any matter about the project.</p>
+
+                <div class="dev-footer">
+                  <div class="dev-footer-left">
+                    <a href="https://nairdah.me/" target="_blank" rel="noopener noreferrer">
+                      <img src="/assets/openvessl_logo.png" alt="OpenVessl logo" class="dev-avatar">
+                    </a>
+                    <div class="dev-info">
+                      <span>Created &amp; Maintained by <a href="https://nairdah.me/" target="_blank" rel="noopener noreferrer" class="dev-link">nairdah</a> &amp; <a href="https://github.com/retardgerman" target="_blank" rel="noopener noreferrer" class="dev-link">retardgerman</a></span>
+                    </div>
+                  </div>
+                  <div class="dev-footer-right">
+                    <p>Thank you for using Anchorr!<br>Please contact me for any matter about the project.</p>
+                  </div>
+                </div>
+
+                <div class="version-footer">
+                  <p>Anchorr <span class="version-number" id="about-version">...</span></p>
                 </div>
               </div>
+            </div>
 
-              <div class="version-footer">
-                <p>Anchorr <span class="version-number" id="about-version">...</span></p>
+          </section>
+        </main>
+
+        <!-- Logs Section -->
+        <section id="logs-section" class="setup-section" style="display: none;">
+          <div class="container">
+            <div style="margin-bottom: 1rem; flex-shrink: 0;">
+              <button type="button" id="back-to-config-btn" data-i18n="logs.back_to_config">← Back to Configuration</button>
+            </div>
+
+            <div class="dashboard-header">
+              <div class="d-flex align-center gap-sm">
+                <button type="button" class="logs-tab-btn active" data-target="all" data-i18n="logs.all_logs">All Logs</button>
+                <button type="button" class="logs-tab-btn" data-target="error" data-i18n="logs.errors">Errors</button>
+                <button type="button" id="refresh-logs-btn" class="logs-tab-btn" title="Refresh logs" data-i18n="logs.refresh" data-i18n-attr="title">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
               </div>
+              <div class="d-flex align-center gap-1">
+                <div class="status-indicator-container">
+                  <div class="status-indicator-item">
+                    <div id="seerr-status-indicator" class="status-dot"></div>
+                    <span>Seerr</span>
+                  </div>
+                  <div class="status-indicator-item">
+                    <div id="jellyfin-status-indicator" class="status-dot"></div>
+                    <span>Jellyfin</span>
+                  </div>
+                </div>
+                <button type="button" id="bot-control-btn-logs" class="btn btn-status btn-danger">
+                  <i class="bi bi-play-fill"></i>
+                  <span id="bot-control-text-logs" data-i18n="config.start_bot">Start Bot</span>
+                </button>
+              </div>
+            </div>
 
+            <div id="logs-container">
+              <div class="text-center text-subtext" style="padding: 2rem;" data-i18n="logs.loading">Loading logs...</div>
             </div>
           </div>
-
         </section>
-      </main>
-
-      <!-- Logs Section -->
-      <section id="logs-section" class="setup-section" style="display: none;">
-        <div class="container">
-          <div style="margin-bottom: 1rem; flex-shrink: 0;">
-            <button type="button" id="back-to-config-btn" data-i18n="logs.back_to_config">
-              ← Back to Configuration
-            </button>
-          </div>
-
-          <div class="dashboard-header">
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <button type="button" class="logs-tab-btn active" data-target="all" data-i18n="logs.all_logs">
-                All Logs
-              </button>
-              <button type="button" class="logs-tab-btn" data-target="error" data-i18n="logs.errors">
-                Errors
-              </button>
-              <button type="button" id="refresh-logs-btn" class="logs-tab-btn" title="Refresh logs" data-i18n="logs.refresh" data-i18n-attr="title">
-                <i class="bi bi-arrow-clockwise"></i>
-              </button>
-            </div>
-            <div style="display: flex; align-items: center; gap: 1.5rem;">
-              <!-- Status Indicators -->
-              <div class="status-indicator-container">
-                <div class="status-indicator-item">
-                  <div id="seerr-status-indicator" class="status-dot"></div>
-                  <span>Seerr</span>
-                </div>
-                <div class="status-indicator-item">
-                  <div id="jellyfin-status-indicator" class="status-dot"></div>
-                  <span>Jellyfin</span>
-                </div>
-              </div>
-              <button type="button" id="bot-control-btn-logs" class="btn btn-status btn-danger">
-                <i class="bi bi-play-fill"></i>
-                <span id="bot-control-text-logs" data-i18n="config.start_bot">Start Bot</span>
-              </button>
-            </div>
-          </div>
-
-          <div id="logs-container">
-            <div style="text-align: center; color: var(--subtext0); padding: 2rem;" data-i18n="logs.loading">
-              Loading logs...
-            </div>
-          </div>
-        </div>
-      </section>
-
-      </main>
 
       <footer class="footer">
-        <div
-          class="container"
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          "
-        >
-          <div class="footer-links" style="margin-top: 0">
-            <a
-              href="https://github.com/nairdahh/Anchorr/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-i18n="footer.report_bug"
-              >Report a Bug</a
-            >
+        <div class="container footer-container">
+          <div class="footer-links" style="margin-top: 0;">
+            <a href="https://github.com/nairdahh/Anchorr/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.report_bug">Report a Bug</a>
             <button id="logs-page-btn" class="footer-btn" data-i18n="footer.logs">Logs</button>
-            <span id="footer-version" style="color: var(--subtext0); font-size: 0.85rem; margin-left: 1rem;">...</span>
+            <span id="footer-version" class="footer-version">...</span>
           </div>
           <div>
             <span data-i18n="footer.made_by">made by</span>
             <a href="https://nairdah.me/" target="_blank" rel="noopener noreferrer">nairdah</a>
-            &
+            &amp;
             <a href="https://github.com/retardgerman" target="_blank" rel="noopener noreferrer">retardgerman</a>
             ❤️
-            <a
-              href="https://ko-fi.com/nairdah"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-i18n="footer.buy_coffee"
-              >Buy me a Coffee!</a
-            >
+            <a href="https://ko-fi.com/nairdah" target="_blank" rel="noopener noreferrer" data-i18n="footer.buy_coffee">Buy me a Coffee!</a>
           </div>
         </div>
       </footer>
@@ -1171,7 +968,7 @@
     <div id="auto-map-modal" class="modal-overlay" style="display: none;">
       <div class="modal-content" style="max-width: 560px;">
         <div class="modal-header">
-          <h3><i class="bi bi-magic" style="color: var(--mauve);"></i> Auto-Map from Seerr</h3>
+          <h3><i class="bi bi-magic icon-mauve"></i> Auto-Map from Seerr</h3>
         </div>
         <div class="modal-body">
           <p>The following Seerr users have linked their Discord account. Select which ones to map:</p>
@@ -1193,7 +990,7 @@
     <div id="sync-seerr-modal" class="modal-overlay" style="display: none;">
       <div class="modal-content" style="max-width: 560px;">
         <div class="modal-header">
-          <h3><i class="bi bi-arrow-repeat" style="color: var(--mauve);"></i> Sync with Seerr</h3>
+          <h3><i class="bi bi-arrow-repeat icon-mauve"></i> Sync with Seerr</h3>
         </div>
         <div class="modal-body">
           <p>The following bot mappings no longer match what's linked in Seerr. Select which ones to remove:</p>
@@ -1215,14 +1012,14 @@
     <div id="bot-autostart-modal" class="modal-overlay" style="display: none;">
       <div class="modal-content">
         <div class="modal-header">
-          <h3><i class="bi bi-play-circle-fill" style="color: var(--mauve);"></i> Start Bot?</h3>
+          <h3><i class="bi bi-play-circle-fill icon-mauve"></i> Start Bot?</h3>
         </div>
         <div class="modal-body">
           <p>You've filled all the bot's requirements. Would you like to start the bot now?</p>
           <p class="modal-note">The bot will automatically connect to Discord and start monitoring for notifications.</p>
         </div>
         <div class="modal-actions">
-          <button id="modal-start-yes" class="btn btn-primary" style="background-color: var(--mauve); border-color: var(--mauve);" data-i18n="modals.start_bot_yes">
+          <button id="modal-start-yes" class="btn btn-primary" data-i18n="modals.start_bot_yes">
             <i class="bi bi-play-fill"></i> Yes, Start Bot
           </button>
           <button id="modal-start-no" class="btn btn-secondary" data-i18n="modals.start_bot_no">
@@ -1233,4 +1030,3 @@
     </div>
   </body>
 </html>
-
