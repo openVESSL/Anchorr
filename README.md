@@ -79,7 +79,7 @@ Before getting started, ensure you have:
 - ✅ API keys from:
   - [The Movie Database (TMDB)](https://www.themoviedb.org/settings/api) - **Required**
   - [OMDb API](http://www.omdbapi.com/apikey.aspx) - Optional, but recommended for richer data
-- ✅ **Node.js** v18+ or **Docker & Docker Compose**
+- ✅ **Node.js** v20+ or **Docker & Docker Compose**
 
 ## 🚀 Quick Start
 

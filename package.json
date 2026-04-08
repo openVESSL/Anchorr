@@ -9,6 +9,9 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

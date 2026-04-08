@@ -1,5 +1,5 @@
 # use a stable node LTS
-FROM node:18-alpine
+FROM node:20-alpine
 
 # create app dir first
 WORKDIR /usr/src/app
