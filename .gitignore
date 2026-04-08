@@ -20,6 +20,7 @@ yarn-error.log*
 .idea/
 .vscode/
 .code-reviewer-graph
+ToDo_v2.md
 
 # Testing
 coverage/
