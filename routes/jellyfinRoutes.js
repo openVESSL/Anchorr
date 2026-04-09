@@ -3,7 +3,7 @@ import axios from "axios";
 import { authenticateToken } from "../utils/auth.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
-import { libraryCache } from "../jellyfinWebhook.js";
+import { libraryCache, getWebhookLog, clearWebhookLog } from "../jellyfinWebhook.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -123,6 +123,16 @@ router.get("/jellyfin/libraries", authenticateToken, async (req, res) => {
       message: "Failed to fetch libraries. Check Jellyfin configuration.",
     });
   }
+});
+
+// Webhook event log (in-memory ring buffer, lost on restart)
+router.get("/webhook-log", authenticateToken, (_req, res) => {
+  res.json({ success: true, events: getWebhookLog() });
+});
+
+router.post("/webhook-log/clear", authenticateToken, (_req, res) => {
+  clearWebhookLog();
+  res.json({ success: true });
 });
 
 export default router;

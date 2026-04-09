@@ -3328,10 +3328,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const logsSection = document.getElementById("logs-section");
   const setupSection = document.getElementById("setup");
   const logsContainer = document.getElementById("logs-container");
+  const webhookLogContainer = document.getElementById("webhook-log-container");
   const logsTabBtns = document.querySelectorAll(".logs-tab-btn");
   const botControlBtnLogs = document.getElementById("bot-control-btn-logs");
   const botControlTextLogs = document.getElementById("bot-control-text-logs");
   let currentLogsTab = "all";
+  let webhookLogPollInterval = null;
 
   // Track if we're on logs page for polling
   let logsPageActive = false;
@@ -3364,6 +3366,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 10000); // Poll every 10 seconds
   });
 
+  function showLogsTab(target) {
+    const isWebhooks = target === "webhooks";
+    logsContainer.style.display = isWebhooks ? "none" : "";
+    webhookLogContainer.style.display = isWebhooks ? "" : "none";
+    if (isWebhooks) {
+      loadWebhookLog();
+      if (!webhookLogPollInterval) {
+        webhookLogPollInterval = setInterval(loadWebhookLog, 10000);
+      }
+    } else {
+      clearInterval(webhookLogPollInterval);
+      webhookLogPollInterval = null;
+    }
+  }
+
   // Logs tab switching
   logsTabBtns.forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -3372,12 +3389,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      logsTabBtns.forEach((b) => {
-        b.classList.remove("active");
-      });
+      logsTabBtns.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       currentLogsTab = btn.dataset.target;
-      await loadLogs(currentLogsTab);
+      showLogsTab(currentLogsTab);
+      if (currentLogsTab !== "webhooks") {
+        await loadLogs(currentLogsTab);
+      }
     });
   });
 
@@ -3439,6 +3457,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       logsContainer.innerHTML = `<div class="logs-empty">${t('errors.loading_logs')}: ${escapeHtml(error.message)}</div>`;
     }
+  }
+
+  // Webhook log
+  const STATUS_META = {
+    notified:   { label: "Notified",    icon: "bi-check-circle-fill" },
+    debounced:  { label: "Debounced",   icon: "bi-hourglass-split" },
+    skipped:    { label: "Skipped",     icon: "bi-skip-forward-fill" },
+    no_channel: { label: "No channel",  icon: "bi-exclamation-triangle-fill" },
+    error:      { label: "Error",       icon: "bi-x-circle-fill" },
+  };
+
+  async function loadWebhookLog() {
+    try {
+      const res = await fetch("/api/webhook-log");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { events } = await res.json();
+
+      const countEl = document.getElementById("webhook-log-count");
+      const tbody = document.getElementById("webhook-log-body");
+      if (!tbody) return;
+
+      if (countEl) countEl.textContent = events.length ? `${events.length} event${events.length !== 1 ? "s" : ""}` : "";
+
+      if (!events.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="webhook-log-empty">No webhook events recorded yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = events.map((ev) => {
+        const meta = STATUS_META[ev.status] || { label: ev.status, icon: "bi-question-circle" };
+        const time = new Date(ev.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        return `<tr>
+          <td class="webhook-log-time">${escapeHtml(time)}</td>
+          <td>${escapeHtml(ev.itemType || "—")}</td>
+          <td class="webhook-log-item" title="${escapeHtml(ev.itemName || "")}">${escapeHtml(ev.itemName || "—")}</td>
+          <td><span class="wh-badge wh-badge--${escapeHtml(ev.status)}"><i class="bi ${meta.icon}"></i>${meta.label}</span></td>
+          <td class="webhook-log-detail" title="${escapeHtml(ev.detail || "")}">${escapeHtml(ev.detail || "—")}</td>
+        </tr>`;
+      }).join("");
+    } catch (err) {
+      const tbody = document.getElementById("webhook-log-body");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="webhook-log-empty">Failed to load webhook log: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  const webhookLogClearBtn = document.getElementById("webhook-log-clear-btn");
+  if (webhookLogClearBtn) {
+    webhookLogClearBtn.addEventListener("click", async () => {
+      await fetch("/api/webhook-log/clear", { method: "POST" });
+      loadWebhookLog();
+    });
   }
 
   // Helper function to escape HTML
@@ -3601,6 +3670,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       clearInterval(logsPollingInterval);
       logsPollingInterval = null;
     }
+    clearInterval(webhookLogPollInterval);
+    webhookLogPollInterval = null;
 
     window.scrollTo(0, 0);
   });

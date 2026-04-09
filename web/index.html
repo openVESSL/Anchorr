@@ -915,6 +915,7 @@
               <div class="d-flex align-center gap-sm">
                 <button type="button" class="logs-tab-btn active" data-target="all" data-i18n="logs.all_logs">All Logs</button>
                 <button type="button" class="logs-tab-btn" data-target="error" data-i18n="logs.errors">Errors</button>
+                <button type="button" class="logs-tab-btn" data-target="webhooks">Webhooks</button>
                 <button type="button" id="refresh-logs-btn" class="logs-tab-btn" title="Refresh logs" data-i18n="logs.refresh" data-i18n-attr="title">
                   <i class="bi bi-arrow-clockwise"></i>
                 </button>
@@ -939,6 +940,31 @@
 
             <div id="logs-container">
               <div class="text-center text-subtext" style="padding: 2rem;" data-i18n="logs.loading">Loading logs...</div>
+            </div>
+
+            <div id="webhook-log-container" style="display: none;">
+              <div class="webhook-log-toolbar">
+                <span class="webhook-log-count" id="webhook-log-count"></span>
+                <button type="button" id="webhook-log-clear-btn" class="btn btn-sm btn-secondary">
+                  <i class="bi bi-trash"></i> Clear
+                </button>
+              </div>
+              <div class="webhook-log-table-wrapper">
+                <table class="webhook-log-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Type</th>
+                      <th>Item</th>
+                      <th>Status</th>
+                      <th>Detail</th>
+                    </tr>
+                  </thead>
+                  <tbody id="webhook-log-body">
+                    <tr><td colspan="5" class="webhook-log-empty">No webhook events recorded yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>

@@ -17,6 +17,23 @@ const sentNotifications = new Map();
 const episodeMessages = new Map(); // Track Discord messages for editing: SeriesId -> { messageId, channelId }
 const creatingDebouncers = new Set(); // Prevent race condition: track SeriesIds currently creating debouncers
 
+// Webhook event log — in-memory ring buffer (debug tool, intentionally lost on restart)
+const WEBHOOK_LOG_MAX = 30;
+const webhookEvents = [];
+
+function logWebhookEvent(entry) {
+  webhookEvents.unshift({ ts: Date.now(), source: "jellyfin", ...entry });
+  if (webhookEvents.length > WEBHOOK_LOG_MAX) webhookEvents.length = WEBHOOK_LOG_MAX;
+}
+
+export function getWebhookLog() {
+  return webhookEvents;
+}
+
+export function clearWebhookLog() {
+  webhookEvents.length = 0;
+}
+
 // API response cache to reduce external API calls
 const apiCache = new Map(); // tmdbId -> { data, timestamp }
 const API_CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -774,13 +791,19 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       return; // If no res object, just return
     }
 
+    // Build a scoped logging helper — skips test notifications so the panel shows only real events
+    const isTestNotification = data.ItemId && (data.ItemId.startsWith("test-") || data.ItemId.startsWith("batch-"));
+    const _itemLabel = data.SeriesName ? `${data.SeriesName} — ${data.Name || ""}` : (data.Name || "Unknown");
+    const logEvent = (status, detail) => {
+      if (!isTestNotification) {
+        logWebhookEvent({ itemName: _itemLabel, itemType: data.ItemType || "Unknown", status, detail: detail || null });
+      }
+    };
+
     // Allow episodes and seasons with enhanced debouncing
 
     // Get library ID - try multiple sources from webhook data
     let libraryId = data.LibraryId || data.CollectionId || data.Library_Id;
-
-    // Check if this is a test notification
-    const isTestNotification = data.ItemId && (data.ItemId.startsWith("test-") || data.ItemId.startsWith("batch-"));
 
     // If no library ID in webhook, use advanced detection (traverse parent chain)
     // Skip library detection for test notifications
@@ -932,6 +955,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       logger.info(
         `🚫 Library ${libraryId} not enabled in JELLYFIN_NOTIFICATION_LIBRARIES. Skipping notification.`
       );
+      logEvent("no_channel", "Library not in notification list");
       if (res) {
         return res
           .status(200)
@@ -965,6 +989,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         logger.debug(
           `Duplicate movie notification detected for: ${data.Name} (${ItemId}). Skipping.`
         );
+        logEvent("skipped", "Duplicate movie");
         if (res) {
           return res
             .status(200)
@@ -999,6 +1024,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         cleanupTimer: cleanupTimer,
       });
 
+      logEvent("notified");
       if (res) return res.status(200).send("OK: Movie notification sent.");
       return; // Exit early to prevent fallthrough to unknown item type handler
     }
@@ -1085,6 +1111,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         logger.info(
           `[BLOCKED] Skipping ${data.ItemType} notification for ${data.Name}: already sent level ${sentLevel} (current level: ${currentLevel})`
         );
+        logEvent("skipped", "Higher-level notification already sent");
         if (res) {
           return res
             .status(200)
@@ -1109,6 +1136,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           isTestNotification,
           onPendingRequestsChanged
         );
+        logEvent("notified");
         if (res)
           return res
             .status(200)
@@ -1151,6 +1179,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           logger.debug(
             `Already sent notification for SeriesId ${SeriesId} (level: ${sentLevel}). Skipping new debouncer creation.`
           );
+          logEvent("skipped", "Notification already sent for series");
           if (res) {
             return res
               .status(200)
@@ -1344,6 +1373,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           logger.info(
             `[DEBOUNCER] Duplicate season detected! Incoming: S${data.SeasonNumber} (idx:${data.IndexNumber}, name:"${data.Name}"), Existing: S${existingSeason.SeasonNumber} (idx:${existingSeason.IndexNumber}, name:"${existingSeason.Name}")`
           );
+          logEvent("skipped", "Duplicate season");
           if (res) {
             return res
               .status(200)
@@ -1392,6 +1422,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           logger.info(
             `[DEBOUNCER] Duplicate episode detected! Incoming: S${data.SeasonNumber}E${data.EpisodeNumber} ("${data.Name}"), Existing: S${existingEpisode.SeasonNumber}E${existingEpisode.EpisodeNumber} ("${existingEpisode.Name}")`
           );
+          logEvent("skipped", "Duplicate episode");
           if (res) {
             return res
               .status(200)
@@ -1471,6 +1502,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       
       logger.info(`[DEBOUNCER] Debouncer.sender() called successfully for SeriesId: ${SeriesId}`);
 
+      logEvent("debounced");
       if (res) {
         return res
           .status(200)
@@ -1493,9 +1525,11 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       isUnknownTest,
       onPendingRequestsChanged
     );
+    logEvent("notified");
     if (res) return res.status(200).send("OK: Notification sent.");
   } catch (err) {
     logger.error("Error handling Jellyfin webhook:", err);
+    try { logEvent("error", err?.message || "Unknown error"); } catch (_) {}
     // Make sure we haven't already sent a response
     if (res && !res.headersSent) {
       res.status(500).send("Error");

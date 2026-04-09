@@ -3312,3 +3312,106 @@ form fieldset:focus-within {
   opacity: 0.7;
   font-size: 0.9rem;
 }
+
+/* ============================== */
+/* Webhook Log Panel              */
+/* ============================== */
+
+.webhook-log-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0 0.75rem;
+}
+
+.webhook-log-count {
+  font-size: 0.8rem;
+  color: var(--subtext0);
+}
+
+.webhook-log-table-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--surface1);
+}
+
+.webhook-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.webhook-log-table thead th {
+  background: var(--surface0);
+  color: var(--subtext0);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--surface1);
+  white-space: nowrap;
+}
+
+.webhook-log-table tbody tr {
+  border-bottom: 1px solid var(--surface0);
+  transition: background 0.15s;
+}
+
+.webhook-log-table tbody tr:last-child { border-bottom: none; }
+
+.webhook-log-table tbody tr:hover { background: var(--surface0); }
+
+.webhook-log-table td {
+  padding: 0.5rem 0.75rem;
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.webhook-log-empty {
+  text-align: center;
+  color: var(--subtext0);
+  padding: 2rem !important;
+}
+
+.webhook-log-time {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--subtext0);
+  white-space: nowrap;
+}
+
+.webhook-log-item {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webhook-log-detail {
+  font-size: 0.8rem;
+  color: var(--subtext0);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status badges */
+.wh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wh-badge--notified  { background: color-mix(in srgb, var(--green)  15%, transparent); color: var(--green); }
+.wh-badge--debounced { background: color-mix(in srgb, var(--blue)   15%, transparent); color: var(--blue); }
+.wh-badge--skipped   { background: color-mix(in srgb, var(--subtext0) 15%, transparent); color: var(--subtext0); }
+.wh-badge--no_channel{ background: color-mix(in srgb, var(--yellow) 15%, transparent); color: var(--yellow); }
+.wh-badge--error     { background: color-mix(in srgb, var(--peach)  15%, transparent); color: var(--peach); }
