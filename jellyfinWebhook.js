@@ -827,8 +827,12 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
                     const libTypeLower = lib.CollectionType?.toLowerCase();
                     
                     let typeMatch = true;
-                    if (itemTypeLower === "movie" && libTypeLower !== "movies") typeMatch = false;
-                    if ((itemTypeLower === "series" || itemTypeLower === "season" || itemTypeLower === "episode") && libTypeLower !== "tvshows") typeMatch = false;
+                    if (libTypeLower) {
+                      // Only reject known cross-type mismatches; allow "mixed" and any
+                      // unrecognised CollectionType (e.g. custom anime libraries) through.
+                      if (itemTypeLower === "movie" && libTypeLower === "tvshows") typeMatch = false;
+                      if ((itemTypeLower === "series" || itemTypeLower === "season" || itemTypeLower === "episode") && libTypeLower === "movies") typeMatch = false;
+                    }
                     
                     if (typeMatch) {
                       libraryId = lib.ItemId;
