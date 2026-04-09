@@ -362,6 +362,7 @@ export async function sendRequest({
   serverId = null,
   profileId = null,
   tags = null,
+  isAnime = false,
   isAutoApproved = null,
   seerrUrl,
   apiKey,
@@ -385,6 +386,7 @@ export async function sendRequest({
   const payload = {
     mediaType,
     mediaId: parseInt(tmdbId, 10),
+    ...(isAnime && { isAnime: true }),
   };
 
   // Always include seasons field for TV shows (empty array = all seasons)

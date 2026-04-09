@@ -388,6 +388,38 @@
                               Sonarr server for TV show requests
                             </div>
                           </div>
+
+                          <div class="form-group">
+                            <label for="DEFAULT_QUALITY_PROFILE_ANIME" class="label-strong" data-i18n="config.default_anime_quality">🎌 Default Anime Quality</label>
+                            <select id="DEFAULT_QUALITY_PROFILE_ANIME" name="DEFAULT_QUALITY_PROFILE_ANIME">
+                              <option value="" data-i18n="config.use_seerr_default">Use Seerr default</option>
+                            </select>
+                            <div class="form-text mt-half" data-i18n="config.default_anime_quality_help">Quality profile for anime TV series (Sonarr). Falls back to TV default if unset.</div>
+                          </div>
+
+                          <div class="form-group">
+                            <label for="DEFAULT_QUALITY_PROFILE_ANIME_MOVIE" class="label-strong" data-i18n="config.default_anime_movie_quality">🎌 Default Anime Movie Quality</label>
+                            <select id="DEFAULT_QUALITY_PROFILE_ANIME_MOVIE" name="DEFAULT_QUALITY_PROFILE_ANIME_MOVIE">
+                              <option value="" data-i18n="config.use_seerr_default">Use Seerr default</option>
+                            </select>
+                            <div class="form-text mt-half" data-i18n="config.default_anime_movie_quality_help">Quality profile for anime movies (Radarr). Falls back to movie default if unset.</div>
+                          </div>
+
+                          <div class="form-group">
+                            <label for="DEFAULT_SERVER_ANIME" class="label-strong" data-i18n="config.default_anime_server">🎌 Default Anime Server</label>
+                            <select id="DEFAULT_SERVER_ANIME" name="DEFAULT_SERVER_ANIME">
+                              <option value="" data-i18n="config.use_seerr_default">Use Seerr default</option>
+                            </select>
+                            <div class="form-text mt-half" data-i18n="config.default_anime_server_help">Sonarr server for anime TV series. Falls back to TV server if unset.</div>
+                          </div>
+
+                          <div class="form-group">
+                            <label for="DEFAULT_SERVER_ANIME_MOVIE" class="label-strong" data-i18n="config.default_anime_movie_server">🎌 Default Anime Movie Server</label>
+                            <select id="DEFAULT_SERVER_ANIME_MOVIE" name="DEFAULT_SERVER_ANIME_MOVIE">
+                              <option value="" data-i18n="config.use_seerr_default">Use Seerr default</option>
+                            </select>
+                            <div class="form-text mt-half" data-i18n="config.default_anime_movie_server_help">Radarr server for anime movies. Falls back to movie server if unset.</div>
+                          </div>
                         </div>
                       </div>
                     </fieldset>

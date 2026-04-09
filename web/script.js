@@ -1080,13 +1080,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Get current saved values
         const movieQualitySelect = document.getElementById("DEFAULT_QUALITY_PROFILE_MOVIE");
         const tvQualitySelect = document.getElementById("DEFAULT_QUALITY_PROFILE_TV");
+        const animeQualitySelect = document.getElementById("DEFAULT_QUALITY_PROFILE_ANIME");
+        const animeMovieQualitySelect = document.getElementById("DEFAULT_QUALITY_PROFILE_ANIME_MOVIE");
         const movieServerSelect = document.getElementById("DEFAULT_SERVER_MOVIE");
         const tvServerSelect = document.getElementById("DEFAULT_SERVER_TV");
+        const animeServerSelect = document.getElementById("DEFAULT_SERVER_ANIME");
+        const animeMovieServerSelect = document.getElementById("DEFAULT_SERVER_ANIME_MOVIE");
 
         const savedMovieQuality = movieQualitySelect.dataset.savedValue || movieQualitySelect.value;
         const savedTvQuality = tvQualitySelect.dataset.savedValue || tvQualitySelect.value;
+        const savedAnimeQuality = animeQualitySelect.dataset.savedValue || animeQualitySelect.value;
+        const savedAnimeMovieQuality = animeMovieQualitySelect.dataset.savedValue || animeMovieQualitySelect.value;
         const savedMovieServer = movieServerSelect.dataset.savedValue || movieServerSelect.value;
         const savedTvServer = tvServerSelect.dataset.savedValue || tvServerSelect.value;
+        const savedAnimeServer = animeServerSelect.dataset.savedValue || animeServerSelect.value;
+        const savedAnimeMovieServer = animeMovieServerSelect.dataset.savedValue || animeMovieServerSelect.value;
 
         // Movie quality profiles (Radarr)
         movieQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
@@ -1110,6 +1118,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
         if (savedTvQuality) tvQualitySelect.value = savedTvQuality;
 
+        // Anime TV quality profiles (Sonarr)
+        animeQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
+        sonarrProfiles.forEach(profile => {
+          const option = document.createElement("option");
+          option.value = `${profile.id}|${profile.serverId}`;
+          option.textContent = `${profile.name} (${profile.serverName})`;
+          animeQualitySelect.appendChild(option);
+        });
+        if (savedAnimeQuality) animeQualitySelect.value = savedAnimeQuality;
+
+        // Anime movie quality profiles (Radarr)
+        animeMovieQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
+        radarrProfiles.forEach(profile => {
+          const option = document.createElement("option");
+          option.value = `${profile.id}|${profile.serverId}`;
+          option.textContent = `${profile.name} (${profile.serverName})`;
+          animeMovieQualitySelect.appendChild(option);
+        });
+        if (savedAnimeMovieQuality) animeMovieQualitySelect.value = savedAnimeMovieQuality;
+
         // Movie servers (Radarr)
         movieServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
         const radarrServers = serversResult.servers.filter(s => s.type === "radarr");
@@ -1131,6 +1159,26 @@ document.addEventListener("DOMContentLoaded", async () => {
           tvServerSelect.appendChild(option);
         });
         if (savedTvServer) tvServerSelect.value = savedTvServer;
+
+        // Anime TV servers (Sonarr)
+        animeServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
+        sonarrServers.forEach(server => {
+          const option = document.createElement("option");
+          option.value = `${server.id}|${server.type}`;
+          option.textContent = `${server.name}${server.isDefault ? " (default)" : ""}`;
+          animeServerSelect.appendChild(option);
+        });
+        if (savedAnimeServer) animeServerSelect.value = savedAnimeServer;
+
+        // Anime movie servers (Radarr)
+        animeMovieServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
+        radarrServers.forEach(server => {
+          const option = document.createElement("option");
+          option.value = `${server.id}|${server.type}`;
+          option.textContent = `${server.name}${server.isDefault ? " (default)" : ""}`;
+          animeMovieServerSelect.appendChild(option);
+        });
+        if (savedAnimeMovieServer) animeMovieServerSelect.value = savedAnimeMovieServer;
 
         const totalProfiles = radarrProfiles.length + sonarrProfiles.length;
         const totalServers = radarrServers.length + sonarrServers.length;

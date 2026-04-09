@@ -132,9 +132,17 @@ async function handleSearchOrRequest(
         }
       }
 
+      // Detect anime: Animation genre (id 16) + Japanese origin
+      const isAnime =
+        Array.isArray(details.genres) &&
+        details.genres.some((g) => g.id === 16) &&
+        details.original_language === "ja";
+      if (isAnime) logger.info(`[REQUEST] Detected anime content: ${tmdbId}`);
+
       const { profileId, serverId } = parseQualityAndServerOptions(
         options,
-        mediaType
+        mediaType,
+        isAnime
       );
 
       let seasonsToRequest = ["all"];
@@ -158,6 +166,7 @@ async function handleSearchOrRequest(
         tags: tagIds,
         profileId,
         serverId,
+        isAnime,
         seerrUrl: getSeerrUrl(),
         apiKey: getSeerrApiKey(),
         discordUserId: interaction.user.id,
@@ -165,7 +174,7 @@ async function handleSearchOrRequest(
         isAutoApproved: getSeerrAutoApprove(),
       });
       logger.info(
-        `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}`
+        `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
       );
 
       if (process.env.NOTIFY_ON_AVAILABLE === "true") {
