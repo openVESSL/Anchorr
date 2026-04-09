@@ -231,11 +231,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
   const testJellyfinBtn = document.getElementById("test-jellyfin-btn");
   const testJellyfinStatus = document.getElementById("test-jellyfin-status");
-  // Create toast element dynamically
-  const toast = document.createElement("div");
-  toast.id = "toast";
-  toast.className = "toast";
-  document.body.appendChild(toast);
+  // Toast container
+  const toastContainer = document.createElement("div");
+  toastContainer.id = "toast-container";
+  document.body.appendChild(toastContainer);
 
   // Global status polling interval to prevent duplicates
   let statusPollingInterval = null;
@@ -260,12 +259,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function showToast(message, duration = 3000) {
-    toast.textContent = message;
-    toast.classList.add("show");
-    setTimeout(() => {
-      toast.classList.remove("show");
-    }, duration);
+  const TOAST_ICONS = {
+    success: "bi-check-circle-fill",
+    error: "bi-x-circle-fill",
+    warning: "bi-exclamation-triangle-fill",
+    info: "bi-info-circle-fill",
+  };
+
+  function showToast(message, type = "info", duration = 4000) {
+    const item = document.createElement("div");
+    item.className = `toast-item toast-item--${type}`;
+
+    const icon = document.createElement("i");
+    icon.className = `toast-icon bi ${TOAST_ICONS[type] ?? TOAST_ICONS.info}`;
+
+    const msg = document.createElement("span");
+    msg.className = "toast-message";
+    msg.textContent = message;
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "toast-close";
+    closeBtn.setAttribute("aria-label", "Dismiss");
+    closeBtn.textContent = "×";
+
+    item.append(icon, msg, closeBtn);
+    toastContainer.appendChild(item);
+
+    // Trigger enter animation
+    item.offsetHeight;
+    item.classList.add("toast-show");
+
+    const dismiss = () => {
+      item.classList.remove("toast-show");
+      item.classList.add("toast-hide");
+      setTimeout(() => item.remove(), 280);
+    };
+
+    closeBtn.addEventListener("click", dismiss);
+    const timer = setTimeout(dismiss, duration);
+    item.addEventListener("mouseenter", () => clearTimeout(timer));
+    item.addEventListener("mouseleave", () => setTimeout(dismiss, 1500));
   }
 
   async function fetchConfig() {
@@ -340,7 +373,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       updateWebhookUrl();
     } catch (error) {
       console.error("[Anchorr] fetchConfig failed:", error);
-      showToast("Error fetching configuration.");
+      showToast("Error fetching configuration.", "error");
     }
   }
 
@@ -783,13 +816,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const errorMsg =
           result.errors?.map((e) => `${e.field}: ${e.message}`).join(", ") ||
           result.message;
-        showToast(`Error: ${errorMsg}`);
+        showToast(`Error: ${errorMsg}`, "error");
       } else {
         const result = await response.json();
-        showToast(result.message);
+        showToast(result.message, "success");
       }
     } catch (error) {
-      showToast("Error saving configuration.");
+      showToast("Error saving configuration.", "error");
     }
   }
 
@@ -805,12 +838,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const response = await fetch(`/api/${action}-bot`, { method: "POST" });
       if (!response.ok) {
         const result = await response.json();
-        showToast(`Error: ${result.message}`);
+        showToast(`Error: ${result.message}`, "error");
         botControlText.textContent = originalText; // Restore text on failure
         botControlBtn.disabled = false;
       } else {
         const result = await response.json();
-        showToast(result.message);
+        showToast(result.message, "success");
         setTimeout(() => {
           fetchStatus();
           // Also update logs page button if visible
@@ -824,7 +857,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }, 1000); // Fetch status after a short delay to get the new state
       }
     } catch (error) {
-      showToast(`Failed to ${action} bot.`);
+      showToast(`Failed to ${action} bot.`, "error");
       botControlText.textContent = originalText; // Restore text on failure
       botControlBtn.disabled = false;
     }
@@ -925,12 +958,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("copy-webhook-secret-btn").addEventListener("click", () => {
     const textToCopy = document.getElementById("WEBHOOK_SECRET")?.value || "";
     if (!textToCopy) {
-      showToast("No webhook secret configured.");
+      showToast("No webhook secret configured.", "warning");
       return;
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(textToCopy)
-        .then(() => showToast("Webhook secret copied to clipboard!"))
+        .then(() => showToast("Webhook secret copied to clipboard!", "success"))
         .catch(() => fallbackCopyTextToClipboard(textToCopy));
     } else {
       fallbackCopyTextToClipboard(textToCopy);
@@ -946,7 +979,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       navigator.clipboard
         .writeText(textToCopy)
         .then(() => {
-          showToast("Webhook URL copied to clipboard!");
+          showToast("Webhook URL copied to clipboard!", "success");
         })
         .catch(() => {
           // Fallback if clipboard API fails
@@ -979,12 +1012,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const successful = document.execCommand("copy");
       if (successful) {
-        showToast("Webhook URL copied to clipboard!");
+        showToast("Webhook URL copied to clipboard!", "success");
       } else {
-        showToast("Failed to copy URL. Please copy manually.");
+        showToast("Failed to copy URL. Please copy manually.", "warning");
       }
     } catch (err) {
-      showToast("Failed to copy URL. Please copy manually.");
+      showToast("Failed to copy URL. Please copy manually.", "warning");
     }
 
     document.body.removeChild(textArea);
@@ -1306,12 +1339,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const apiKey = document.getElementById("JELLYFIN_API_KEY").value;
 
       if (!url || !url.trim()) {
-        showToast("Please enter Jellyfin URL first.");
+        showToast("Please enter Jellyfin URL first.", "warning");
         return;
       }
 
       if (!apiKey || !apiKey.trim()) {
-        showToast("Please enter Jellyfin API Key first.");
+        showToast("Please enter Jellyfin API Key first.", "warning");
         return;
       }
 
@@ -2331,7 +2364,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       displayMappings();
     } catch (error) {
       console.error("[MAPPINGS] Failed to reload mappings:", error);
-      showToast("Mappings updated, but failed to refresh the list. Please reload the page.");
+      showToast("Mappings updated, but failed to refresh the list. Please reload the page.", "warning");
     }
   }
 
@@ -2465,13 +2498,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const result = await response.json();
 
       if (result.success) {
-        showToast("Mapping removed successfully!");
+        showToast("Mapping removed successfully!", "success");
         await loadMappings();
       } else {
-        showToast(`Error: ${result.message}`);
+        showToast(`Error: ${result.message}`, "error");
       }
     } catch (error) {
-      showToast("Failed to remove mapping.");
+      showToast("Failed to remove mapping.", "error");
     }
   };
 
@@ -2487,7 +2520,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const seerrUserId = seerrSelect.dataset.value;
 
       if (!discordUserId || !seerrUserId) {
-        showToast("Please select both a Discord user and a Seerr user.");
+        showToast("Please select both a Discord user and a Seerr user.", "warning");
         return;
       }
 
@@ -2507,11 +2540,11 @@ document.addEventListener("DOMContentLoaded", async () => {
               avatar: lookupData.avatar,
             };
           } else {
-            showToast(`Could not resolve Discord user: ${lookupData.message}`);
+            showToast(`Could not resolve Discord user: ${lookupData.message}`, "error");
             return;
           }
         } catch (_err) {
-          showToast("Failed to look up Discord user.");
+          showToast("Failed to look up Discord user.", "error");
           return;
         }
       }
@@ -2538,7 +2571,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const result = await response.json();
 
         if (result.success) {
-          showToast("Mapping added successfully!");
+          showToast("Mapping added successfully!", "success");
 
           // Reset Discord custom select
           delete discordSelect.dataset.value;
@@ -2573,10 +2606,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           await loadMappings();
         } else {
-          showToast(`Error: ${result.message}`);
+          showToast(`Error: ${result.message}`, "error");
         }
       } catch (error) {
-        showToast("Failed to add mapping.");
+        showToast("Failed to add mapping.", "error");
       }
     });
   }
@@ -2594,13 +2627,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const res = await fetch("/api/seerr/auto-map-preview");
         if (!res.ok) {
           console.error("[AUTO-MAP] Preview fetch returned", res.status);
-          showToast(`Error: Server returned ${res.status}`);
+          showToast(`Error: Server returned ${res.status}`, "error");
           return;
         }
         const data = await res.json();
 
         if (!data.success) {
-          showToast(`Error: ${data.message || "Unknown error"}`);
+          showToast(`Error: ${data.message || "Unknown error"}`, "error");
           return;
         }
 
@@ -2642,7 +2675,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         modal.style.display = "flex";
       } catch (err) {
         console.error("[AUTO-MAP] Preview fetch error:", err);
-        showToast("Failed to fetch auto-map preview.");
+        showToast("Failed to fetch auto-map preview.", "error");
       } finally {
         autoMapSeerrBtn.disabled = false;
         autoMapSeerrBtn.innerHTML = originalHtml;
@@ -2679,7 +2712,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const selected = checked.map((cb) => candidates[parseInt(cb.dataset.index, 10)]).filter(Boolean);
 
       if (selected.length === 0) {
-        showToast("No mappings selected.");
+        showToast("No mappings selected.", "warning");
         return;
       }
 
@@ -2694,21 +2727,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
         if (!res.ok) {
           console.error("[AUTO-MAP] Save fetch returned", res.status);
-          showToast(`Error: Server returned ${res.status}`);
+          showToast(`Error: Server returned ${res.status}`, "error");
           return;
         }
         const result = await res.json();
 
         if (result.success) {
           closeAutoMapModal();
-          showToast(`${result.saved} mapping${result.saved !== 1 ? "s" : ""} saved!`);
+          showToast(`${result.saved} mapping${result.saved !== 1 ? "s" : ""} saved!`, "success");
           await loadMappings();
         } else {
-          showToast(`Error: ${result.message || "Unknown error"}`);
+          showToast(`Error: ${result.message || "Unknown error"}`, "error");
         }
       } catch (err) {
         console.error("[AUTO-MAP] Save error:", err);
-        showToast("Failed to save mappings.");
+        showToast("Failed to save mappings.", "error");
       } finally {
         autoMapSaveBtn.disabled = false;
         autoMapSaveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Save Mappings';
@@ -2749,13 +2782,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const res = await fetch("/api/seerr/sync-preview");
         if (!res.ok) {
           console.error("[SYNC] Preview fetch returned", res.status);
-          showToast(`Error: Server returned ${res.status}`);
+          showToast(`Error: Server returned ${res.status}`, "error");
           return;
         }
         const data = await res.json();
 
         if (!data.success) {
-          showToast(`Error: ${data.message || "Unknown error"}`);
+          showToast(`Error: ${data.message || "Unknown error"}`, "error");
           return;
         }
 
@@ -2842,7 +2875,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         syncSeerrModal.style.display = "flex";
       } catch (err) {
         console.error("[SYNC] Preview fetch error:", err);
-        showToast("Failed to fetch sync preview.");
+        showToast("Failed to fetch sync preview.", "error");
       } finally {
         syncSeerrBtn.disabled = false;
         syncSeerrBtn.innerHTML = originalHtml;
@@ -2857,7 +2890,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const selected = checked.map((cb) => stale[parseInt(cb.dataset.index, 10)]).filter(Boolean);
 
       if (selected.length === 0) {
-        showToast("No mappings selected.");
+        showToast("No mappings selected.", "warning");
         return;
       }
 
@@ -2877,21 +2910,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (errBody?.message) serverMsg = errBody.message;
           } catch (_) { /* best effort */ }
           console.error("[SYNC] Remove fetch returned", res.status, serverMsg);
-          showToast(`Error: ${serverMsg}`);
+          showToast(`Error: ${serverMsg}`, "error");
           return;
         }
         const result = await res.json();
 
         if (result.success) {
           closeSyncModal();
-          showToast(`${result.removed} mapping${result.removed !== 1 ? "s" : ""} removed!`);
+          showToast(`${result.removed} mapping${result.removed !== 1 ? "s" : ""} removed!`, "success");
           await loadMappings();
         } else {
-          showToast(`Error: ${result.message || "Unknown error"}`);
+          showToast(`Error: ${result.message || "Unknown error"}`, "error");
         }
       } catch (err) {
         console.error("[SYNC] Remove error:", err);
-        showToast("Failed to remove mappings.");
+        showToast("Failed to remove mappings.", "error");
       } finally {
         syncSeerrRemoveBtn.disabled = false;
         syncSeerrRemoveBtn.innerHTML = '<i class="bi bi-trash"></i> Remove Selected';
@@ -2961,15 +2994,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Show combined status
         if (successCount === 2) {
-          showToast(`✅ Users refreshed: ${messages.join(", ")}`);
+          showToast(`Users refreshed: ${messages.join(", ")}`, "success");
         } else if (successCount === 1) {
-          showToast(`⚠️ Partial refresh: ${messages.join(", ")}`);
+          showToast(`Partial refresh: ${messages.join(", ")}`, "warning");
         } else {
           throw new Error("Failed to refresh users");
         }
       } catch (error) {
         console.error("Refresh users error:", error);
-        showToast("Failed to refresh users. Check connections.");
+        showToast("Failed to refresh users. Check connections.", "error");
       } finally {
         refreshAllUsersBtn.disabled = false;
         refreshAllUsersBtn.innerHTML = originalHtml;
@@ -3532,12 +3565,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (!response.ok) {
         const data = await response.json();
-        showToast(`Error: ${data.message}`);
+        showToast(`Error: ${data.message}`, "error");
         botControlTextLogs.textContent = originalText;
         botControlBtnLogs.disabled = false;
       } else {
         const data = await response.json();
-        showToast(data.message);
+        showToast(data.message, "success");
         setTimeout(async () => {
           await updateBotControlButtonLogs();
           await fetchStatus(); // Update main page button too
@@ -3545,7 +3578,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }, 1000);
       }
     } catch (error) {
-      showToast(`Failed to control bot.`);
+      showToast(`Failed to control bot.`, "error");
       botControlBtnLogs.disabled = false;
     }
   });
