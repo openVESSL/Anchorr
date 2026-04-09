@@ -1,3 +1,45 @@
+/* ============================================================
+   Self-hosted fonts — Outfit / Syne / JetBrains Mono
+   Source: Google Fonts CDN, self-hosted under web/fonts/
+   License: SIL OFL 1.1 — see web/fonts/LICENSE.txt
+   ============================================================ */
+
+/* Outfit — body font, weights 400–700 (variable, latin subset) */
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/outfit-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Syne — display font, weights 600–800 (variable, latin subset) */
+@font-face {
+  font-family: 'Syne';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/syne-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* JetBrains Mono — monospace, weights 400–500 (variable, latin subset) */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   --background: #1e1e2e;
   --foreground: #cdd6f4;
@@ -15,6 +57,10 @@
   --border-color: #313244;
   --border-radius: 12px;
   --code-bg: #45475a;
+  /* Typography */
+  --font-body: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Syne', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
 }
 
 /* Utility classes */
@@ -27,8 +73,7 @@ body {
   height: 100%;
 }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family: var(--font-body);
   background-color: var(--background);
   color: var(--foreground);
   margin: 0;
@@ -274,27 +319,29 @@ a:hover {
   height: 200%;
   background: radial-gradient(
       ellipse at 50% 0%,
-      hsla(258, 80%, 70%, 0.15),
+      hsla(258, 80%, 70%, 0.18),
       transparent 50%
     ),
     radial-gradient(
       ellipse at 70% 20%,
-      hsla(210, 80%, 70%, 0.1),
+      hsla(210, 80%, 70%, 0.13),
       transparent 60%
     ),
     radial-gradient(
       ellipse at 30% 20%,
-      hsla(320, 80%, 70%, 0.1),
+      hsla(320, 80%, 70%, 0.13),
       transparent 60%
     );
   animation: aurora-glow 15s infinite linear;
 }
 .hero-title {
+  font-family: var(--font-display);
   font-size: 3.5rem;
   color: var(--mauve);
   margin-bottom: 1rem;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 .hero-subtitle {
   font-size: 1.25rem;
@@ -374,10 +421,12 @@ main {
 }
 
 .section-title {
+  font-family: var(--font-display);
   text-align: center;
   font-size: 2.5rem;
   color: var(--mauve);
   margin-bottom: 3rem;
+  letter-spacing: -0.01em;
 }
 
 /* Features Section */
@@ -483,7 +532,7 @@ code:not(.code-block) {
   padding: 0.2em 0.4em;
   margin: 0 0.1em;
   border-radius: 6px;
-  font-family: "Fira Code", "Courier New", Courier, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
   color: var(--text);
 }
@@ -664,12 +713,12 @@ body.auth-mode .footer {
 /* Auth Container Transition */
 .auth-container {
   background-color: rgba(30, 30, 46, 0.6);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px) saturate(150%);
   padding: 2.5rem;
   border-radius: var(--border-radius);
   border: 1px solid var(--surface1);
   margin-top: 2rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(203, 166, 247, 0.06);
   text-align: left;
   transition: opacity 0.5s ease, transform 0.5s ease;
   opacity: 1;
@@ -786,9 +835,11 @@ body.auth-mode .footer {
 }
 
 .dashboard-title {
+  font-family: var(--font-display);
   font-size: 2rem;
   color: var(--blue);
   margin: 0;
+  letter-spacing: -0.01em;
   transition: color 0.3s ease;
 }
 
@@ -959,9 +1010,10 @@ select {
   background-color: var(--background);
   border: 1px solid var(--surface1);
   color: var(--text);
-  padding: 0.75rem;
+  padding: 0.85rem 1rem;
   border-radius: 8px;
   font-size: 1rem;
+  letter-spacing: 0.01em;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -970,7 +1022,7 @@ form input[type="password"]:focus,
 select:focus {
   outline: none;
   border-color: var(--mauve);
-  box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.2);
+  box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 select option {
@@ -1179,12 +1231,14 @@ input:checked + .slider:before {
 
 .dashboard-nav .nav-item {
   padding: 0.75rem 1rem;
+  padding-left: calc(1rem - 3px);
   border-radius: 8px;
   font-weight: 500;
   color: var(--text);
   opacity: 0.8;
   border: 1px solid transparent;
-  transition: background-color 0.2s ease, opacity 0.2s ease;
+  border-left: 3px solid transparent;
+  transition: background-color 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
 }
 
 .dashboard-nav .btn-primary {
@@ -1204,6 +1258,9 @@ input:checked + .slider:before {
   color: var(--mauve);
   font-weight: 600;
   opacity: 1;
+  border-left: 3px solid var(--mauve);
+  padding-left: calc(1rem - 3px);
+  box-shadow: inset 3px 0 12px rgba(203, 166, 247, 0.08);
 }
 
 .config-pane {
@@ -1549,12 +1606,13 @@ input:checked + .slider:before {
 }
 
 .about-content h2 {
+  font-family: var(--font-display);
   font-size: 2.2rem;
   color: var(--mauve);
   text-align: center;
   margin-bottom: 1.5rem;
   text-shadow: 0 0 30px rgba(203, 166, 247, 0.3);
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
 }
 
 .about-content .about-description,
@@ -1876,12 +1934,12 @@ input:checked + .slider:before {
   font-size: 0.85rem;
   opacity: 0.7;
   letter-spacing: 0.05em;
-  font-family: "Fira Code", monospace;
+  font-family: var(--font-mono);
 }
 
 .version-number {
   font-weight: 600;
-  font-family: "Fira Code", monospace;
+  font-family: var(--font-mono);
 }
 
 .tagline-container .tagline-description {
@@ -2496,6 +2554,12 @@ input:checked + .slider:before {
   flex: 1;
   min-height: 0;
 }
+
+/* Global scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--mantle); }
+::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mauve); }
 
 #logs-container::-webkit-scrollbar {
   width: 10px;
