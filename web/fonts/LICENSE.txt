@@ -1,0 +1,8 @@
+The fonts in this directory are licensed under the SIL Open Font License, Version 1.1.
+A copy of the OFL is available at https://openfontlicense.org/
+
+Outfit         — Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+Syne           — Copyright 2017 The Syne Project Authors (https://gitlab.com/bonjour-monde/fonderie/syne-typeface)
+JetBrains Mono — Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+
+Source: downloaded via Google Fonts CDN (fonts.gstatic.com) and self-hosted to avoid external network requests.
