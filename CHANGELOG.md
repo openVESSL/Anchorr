@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] - 2026-04-10
+
+### ✨ Added
+
+- **Anime quality profiles & server selection**: Separate default quality profiles and Radarr/Sonarr servers can now be configured for anime content (both TV series and movies). Anime is detected automatically via TMDB metadata (Animation genre + Japanese origin). If no anime-specific config is set, the standard movie/TV defaults are used — existing setups are unaffected
+- **Jellyseerr `isAnime` flag**: When anime content is detected, the `isAnime: true` flag is included in the Jellyseerr request payload, allowing Jellyseerr to route to its anime-configured instance
+
+---
+
 ## [1.4.9] - 2026-04-03
 
 ### 🔒 Security
