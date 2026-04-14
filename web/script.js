@@ -214,7 +214,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (aboutEl) aboutEl.textContent = v;
       }
     })
-    .catch(() => {});
+    .catch((e) => console.debug("Could not fetch version:", e));
   const form = document.getElementById("config-form");
   const botControlBtn = document.getElementById("bot-control-btn");
   const botControlText = document.getElementById("bot-control-text");
@@ -352,6 +352,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const status = await response.json();
       updateStatusIndicator(status.isBotRunning, status.botUsername);
     } catch (error) {
+      console.warn("Failed to fetch bot status:", error);
       updateStatusIndicator(false);
     }
   }
@@ -415,7 +416,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         showAuth(data.hasUsers);
       }
     } catch (error) {
-      showAuth(true); // Default to showing login if check fails
+      console.warn("Session check failed, showing auth:", error);
+      showAuth(true);
     }
   }
 
@@ -919,7 +921,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const input = document.getElementById("WEBHOOK_SECRET");
         if (input && data.secret) input.value = data.secret;
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn("Could not load webhook secret:", e);
+    }
   })();
 
   // Copy webhook secret (reads from the already-populated input field)
@@ -2051,6 +2055,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       return data.value;
     } catch (error) {
+      console.debug("Cache read error:", error);
       return null;
     }
   }
@@ -2064,7 +2069,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      // Cache save error
+      console.debug("Cache write error:", error);
     }
   }
 
@@ -2255,7 +2260,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         saveToCache(SEERR_USERS_CACHE_KEY, data.users);
         populateSeerrUserSelect();
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to load Seerr users:", error);
+    }
   }
 
   function populateSeerrUserSelect() {
@@ -2461,7 +2468,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Reload mappings after update
       const response = await fetch("/api/user-mappings");
       currentMappings = await response.json();
-    } catch (error) {}
+    } catch (error) {
+      console.error("[MAPPINGS] Failed to reload after update:", error);
+    }
   }
 
   function displayMappings() {
@@ -3330,7 +3339,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.getElementById("blocklist-roles").innerHTML =
           `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to load roles:", error);
+    }
   }
 
   function populateRoleList(containerId, selectedRoles) {
@@ -3596,7 +3607,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         botControlBtnLogs.querySelector("i").className = "bi bi-play-fill";
         botControlTextLogs.textContent = "Start Bot";
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to fetch bot status for logs page:", error);
+    }
   }
 
   // Bot control button for logs page

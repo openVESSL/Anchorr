@@ -187,7 +187,10 @@ class JellyfinPoller {
         const configLibraryId = resolveConfigLibraryId(libraryId, libraryIdMap);
         const targetChannelId = resolveTargetChannel(configLibraryId, libraryChannels);
 
-        if (!targetChannelId) continue;
+        if (!targetChannelId) {
+          logger.error(`No channel resolved for "${item.Name}" (libraryId: ${configLibraryId}) — set JELLYFIN_CHANNEL_ID or configure library channels`);
+          continue;
+        }
 
         const isAnimeLibrary = getLibraryAnimeFlag(configLibraryId, libraryChannels);
         logger.info(`✅ Will send to channel: ${targetChannelId}${isAnimeLibrary ? " [anime]" : ""}`);
