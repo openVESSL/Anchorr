@@ -12,7 +12,9 @@ export function getOptionStringRobust(
     try {
       const v = interaction.options.getString(n);
       if (typeof v === "string" && v.length > 0) return v;
-    } catch (e) { }
+    } catch (e) {
+      logger.debug(`getOptionStringRobust: getString("${n}") threw: ${e?.message}`);
+    }
   }
   try {
     const data = (interaction.options && interaction.options.data) || [];
@@ -22,7 +24,9 @@ export function getOptionStringRobust(
           return String(opt.value);
       }
     }
-  } catch (e) { }
+  } catch (e) {
+    logger.warn(`getOptionStringRobust: options.data fallback threw: ${e?.message}`);
+  }
   return null;
 }
 

@@ -116,7 +116,7 @@ function buildJellyfinUrl(_baseUrl, appendPath, hash) {
     }
     return u.toString();
   } catch (_e) {
-    logger.warn(`buildJellyfinUrl: Invalid JELLYFIN_BASE_URL "${effectiveBaseUrl}", falling back to string concatenation`);
+    logger.warn(`buildJellyfinUrl: Invalid JELLYFIN_BASE_URL "${effectiveBaseUrl}": ${_e?.message}. Falling back to string concatenation.`);
     const baseNoSlash = String(effectiveBaseUrl || "").replace(/\/+$/, "");
     const pathNoLead = String(appendPath || "").replace(/^\/+/, "");
     const h = hash

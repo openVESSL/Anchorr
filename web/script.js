@@ -16,14 +16,19 @@ async function loadTranslations(language) {
   try {
     const response = await fetch(`/locales/${language}.json`);
     if (!response.ok) {
-      console.warn(`Failed to load ${language} translations, falling back to English`);
+      console.warn(`Failed to load ${language} translations (HTTP ${response.status}), falling back to English`);
       const fallbackResponse = await fetch('/locales/en.json');
+      if (!fallbackResponse.ok) {
+        throw new Error(`English fallback also failed: HTTP ${fallbackResponse.status}`);
+      }
       return await fallbackResponse.json();
     }
     return await response.json();
   } catch (error) {
     console.error('Error loading translations:', error);
-    // Return minimal fallback
+    if (typeof showToast === 'function') {
+      showToast('UI language could not be loaded. Some labels may be missing.');
+    }
     return {
       common: { loading: 'Loading...' },
       auth: { login: 'Login' },
@@ -703,6 +708,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (error) {
       console.error("Autostart check failed, proceeding with save:", error);
+      showToast("Warning: Could not check bot autostart state. Saving anyway.");
       await saveConfig(config);
     }
   });
@@ -793,7 +799,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         showToast(result.message);
       }
     } catch (error) {
-      showToast("Error saving configuration.");
+      console.error("saveConfig failed:", error);
+      showToast(`Error saving configuration: ${error.message || "Unknown error"}`);
     }
   }
 
@@ -2673,7 +2680,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           showToast(`Error: ${result.message}`);
         }
       } catch (error) {
-        showToast("Failed to add mapping.");
+        console.error("Failed to add mapping:", error);
+        showToast(`Failed to add mapping: ${error.message || "Unknown error"}`);
       }
     });
   }
@@ -3017,6 +3025,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           fetch("/api/discord-members"),
           fetch("/api/seerr-users"),
         ]);
+
+        if (!discordResponse.ok) throw new Error(`Discord members: HTTP ${discordResponse.status}`);
+        if (!seerrResponse.ok) throw new Error(`Seerr users: HTTP ${seerrResponse.status}`);
 
         const discordData = await discordResponse.json();
         const seerrData = await seerrResponse.json();

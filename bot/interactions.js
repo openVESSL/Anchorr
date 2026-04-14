@@ -250,7 +250,7 @@ async function handleSearchOrRequest(
           components.push(tagRow);
         }
       } catch (err) {
-        logger.debug(
+        logger.warn(
           "Failed to fetch tags for movie tag selector:",
           err?.message
         );
@@ -758,7 +758,7 @@ export function registerInteractions(client) {
                 })
                 .filter((id) => id !== null);
             } catch (err) {
-              logger.debug(
+              logger.warn(
                 "Failed to fetch tags for API call:",
                 err?.message
               );
@@ -1128,7 +1128,7 @@ export function registerInteractions(client) {
                 components.push(tagRow);
               }
             } catch (err) {
-              logger.debug(
+              logger.warn(
                 "Failed to fetch tags for season selector:",
                 err?.message
               );
@@ -1325,6 +1325,11 @@ export function registerInteractions(client) {
       }
     } catch (outerErr) {
       logger.error("Interaction handler error:", outerErr);
+      try {
+        if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "⚠️ An unexpected error occurred. Please try again.", flags: 64 });
+        }
+      } catch (_) { /* interaction may already be acknowledged */ }
     }
   });
 }

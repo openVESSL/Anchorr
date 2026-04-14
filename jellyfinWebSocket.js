@@ -176,6 +176,7 @@ export class JellyfinWebSocketClient {
       logger.info(`✅ Cached ${libraries.length} library mappings`);
     } catch (err) {
       logger.warn("Failed to refresh library mappings:", err?.message || err);
+      logger.warn(`Library ID map is stale (${this.libraryIdMap.size} entries). Channel routing may be incorrect until the next successful refresh.`);
     }
   }
 
