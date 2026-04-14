@@ -363,13 +363,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       botControlBtn.classList.remove("btn-success");
       botControlBtn.classList.add("btn-danger");
       botControlIcon.className = "bi bi-pause-fill";
-      botControlText.textContent = "Stop Bot";
+      botControlText.textContent = t("bot.actions.stop");
       botControlBtn.dataset.action = "stop";
     } else {
       botControlBtn.classList.remove("btn-danger");
       botControlBtn.classList.add("btn-success");
       botControlIcon.className = "bi bi-play-fill";
-      botControlText.textContent = "Start Bot";
+      botControlText.textContent = t("bot.actions.start");
       botControlBtn.dataset.action = "start";
     }
   }
@@ -803,7 +803,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     botControlBtn.disabled = true;
     const originalText = botControlText.textContent;
-    botControlText.textContent = "Processing...";
+    botControlText.textContent = t("common.processing");
 
     try {
       const response = await fetch(`/api/${action}-bot`, { method: "POST" });
@@ -1103,7 +1103,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const savedAnimeMovieServer = animeMovieServerSelect.dataset.savedValue || animeMovieServerSelect.value;
 
         // Movie quality profiles (Radarr)
-        movieQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
+        movieQualitySelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         const radarrProfiles = profilesResult.profiles.filter(p => p.type === "radarr");
         radarrProfiles.forEach(profile => {
           const option = document.createElement("option");
@@ -1114,7 +1114,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedMovieQuality) movieQualitySelect.value = savedMovieQuality;
 
         // TV quality profiles (Sonarr)
-        tvQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
+        tvQualitySelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         const sonarrProfiles = profilesResult.profiles.filter(p => p.type === "sonarr");
         sonarrProfiles.forEach(profile => {
           const option = document.createElement("option");
@@ -1125,7 +1125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedTvQuality) tvQualitySelect.value = savedTvQuality;
 
         // Anime TV quality profiles (Sonarr)
-        animeQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
+        animeQualitySelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         sonarrProfiles.forEach(profile => {
           const option = document.createElement("option");
           option.value = `${profile.id}|${profile.serverId}`;
@@ -1135,7 +1135,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedAnimeQuality) animeQualitySelect.value = savedAnimeQuality;
 
         // Anime movie quality profiles (Radarr)
-        animeMovieQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
+        animeMovieQualitySelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         radarrProfiles.forEach(profile => {
           const option = document.createElement("option");
           option.value = `${profile.id}|${profile.serverId}`;
@@ -1145,7 +1145,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedAnimeMovieQuality) animeMovieQualitySelect.value = savedAnimeMovieQuality;
 
         // Movie servers (Radarr)
-        movieServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
+        movieServerSelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         const radarrServers = serversResult.servers.filter(s => s.type === "radarr");
         radarrServers.forEach(server => {
           const option = document.createElement("option");
@@ -1156,7 +1156,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedMovieServer) movieServerSelect.value = savedMovieServer;
 
         // TV servers (Sonarr)
-        tvServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
+        tvServerSelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         const sonarrServers = serversResult.servers.filter(s => s.type === "sonarr");
         sonarrServers.forEach(server => {
           const option = document.createElement("option");
@@ -1167,7 +1167,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedTvServer) tvServerSelect.value = savedTvServer;
 
         // Anime TV servers (Sonarr)
-        animeServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
+        animeServerSelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         sonarrServers.forEach(server => {
           const option = document.createElement("option");
           option.value = `${server.id}|${server.type}`;
@@ -1177,7 +1177,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedAnimeServer) animeServerSelect.value = savedAnimeServer;
 
         // Anime movie servers (Radarr)
-        animeMovieServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
+        animeMovieServerSelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         radarrServers.forEach(server => {
           const option = document.createElement("option");
           option.value = `${server.id}|${server.type}`;
@@ -1458,9 +1458,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                     data-library-id="${escapeHtml(lib.id)}"
                     ${!isChecked ? "disabled" : ""}
                   >
-                    <option value="">Use Default Channel</option>
+                    <option value="">${t("config.use_default_channel")}</option>
                   </select>
-                  <label class="library-anime-label" title="Mark as anime library">
+                  <label class="library-anime-label" title="${t("config.library_anime_title")}">
                     <input
                       type="checkbox"
                       class="library-anime-toggle"
@@ -1468,7 +1468,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                       ${isAnime ? "checked" : ""}
                       ${!isChecked ? "disabled" : ""}
                     />
-                    <span class="library-anime-text">Anime</span>
+                    <span class="library-anime-text">${t("config.library_anime_label")}</span>
                   </label>
                 </div>
               </div>
@@ -1505,7 +1505,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   class="library-channel-select"
                   ${!episodesEnabled ? "disabled" : ""}
                 >
-                  <option value="">Use Default Channel</option>
+                  <option value="">${t("config.use_default_channel")}</option>
                 </select>
               </div>
 
@@ -1527,7 +1527,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   class="library-channel-select"
                   ${!seasonsEnabled ? "disabled" : ""}
                 >
-                  <option value="">Use Default Channel</option>
+                  <option value="">${t("config.use_default_channel")}</option>
                 </select>
               </div>
             `;
@@ -1639,7 +1639,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Clear and populate options
         select.innerHTML =
-          '<option value="">Use Default Channel</option>' +
+          `<option value="">${t("config.use_default_channel")}</option>` +
           channels
             .map((ch) => {
               let icon = "";
@@ -1665,7 +1665,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (episodesSelect) {
         episodesSelect.innerHTML =
-          '<option value="">Use Default Channel</option>' +
+          `<option value="">${t("config.use_default_channel")}</option>` +
           channels
             .map((ch) => {
               let icon = "";
@@ -1683,7 +1683,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (seasonsSelect) {
         seasonsSelect.innerHTML =
-          '<option value="">Use Default Channel</option>' +
+          `<option value="">${t("config.use_default_channel")}</option>` +
           channels
             .map((ch) => {
               let icon = "";
@@ -3609,12 +3609,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         botControlBtnLogs.classList.remove("btn-success");
         botControlBtnLogs.classList.add("btn-danger");
         botControlBtnLogs.querySelector("i").className = "bi bi-pause-fill";
-        botControlTextLogs.textContent = "Stop Bot";
+        botControlTextLogs.textContent = t("bot.actions.stop");
       } else {
         botControlBtnLogs.classList.remove("btn-danger");
         botControlBtnLogs.classList.add("btn-success");
         botControlBtnLogs.querySelector("i").className = "bi bi-play-fill";
-        botControlTextLogs.textContent = "Start Bot";
+        botControlTextLogs.textContent = t("bot.actions.start");
       }
     } catch (error) {
       console.error("Failed to fetch bot status for logs page:", error);
@@ -3633,7 +3633,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       botControlBtnLogs.disabled = true;
       const originalText = botControlTextLogs.textContent;
-      botControlTextLogs.textContent = "Processing...";
+      botControlTextLogs.textContent = t("common.processing");
 
       const response = await fetch(endpoint, { method: "POST" });
 

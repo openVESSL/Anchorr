@@ -544,7 +544,7 @@
 
                       <!-- Episode Debouncing Section -->
                       <div class="form-group" style="margin-top: 1.5rem;">
-                        <label for="WEBHOOK_DEBOUNCE_SECONDS" style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
+                        <label for="WEBHOOK_DEBOUNCE_SECONDS" style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);" data-i18n="config.debounce_title">
                           Episode Notification Debounce
                         </label>
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -567,29 +567,24 @@
                               </div>
                             </div>
                           </div>
-                          <span style="color: var(--subtext0); font-weight: 500; font-size: 1rem;">seconds <span style="opacity: 0.7; font-size: 0.9rem;">(range: 1 second - 10 minutes)</span></span>
+                          <span style="color: var(--subtext0); font-weight: 500; font-size: 1rem;"><span data-i18n="config.debounce_unit">seconds</span> <span style="opacity: 0.7; font-size: 0.9rem;" data-i18n="config.debounce_range">(range: 1 second - 10 minutes)</span></span>
                         </div>
                         <input type="hidden" id="WEBHOOK_DEBOUNCE_MS" name="WEBHOOK_DEBOUNCE_MS" value="60000" />
-                        <div class="form-text" style="margin-top: 0.5rem;">
-                          Debounce function to determine how long to wait before sending notifications for multiple episodes/seasons, bundling them into a single notification message.
+                        <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.debounce_help">
+                          Determines how long to wait before sending notifications for multiple episodes/seasons, bundling them into a single notification message.
                         </div>
                       </div>
 
                       <!-- Library Notifications Section -->
                       <div class="form-group" style="margin-top: 2rem;">
                         <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          <strong>Library Channel Mapping</strong>
+                          <strong data-i18n="config.library_channel_mapping_title">Library Channel Mapping</strong>
                         </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
-                          Map specific Jellyfin libraries to different Discord channels.
-                          <br>
-                          <small style="color: var(--subtext0);">
-                            Click "Fetch Libraries" to load your libraries, then select a channel for each one.
-                            <br><strong>Note:</strong> Unchecked libraries will not send any notifications.
-                          </small>
+                        <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.library_channel_mapping_help">
+                          Map specific Jellyfin libraries to different Discord channels. Click "Fetch Libraries" to load your libraries, then select a channel for each one. Unchecked libraries will not send any notifications.
                         </div>
                         <button type="button" id="fetch-libraries-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem; margin: 0 0 1rem 0; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;">
-                          <i class="bi bi-arrow-clockwise"></i> Fetch Libraries
+                          <i class="bi bi-arrow-clockwise"></i> <span data-i18n="config.fetch_libraries">Fetch Libraries</span>
                         </button>
                         <span id="fetch-libraries-status" style="margin-left: 1rem;"></span>
                         
@@ -664,9 +659,9 @@
                       <!-- Embed Customization Section -->
                       <div class="form-group" style="margin-top: 2rem;">
                         <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          <strong>Embed Customization</strong>
+                          <strong data-i18n="config.embed_customization_title">Embed Customization</strong>
                         </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
+                        <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.embed_customization_help">
                           Customize which elements appear in your Discord notification embeds.
                         </div>
 
@@ -674,64 +669,64 @@
                           <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_BACKDROP" name="EMBED_SHOW_BACKDROP" checked>
                             <label class="form-check-label" for="EMBED_SHOW_BACKDROP" style="margin-left: 0.5rem;">
-                              <strong>Backdrop Image</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Large background image</div>
+                              <strong data-i18n="config.embed_backdrop">Backdrop Image</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;" data-i18n="config.embed_backdrop_help">Large background image</div>
                             </label>
                           </div>
 
                           <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_OVERVIEW" name="EMBED_SHOW_OVERVIEW" checked>
                             <label class="form-check-label" for="EMBED_SHOW_OVERVIEW" style="margin-left: 0.5rem;">
-                              <strong>Overview/Description</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Plot summary text</div>
+                              <strong data-i18n="config.embed_overview">Overview/Description</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;" data-i18n="config.embed_overview_help">Plot summary text</div>
                             </label>
                           </div>
 
                           <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_GENRE" name="EMBED_SHOW_GENRE" checked>
                             <label class="form-check-label" for="EMBED_SHOW_GENRE" style="margin-left: 0.5rem;">
-                              <strong>Genre</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Genre field</div>
+                              <strong data-i18n="config.embed_genre">Genre</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;" data-i18n="config.embed_genre_help">Genre field</div>
                             </label>
                           </div>
 
                           <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_RUNTIME" name="EMBED_SHOW_RUNTIME" checked>
                             <label class="form-check-label" for="EMBED_SHOW_RUNTIME" style="margin-left: 0.5rem;">
-                              <strong>Runtime</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Duration field</div>
+                              <strong data-i18n="config.embed_runtime">Runtime</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;" data-i18n="config.embed_runtime_help">Duration field</div>
                             </label>
                           </div>
 
                           <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_RATING" name="EMBED_SHOW_RATING" checked>
                             <label class="form-check-label" for="EMBED_SHOW_RATING" style="margin-left: 0.5rem;">
-                              <strong>Rating</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">IMDB/TMDB rating</div>
+                              <strong data-i18n="config.embed_rating">Rating</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;" data-i18n="config.embed_rating_help">IMDB/TMDB rating</div>
                             </label>
                           </div>
 
                           <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_BUTTON_LETTERBOXD" name="EMBED_SHOW_BUTTON_LETTERBOXD" checked>
                             <label class="form-check-label" for="EMBED_SHOW_BUTTON_LETTERBOXD" style="margin-left: 0.5rem;">
-                              <strong>Letterboxd Button</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Link to Letterboxd</div>
+                              <strong data-i18n="config.embed_letterboxd_btn">Letterboxd Button</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;" data-i18n="config.embed_letterboxd_btn_help">Link to Letterboxd</div>
                             </label>
                           </div>
 
                           <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_BUTTON_IMDB" name="EMBED_SHOW_BUTTON_IMDB" checked>
                             <label class="form-check-label" for="EMBED_SHOW_BUTTON_IMDB" style="margin-left: 0.5rem;">
-                              <strong>IMDb Button</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Link to IMDb</div>
+                              <strong data-i18n="config.embed_imdb_btn">IMDb Button</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;" data-i18n="config.embed_imdb_btn_help">Link to IMDb</div>
                             </label>
                           </div>
 
                           <div class="form-check form-switch" style="padding: 0.75rem; background-color: var(--surface0); border-radius: 8px;">
                             <input class="form-check-input" type="checkbox" id="EMBED_SHOW_BUTTON_WATCH" name="EMBED_SHOW_BUTTON_WATCH" checked>
                             <label class="form-check-label" for="EMBED_SHOW_BUTTON_WATCH" style="margin-left: 0.5rem;">
-                              <strong>Watch Now Button</strong>
-                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;">Link to Jellyfin</div>
+                              <strong data-i18n="config.embed_watch_btn">Watch Now Button</strong>
+                              <div style="font-size: 0.85rem; color: var(--subtext0); margin-top: 0.25rem;" data-i18n="config.embed_watch_btn_help">Link to Jellyfin</div>
                             </label>
                           </div>
                         </div>
@@ -780,37 +775,37 @@
                   <!-- User Mappings Pane -->
                   <div id="config-pane-mappings" class="config-pane">
                     <fieldset>
-                      <legend>User Mapping</legend>
-                      <p class="form-text" style="margin-bottom: 1.5rem;">
+                      <legend data-i18n="config.mappings_legend">User Mapping</legend>
+                      <p class="form-text" style="margin-bottom: 1.5rem;" data-i18n="config.mappings_pane_description">
                         Map Discord users to their Seerr accounts. When a user makes a request from Discord, it will be associated with their Seerr account instead of the API key owner.
                       </p>
-                      
+
                       <div id="mappings-container">
                         <div class="mappings-list" id="mappings-list">
                           <!-- Mappings will be populated here -->
                         </div>
-                        
+
                         <div class="add-mapping-form" style="margin-top: 1.5rem;">
                           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                            <h4 style="font-size: 1.1rem; margin: 0; color: var(--mauve); line-height: 1.4;">Add New Mapping</h4>
+                            <h4 style="font-size: 1.1rem; margin: 0; color: var(--mauve); line-height: 1.4;" data-i18n="config.add_new_mapping">Add New Mapping</h4>
                             <div style="display: flex; gap: 0.5rem;">
                               <button type="button" id="auto-map-seerr-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
-                                <i class="bi bi-magic"></i> Auto-Map from Seerr
+                                <i class="bi bi-magic"></i> <span data-i18n="config.auto_map_seerr">Auto-Map from Seerr</span>
                               </button>
                               <button type="button" id="sync-seerr-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
-                                <i class="bi bi-arrow-repeat"></i> Sync with Seerr
+                                <i class="bi bi-arrow-repeat"></i> <span data-i18n="config.sync_seerr">Sync with Seerr</span>
                               </button>
                               <button type="button" id="refresh-all-users-btn" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; height: fit-content;">
-                                <i class="bi bi-arrow-clockwise"></i> Refresh Users
+                                <i class="bi bi-arrow-clockwise"></i> <span data-i18n="config.refresh_users">Refresh Users</span>
                               </button>
                             </div>
                           </div>
                           <div class="form-group">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                              <label for="discord-user-select" style="margin-bottom: 0;">Discord User</label>
+                              <label for="discord-user-select" style="margin-bottom: 0;" data-i18n="config.discord_user_label">Discord User</label>
                             </div>
                             <div class="custom-select" id="discord-user-select">
-                              <input type="text" class="custom-select-trigger" placeholder="Search Discord users..." readonly />
+                              <input type="text" class="custom-select-trigger" data-i18n="config.discord_user_placeholder" data-i18n-attr="placeholder" placeholder="Search Discord users..." readonly />
                               <i class="bi bi-chevron-down custom-select-chevron"></i>
                               <div class="custom-select-dropdown">
                                 <div class="custom-select-options">
@@ -818,19 +813,19 @@
                                 </div>
                               </div>
                             </div>
-                            <div class="form-text">
+                            <div class="form-text" data-i18n="config.discord_user_help">
                               Select a Discord server member, or enter their User ID manually below if they don't appear in the list.
                             </div>
                             <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-                              <input type="text" id="discord-user-id-manual" placeholder="Or enter Discord User ID manually..." style="flex: 1; background: var(--surface0); border: 1px solid var(--surface2); color: var(--text); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.9rem;" />
+                              <input type="text" id="discord-user-id-manual" data-i18n="config.discord_user_id_placeholder" data-i18n-attr="placeholder" placeholder="Or enter Discord User ID manually..." style="flex: 1; background: var(--surface0); border: 1px solid var(--surface2); color: var(--text); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.9rem;" />
                             </div>
                           </div>
                           <div class="form-group">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                              <label for="seerr-user-select" style="margin-bottom: 0;">Seerr User</label>
+                              <label for="seerr-user-select" style="margin-bottom: 0;" data-i18n="config.seerr_user_label">Seerr User</label>
                             </div>
                             <div class="custom-select" id="seerr-user-select">
-                              <input type="text" class="custom-select-trigger" placeholder="Search Seerr users..." readonly />
+                              <input type="text" class="custom-select-trigger" data-i18n="config.seerr_user_placeholder" data-i18n-attr="placeholder" placeholder="Search Seerr users..." readonly />
                               <i class="bi bi-chevron-down custom-select-chevron"></i>
                               <div class="custom-select-dropdown">
                                 <div class="custom-select-options">
@@ -838,11 +833,11 @@
                                 </div>
                               </div>
                             </div>
-                            <div class="form-text">
+                            <div class="form-text" data-i18n="config.seerr_user_help">
                               Select the corresponding Seerr account
                             </div>
                           </div>
-                          <button type="button" id="add-mapping-btn" class="btn btn-primary" style="margin-left: 0;">Add Mapping</button>
+                          <button type="button" id="add-mapping-btn" class="btn btn-primary" style="margin-left: 0;" data-i18n="config.add_mapping_btn">Add Mapping</button>
                         </div>
                       </div>
                     </fieldset>
@@ -851,27 +846,27 @@
                   <!-- Role Permissions Pane -->
                   <div id="config-pane-roles" class="config-pane">
                     <fieldset>
-                      <legend>Role Permissions</legend>
-                      <p class="form-text" style="margin-bottom: 1.5rem;">
+                      <legend data-i18n="config.roles_legend">Role Permissions</legend>
+                      <p class="form-text" style="margin-bottom: 1.5rem;" data-i18n="config.roles_pane_description">
                         Control who can use bot commands by configuring role-based permissions. If no roles are selected in the allowlist, everyone can use commands. If any role is added to the blocklist, members with that role will be blocked regardless of allowlist settings.
                       </p>
-                      
+
                       <div class="form-group">
-                        <label style="font-weight: 600; color: var(--green);">Allowlist (Allow Only These Roles)</label>
+                        <label style="font-weight: 600; color: var(--green);" data-i18n="config.allowlist_title">Allowlist (Allow Only These Roles)</label>
                         <div id="allowlist-roles" class="role-list">
                           <p class="form-text" style="opacity: 0.7; font-style: italic;">Loading roles...</p>
                         </div>
-                        <div class="form-text">
+                        <div class="form-text" data-i18n="config.allowlist_help">
                           If empty, all members can use commands. If roles are selected, only members with these roles can use commands.
                         </div>
                       </div>
-                      
+
                       <div class="form-group">
-                        <label style="font-weight: 600; color: var(--peach);">Blocklist (Block These Roles)</label>
+                        <label style="font-weight: 600; color: var(--peach);" data-i18n="config.blocklist_title">Blocklist (Block These Roles)</label>
                         <div id="blocklist-roles" class="role-list">
                           <p class="form-text" style="opacity: 0.7; font-style: italic;">Loading roles...</p>
                         </div>
-                        <div class="form-text">
+                        <div class="form-text" data-i18n="config.blocklist_help">
                           Members with these roles will never be able to use bot commands, even if they have an allowed role.
                         </div>
                       </div>
@@ -881,17 +876,17 @@
                   <!-- Miscellaneous Pane -->
                   <div id="config-pane-misc" class="config-pane">
                     <fieldset>
-                      <legend>Miscellaneous Settings</legend>
-                      <p class="form-text" style="margin-bottom: 1.5rem;">
+                      <legend data-i18n="config.misc_legend">Miscellaneous Settings</legend>
+                      <p class="form-text" style="margin-bottom: 1.5rem;" data-i18n="config.misc_pane_description">
                         Optional settings to enhance your bot experience. These are extra features that can be enabled after your bot is fully configured and running.
                       </p>
-                      
+
                       <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                           <input type="checkbox" id="AUTO_START_BOT" name="AUTO_START_BOT" />
-                          Auto-start bot on server boot
+                          <span data-i18n="config.auto_start_label">Auto-start bot on server boot</span>
                         </label>
-                        <div class="form-text">
+                        <div class="form-text" data-i18n="config.auto_start_help">
                           If enabled, the bot starts automatically when the container/server restarts and valid Discord credentials are present.
                         </div>
                       </div>
@@ -899,9 +894,9 @@
                       <div class="form-group" style="margin-top: 1.5rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                           <input type="checkbox" id="NOTIFY_ON_AVAILABLE" name="NOTIFY_ON_AVAILABLE" />
-                          Send PM when request is available
+                          <span data-i18n="config.notify_on_available_label">Send PM when request is available</span>
                         </label>
-                        <div class="form-text">
+                        <div class="form-text" data-i18n="config.notify_on_available_help">
                           When enabled, users will receive a private message when their requested content becomes available on Jellyfin.
                         </div>
                       </div>
@@ -909,9 +904,9 @@
                       <div class="form-group" style="margin-top: 1.5rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                           <input type="checkbox" id="PRIVATE_MESSAGE_MODE" name="PRIVATE_MESSAGE_MODE" />
-                          Ephemeral Message Mode
+                          <span data-i18n="config.ephemeral_mode_label">Ephemeral Message Mode</span>
                         </label>
-                        <div class="form-text">
+                        <div class="form-text" data-i18n="config.ephemeral_mode_help">
                           When enabled, all bot responses (search and request results) are sent as ephemeral messages (only visible to the user who used the command). When disabled, successful results are visible to everyone in the channel, but warning messages (e.g., "already on Jellyfin") are always ephemeral.
                         </div>
                       </div>
@@ -919,9 +914,9 @@
                       <div class="form-group" style="margin-top: 1.5rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                           <input type="checkbox" id="SEERR_AUTO_APPROVE" name="SEERR_AUTO_APPROVE" />
-                          Seerr Auto-Approve Requests
+                          <span data-i18n="config.auto_approve_label">Seerr Auto-Approve Requests</span>
                         </label>
-                        <div class="form-text">
+                        <div class="form-text" data-i18n="config.auto_approve_help">
                           When enabled, requests made through the bot will be automatically approved in Seerr. If disabled, requests will remain "Pending" for manual approval.
                         </div>
                       </div>
@@ -930,36 +925,36 @@
                       <div class="form-group" style="margin-top: 2rem; padding: 1rem; background-color: var(--surface0); border-radius: 8px; border-left: 4px solid var(--peach);">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 1rem;">
                           <input type="checkbox" id="DAILY_RANDOM_PICK_ENABLED" name="DAILY_RANDOM_PICK_ENABLED" />
-                          Enable Daily Random Pick
+                          <span data-i18n="config.daily_pick_title">Enable Daily Random Pick</span>
                         </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
+                        <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.daily_pick_help">
                           Send a daily recommendation of random media to a Discord channel. Great for discovering hidden gems!
                         </div>
 
                         <div class="form-group" style="margin-top: 1rem;">
-                          <label for="DAILY_RANDOM_PICK_CHANNEL_ID" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Channel</label>
+                          <label for="DAILY_RANDOM_PICK_CHANNEL_ID" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.daily_pick_channel_label">Channel</label>
                           <select
                             id="DAILY_RANDOM_PICK_CHANNEL_ID"
                             name="DAILY_RANDOM_PICK_CHANNEL_ID"
                             style="width: 100%; background-color: var(--background); border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
-                            <option value="" style="color: var(--subtext0);">Select a channel...</option>
+                            <option value="" style="color: var(--subtext0);" data-i18n="config.daily_pick_channel_placeholder">Select a channel...</option>
                           </select>
-                          <div class="form-text" style="margin-top: 0.5rem;">
+                          <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.daily_pick_channel_help">
                             Discord channel where daily picks will be sent
                           </div>
                         </div>
 
                         <div class="form-group" style="margin-top: 1rem;">
-                          <label for="DAILY_RANDOM_PICK_INTERVAL" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Interval (minutes)</label>
+                          <label for="DAILY_RANDOM_PICK_INTERVAL" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.daily_pick_interval_label">Interval (minutes)</label>
                           <input type="number" id="DAILY_RANDOM_PICK_INTERVAL" name="DAILY_RANDOM_PICK_INTERVAL" placeholder="1440" min="1" max="525600" style="width: 100%; max-width: 150px; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface1); color: var(--text); font-size: 1rem;" />
-                          <div class="form-text" style="margin-top: 0.5rem;">
+                          <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.daily_pick_interval_help">
                             How often to send a random pick in minutes (default: 1440 = 24 hours)
                           </div>
                         </div>
 
                         <div style="margin-top: 1rem;">
                           <button type="button" id="test-random-pick-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: inline-flex; align-items: center; gap: 0.5rem;">
-                            <i class="bi bi-shuffle"></i> Test Random Pick
+                            <i class="bi bi-shuffle"></i> <span data-i18n="config.test_random_pick">Test Random Pick</span>
                           </button>
                         </div>
                       </div>
@@ -967,58 +962,58 @@
                       <!-- Discord Embed Colors Section -->
                       <div class="form-group" style="margin-top: 2rem;">
                         <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          <strong>Discord Embed Colors</strong>
+                          <strong data-i18n="config.embed_colors_title">Discord Embed Colors</strong>
                         </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
+                        <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.embed_colors_help">
                           Customize the colors of Discord notification embeds for different content types.
                         </div>
 
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
                           <!-- Movie Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_MOVIE" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">🎬 Movies</label>
+                            <label for="EMBED_COLOR_MOVIE" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.embed_color_movie_label">🎬 Movies</label>
                             <input type="text" id="EMBED_COLOR_MOVIE" name="EMBED_COLOR_MOVIE" data-coloris value="#cba6f7" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
                           </div>
 
                           <!-- Series Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_SERIES" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 TV Series</label>
+                            <label for="EMBED_COLOR_SERIES" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.embed_color_series_label">📺 TV Series</label>
                             <input type="text" id="EMBED_COLOR_SERIES" name="EMBED_COLOR_SERIES" data-coloris value="#cba6f7" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
                           </div>
 
                           <!-- Season Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_SEASON" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 Seasons</label>
+                            <label for="EMBED_COLOR_SEASON" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.embed_color_season_label">📺 Seasons</label>
                             <input type="text" id="EMBED_COLOR_SEASON" name="EMBED_COLOR_SEASON" data-coloris value="#89b4fa" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
                           </div>
 
                           <!-- Single Episode Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_EPISODE_SINGLE" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 Single Episode</label>
+                            <label for="EMBED_COLOR_EPISODE_SINGLE" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.embed_color_episode_single_label">📺 Single Episode</label>
                             <input type="text" id="EMBED_COLOR_EPISODE_SINGLE" name="EMBED_COLOR_EPISODE_SINGLE" data-coloris value="#89b4fa" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
                           </div>
 
                           <!-- Few Episodes Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_EPISODE_FEW" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 Few Episodes (2-5)</label>
+                            <label for="EMBED_COLOR_EPISODE_FEW" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.embed_color_episode_few_label">📺 Few Episodes (2-5)</label>
                             <input type="text" id="EMBED_COLOR_EPISODE_FEW" name="EMBED_COLOR_EPISODE_FEW" data-coloris value="#89b4fa" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
                           </div>
 
                           <!-- Many Episodes Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_EPISODE_MANY" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">📺 Many Episodes (6+)</label>
+                            <label for="EMBED_COLOR_EPISODE_MANY" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.embed_color_episode_many_label">📺 Many Episodes (6+)</label>
                             <input type="text" id="EMBED_COLOR_EPISODE_MANY" name="EMBED_COLOR_EPISODE_MANY" data-coloris value="#89b4fa" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
                           </div>
 
                           <!-- Search Result Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_SEARCH" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">🔍 Search Results</label>
+                            <label for="EMBED_COLOR_SEARCH" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.embed_color_search_label">🔍 Search Results</label>
                             <input type="text" id="EMBED_COLOR_SEARCH" name="EMBED_COLOR_SEARCH" data-coloris value="#fab387" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
                           </div>
 
                           <!-- Request Success Color -->
                           <div class="color-picker-group">
-                            <label for="EMBED_COLOR_SUCCESS" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">✅ Request Success</label>
+                            <label for="EMBED_COLOR_SUCCESS" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.embed_color_success_label">✅ Request Success</label>
                             <input type="text" id="EMBED_COLOR_SUCCESS" name="EMBED_COLOR_SUCCESS" data-coloris value="#a6e3a1" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface0); color: var(--text); font-size: 1rem;" />
                           </div>
                         </div>
@@ -1027,18 +1022,18 @@
                       <!-- App Settings Section -->
                       <div class="form-group" style="margin-top: 2rem;">
                         <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">
-                          <strong>App Settings</strong>
+                          <strong data-i18n="config.app_settings_title">App Settings</strong>
                         </label>
-                        <div class="form-text" style="margin-bottom: 1rem;">
+                        <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.app_settings_help">
                           General application settings for Anchorr.
                         </div>
 
                         <div class="form-group">
-                          <label for="app-language" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Language</label>
+                          <label for="app-language" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.language">Language</label>
                           <select id="app-language" name="LANGUAGE" style="width: 100%; max-width: 300px; background-color: #1e1e2e; border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
                             <!-- Languages will be populated dynamically -->
                           </select>
-                          <div class="form-text" style="margin-top: 0.5rem;">
+                          <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.language_help">
                             Select the language for the Anchorr dashboard interface.
                           </div>
                         </div>
