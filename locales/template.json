@@ -186,7 +186,8 @@
     "loading_members_bot_running": "",
     "loading_logs": "",
     "bot_must_be_running": "",
-    "no_roles_available": ""
+    "no_roles_available": "",
+    "logout_failed": ""
   },
   "modals": {
     "start_bot_yes": "",

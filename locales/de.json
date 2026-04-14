@@ -279,7 +279,8 @@
     "loading_members_bot_running": "Fehler beim Laden der Mitglieder. Läuft der Bot?",
     "loading_logs": "Fehler beim Laden der Logs",
     "bot_must_be_running": "Bot muss laufen, um Rollen zu laden",
-    "no_roles_available": "Keine Rollen verfügbar"
+    "no_roles_available": "Keine Rollen verfügbar",
+    "logout_failed": "Abmeldung fehlgeschlagen. Bitte erneut versuchen."
   },
   "modals": {
     "start_bot_yes": "Ja, Bot starten",

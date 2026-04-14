@@ -207,7 +207,8 @@
     "loading_members_bot_running": "Error loading members. Is bot running?",
     "loading_logs": "Error loading logs",
     "bot_must_be_running": "Bot must be running to load roles",
-    "no_roles_available": "No roles available"
+    "no_roles_available": "No roles available",
+    "logout_failed": "Logout failed. Please try again."
   },
   "modals": {
     "start_bot_yes": "Yes, Start Bot",

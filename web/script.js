@@ -625,7 +625,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         location.reload();
       } catch (error) {
         console.error("Logout request failed:", error);
-        showToast("Logout failed. Please try again.");
+        showToast(t('errors.logout_failed'));
       }
     });
   }

@@ -191,7 +191,8 @@
     "loading_members_bot_running": "Fel vid laddning av medlemmar. Körs boten?",
     "loading_logs": "Fel vid laddning av loggar",
     "bot_must_be_running": "Boten måste köras för att ladda roller",
-    "no_roles_available": "Inga roller tillgängliga"
+    "no_roles_available": "Inga roller tillgängliga",
+    "logout_failed": "Utloggning misslyckades. Försök igen."
   },
   "modals": {
     "start_bot_yes": "Ja, starta bot",
