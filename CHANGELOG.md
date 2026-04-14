@@ -7,12 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.5.0] - 2026-04-10
+## [1.5.0] - 2026-04-14
 
 ### ✨ Added
 
 - **Anime quality profiles & server selection**: Separate default quality profiles and Radarr/Sonarr servers can now be configured for anime content (both TV series and movies). Anime is detected automatically via TMDB metadata (Animation genre + Japanese origin). If no anime-specific config is set, the standard movie/TV defaults are used — existing setups are unaffected
 - **Jellyseerr `isAnime` flag**: When anime content is detected, the `isAnime: true` flag is included in the Jellyseerr request payload, allowing Jellyseerr to route to its anime-configured instance
+- **Anime library toggle**: Each library row in the Jellyfin notification mapping UI now has a compact checkbox to manually mark it as an anime library. This is explicit and works regardless of library naming. When flagged, the `isAnime` flag is passed through to all notification paths (webhook, poller, WebSocket) — independent of TMDB metadata detection
 - **CI: npm audit gate**: A new `audit` job runs `npm audit --audit-level=high` before the Docker build — vulnerable dependencies now block the pipeline
 
 ### 🐛 Fixed
@@ -21,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Docker config volume permissions**: Added entrypoint script to fix ownership on first run, preventing write failures for the non-root container user
 - **Seerr error messages**: Request failures now surface specific messages (auth errors, server errors, connection refused) instead of generic "An error occurred"
 - **Seerr `checkMediaStatus` error handling**: Network and 5xx errors are now propagated instead of silently returning `{ exists: false }`
+- **Silent failures in dashboard**: Previously empty or unchecked `catch` blocks in the web dashboard now log errors at the appropriate level (`console.error`/`console.warn`/`console.debug`). Affected paths include bot status polling, logout, guild/channel loading, role loading, connection status checks, webhook secret loading, and localStorage cache access
+- **Legacy library config migration**: The `JELLYFIN_NOTIFICATION_LIBRARIES` config is now parsed consistently across all notification paths. Legacy array format (`["libId1", "libId2"]`) and legacy string-value format (`{ libId: "channelId" }`) are both migrated transparently to the new object format (`{ libId: { channel, isAnime } }`) at read time
+
+### 🏗️ Code Quality
+
+- **Shared library resolver**: All three notification sources (webhook, poller, WebSocket) now go through shared `getLibraryChannels()`, `resolveTargetChannel()`, and `getLibraryAnimeFlag()` functions in `jellyfin/libraryResolver.js`, eliminating duplicated inline logic
 
 ### 🗑️ Removed
 
