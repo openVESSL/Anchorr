@@ -52,8 +52,13 @@ export function getLibraryChannels() {
   try {
     const raw = process.env.JELLYFIN_NOTIFICATION_LIBRARIES;
     if (!raw) return {};
-    if (typeof raw === "object") return raw;
-    return JSON.parse(raw);
+    const parsed = typeof raw === "object" ? raw : JSON.parse(raw);
+    // Legacy: array of library IDs — convert to object mapped to default channel
+    if (Array.isArray(parsed)) {
+      const defaultCh = process.env.JELLYFIN_CHANNEL_ID || "";
+      return Object.fromEntries(parsed.map((id) => [id, defaultCh]));
+    }
+    return parsed;
   } catch (e) {
     logger.warn("Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES:", e);
     return {};
