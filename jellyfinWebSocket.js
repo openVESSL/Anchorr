@@ -7,6 +7,7 @@ import {
   resolveConfigLibraryId,
   getLibraryChannels,
   resolveTargetChannel,
+  getLibraryAnimeFlag,
   deduplicator,
 } from "./jellyfin/libraryResolver.js";
 
@@ -322,7 +323,8 @@ export class JellyfinWebSocketClient {
 
     if (!targetChannelId) return;
 
-    logger.info(`✅ Will send to channel: ${targetChannelId}`);
+    const isAnimeLibrary = getLibraryAnimeFlag(configLibraryId, libraryChannels);
+    logger.info(`✅ Will send to channel: ${targetChannelId}${isAnimeLibrary ? " [anime]" : ""}`);
 
     try {
       const webhookData = jellyfinApi.transformToWebhookFormat(item, baseUrl, serverId);
@@ -331,7 +333,14 @@ export class JellyfinWebSocketClient {
         webhookData,
         this.client,
         this.pendingRequests,
-        targetChannelId
+        targetChannelId,
+        0,
+        null,
+        0,
+        null,
+        false,
+        null,
+        isAnimeLibrary
       );
 
       logger.info(`📤 Notification sent for "${item.Name}"`);

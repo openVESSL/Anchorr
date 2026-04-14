@@ -678,6 +678,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ? JSON.parse(libConfigString)
         : {};
     } catch (e) {
+      console.error("Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES before save:", e);
       config.JELLYFIN_NOTIFICATION_LIBRARIES = {};
     }
 
@@ -698,7 +699,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await saveConfig(config);
       }
     } catch (error) {
-      // If check fails, save normally
+      console.error("Autostart check failed, proceeding with save:", error);
       await saveConfig(config);
     }
   });
@@ -1408,6 +1409,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
               }
             } catch (e) {
+              console.error("Failed to parse saved library channel config:", e);
               libraryChannels = {};
             }
 
@@ -1691,7 +1693,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           seasonsSelect.value = seasonChannel;
         }
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to populate library channel dropdowns:", error);
+    }
   }
 
   // Update the hidden input with selected notification libraries (object format)

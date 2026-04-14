@@ -6,6 +6,7 @@ import {
   resolveConfigLibraryId,
   getLibraryChannels,
   resolveTargetChannel,
+  getLibraryAnimeFlag,
   deduplicator,
 } from "./jellyfin/libraryResolver.js";
 
@@ -188,7 +189,8 @@ class JellyfinPoller {
 
         if (!targetChannelId) continue;
 
-        logger.info(`✅ Will send to channel: ${targetChannelId}`);
+        const isAnimeLibrary = getLibraryAnimeFlag(configLibraryId, libraryChannels);
+        logger.info(`✅ Will send to channel: ${targetChannelId}${isAnimeLibrary ? " [anime]" : ""}`);
 
         const webhookData = jellyfinApi.transformToWebhookFormat(item, baseUrl, serverId);
 
@@ -197,7 +199,14 @@ class JellyfinPoller {
             webhookData,
             this.client,
             this.pendingRequests,
-            targetChannelId
+            targetChannelId,
+            0,
+            null,
+            0,
+            null,
+            false,
+            null,
+            isAnimeLibrary
           );
           logger.info(`✅ Sent notification for ${itemType}: ${item.Name}`);
         } catch (err) {

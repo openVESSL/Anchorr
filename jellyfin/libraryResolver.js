@@ -78,7 +78,13 @@ export function resolveTargetChannel(configLibraryId, libraryChannels) {
     typeof libConfig === "object" && libConfig !== null
       ? libConfig.channel
       : libConfig;
-  return channelId || defaultChannelId || null;
+  const resolved = channelId || defaultChannelId || null;
+  if (resolved === null) {
+    logger.warn(
+      `⚠️ Library ${configLibraryId} is in the notification list but no channel is configured and no default channel is set — notification will be skipped.`
+    );
+  }
+  return resolved;
 }
 
 /**
