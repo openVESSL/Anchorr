@@ -16,14 +16,19 @@ async function loadTranslations(language) {
   try {
     const response = await fetch(`/locales/${language}.json`);
     if (!response.ok) {
-      console.warn(`Failed to load ${language} translations, falling back to English`);
+      console.warn(`Failed to load ${language} translations (HTTP ${response.status}), falling back to English`);
       const fallbackResponse = await fetch('/locales/en.json');
+      if (!fallbackResponse.ok) {
+        throw new Error(`English fallback also failed: HTTP ${fallbackResponse.status}`);
+      }
       return await fallbackResponse.json();
     }
     return await response.json();
   } catch (error) {
     console.error('Error loading translations:', error);
-    // Return minimal fallback
+    if (typeof showToast === 'function') {
+      showToast('UI language could not be loaded. Some labels may be missing.');
+    }
     return {
       common: { loading: 'Loading...' },
       auth: { login: 'Login' },
@@ -214,7 +219,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (aboutEl) aboutEl.textContent = v;
       }
     })
-    .catch(() => {});
+    .catch((e) => console.debug("Could not fetch version:", e));
   const form = document.getElementById("config-form");
   const botControlBtn = document.getElementById("bot-control-btn");
   const botControlText = document.getElementById("bot-control-text");
@@ -352,6 +357,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const status = await response.json();
       updateStatusIndicator(status.isBotRunning, status.botUsername);
     } catch (error) {
+      console.warn("Failed to fetch bot status:", error);
       updateStatusIndicator(false);
     }
   }
@@ -362,13 +368,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       botControlBtn.classList.remove("btn-success");
       botControlBtn.classList.add("btn-danger");
       botControlIcon.className = "bi bi-pause-fill";
-      botControlText.textContent = "Stop Bot";
+      botControlText.textContent = t("bot.actions.stop");
       botControlBtn.dataset.action = "stop";
     } else {
       botControlBtn.classList.remove("btn-danger");
       botControlBtn.classList.add("btn-success");
       botControlIcon.className = "bi bi-play-fill";
-      botControlText.textContent = "Start Bot";
+      botControlText.textContent = t("bot.actions.start");
       botControlBtn.dataset.action = "start";
     }
   }
@@ -415,7 +421,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         showAuth(data.hasUsers);
       }
     } catch (error) {
-      showAuth(true); // Default to showing login if check fails
+      console.warn("Session check failed, showing auth:", error);
+      showAuth(true);
     }
   }
 
@@ -622,7 +629,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await fetch("/api/auth/logout", { method: "POST" });
         location.reload();
       } catch (error) {
-        // Logout error handling
+        console.error("Logout request failed:", error);
+        showToast(t('errors.logout_failed'));
       }
     });
   }
@@ -678,6 +686,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         ? JSON.parse(libConfigString)
         : {};
     } catch (e) {
+      console.error("Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES before save:", e);
       config.JELLYFIN_NOTIFICATION_LIBRARIES = {};
     }
 
@@ -698,7 +707,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await saveConfig(config);
       }
     } catch (error) {
-      // If check fails, save normally
+      console.error("Autostart check failed, proceeding with save:", error);
+      showToast("Warning: Could not check bot autostart state. Saving anyway.");
       await saveConfig(config);
     }
   });
@@ -789,7 +799,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         showToast(result.message);
       }
     } catch (error) {
-      showToast("Error saving configuration.");
+      console.error("saveConfig failed:", error);
+      showToast(`Error saving configuration: ${error.message || "Unknown error"}`);
     }
   }
 
@@ -799,7 +810,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     botControlBtn.disabled = true;
     const originalText = botControlText.textContent;
-    botControlText.textContent = "Processing...";
+    botControlText.textContent = t("common.processing");
 
     try {
       const response = await fetch(`/api/${action}-bot`, { method: "POST" });
@@ -918,7 +929,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const input = document.getElementById("WEBHOOK_SECRET");
         if (input && data.secret) input.value = data.secret;
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn("Could not load webhook secret:", e);
+    }
   })();
 
   // Copy webhook secret (reads from the already-populated input field)
@@ -1080,16 +1093,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Get current saved values
         const movieQualitySelect = document.getElementById("DEFAULT_QUALITY_PROFILE_MOVIE");
         const tvQualitySelect = document.getElementById("DEFAULT_QUALITY_PROFILE_TV");
+        const animeQualitySelect = document.getElementById("DEFAULT_QUALITY_PROFILE_ANIME");
+        const animeMovieQualitySelect = document.getElementById("DEFAULT_QUALITY_PROFILE_ANIME_MOVIE");
         const movieServerSelect = document.getElementById("DEFAULT_SERVER_MOVIE");
         const tvServerSelect = document.getElementById("DEFAULT_SERVER_TV");
+        const animeServerSelect = document.getElementById("DEFAULT_SERVER_ANIME");
+        const animeMovieServerSelect = document.getElementById("DEFAULT_SERVER_ANIME_MOVIE");
 
         const savedMovieQuality = movieQualitySelect.dataset.savedValue || movieQualitySelect.value;
         const savedTvQuality = tvQualitySelect.dataset.savedValue || tvQualitySelect.value;
+        const savedAnimeQuality = animeQualitySelect.dataset.savedValue || animeQualitySelect.value;
+        const savedAnimeMovieQuality = animeMovieQualitySelect.dataset.savedValue || animeMovieQualitySelect.value;
         const savedMovieServer = movieServerSelect.dataset.savedValue || movieServerSelect.value;
         const savedTvServer = tvServerSelect.dataset.savedValue || tvServerSelect.value;
+        const savedAnimeServer = animeServerSelect.dataset.savedValue || animeServerSelect.value;
+        const savedAnimeMovieServer = animeMovieServerSelect.dataset.savedValue || animeMovieServerSelect.value;
 
         // Movie quality profiles (Radarr)
-        movieQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
+        movieQualitySelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         const radarrProfiles = profilesResult.profiles.filter(p => p.type === "radarr");
         radarrProfiles.forEach(profile => {
           const option = document.createElement("option");
@@ -1100,7 +1121,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedMovieQuality) movieQualitySelect.value = savedMovieQuality;
 
         // TV quality profiles (Sonarr)
-        tvQualitySelect.innerHTML = '<option value="">Use Seerr default</option>';
+        tvQualitySelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         const sonarrProfiles = profilesResult.profiles.filter(p => p.type === "sonarr");
         sonarrProfiles.forEach(profile => {
           const option = document.createElement("option");
@@ -1110,8 +1131,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
         if (savedTvQuality) tvQualitySelect.value = savedTvQuality;
 
+        // Anime TV quality profiles (Sonarr)
+        animeQualitySelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
+        sonarrProfiles.forEach(profile => {
+          const option = document.createElement("option");
+          option.value = `${profile.id}|${profile.serverId}`;
+          option.textContent = `${profile.name} (${profile.serverName})`;
+          animeQualitySelect.appendChild(option);
+        });
+        if (savedAnimeQuality) animeQualitySelect.value = savedAnimeQuality;
+
+        // Anime movie quality profiles (Radarr)
+        animeMovieQualitySelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
+        radarrProfiles.forEach(profile => {
+          const option = document.createElement("option");
+          option.value = `${profile.id}|${profile.serverId}`;
+          option.textContent = `${profile.name} (${profile.serverName})`;
+          animeMovieQualitySelect.appendChild(option);
+        });
+        if (savedAnimeMovieQuality) animeMovieQualitySelect.value = savedAnimeMovieQuality;
+
         // Movie servers (Radarr)
-        movieServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
+        movieServerSelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         const radarrServers = serversResult.servers.filter(s => s.type === "radarr");
         radarrServers.forEach(server => {
           const option = document.createElement("option");
@@ -1122,7 +1163,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (savedMovieServer) movieServerSelect.value = savedMovieServer;
 
         // TV servers (Sonarr)
-        tvServerSelect.innerHTML = '<option value="">Use Seerr default</option>';
+        tvServerSelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
         const sonarrServers = serversResult.servers.filter(s => s.type === "sonarr");
         sonarrServers.forEach(server => {
           const option = document.createElement("option");
@@ -1131,6 +1172,26 @@ document.addEventListener("DOMContentLoaded", async () => {
           tvServerSelect.appendChild(option);
         });
         if (savedTvServer) tvServerSelect.value = savedTvServer;
+
+        // Anime TV servers (Sonarr)
+        animeServerSelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
+        sonarrServers.forEach(server => {
+          const option = document.createElement("option");
+          option.value = `${server.id}|${server.type}`;
+          option.textContent = `${server.name}${server.isDefault ? " (default)" : ""}`;
+          animeServerSelect.appendChild(option);
+        });
+        if (savedAnimeServer) animeServerSelect.value = savedAnimeServer;
+
+        // Anime movie servers (Radarr)
+        animeMovieServerSelect.innerHTML = `<option value="">${t("config.use_seerr_default")}</option>`;
+        radarrServers.forEach(server => {
+          const option = document.createElement("option");
+          option.value = `${server.id}|${server.type}`;
+          option.textContent = `${server.name}${server.isDefault ? " (default)" : ""}`;
+          animeMovieServerSelect.appendChild(option);
+        });
+        if (savedAnimeMovieServer) animeMovieServerSelect.value = savedAnimeMovieServer;
 
         const totalProfiles = radarrProfiles.length + sonarrProfiles.length;
         const totalServers = radarrServers.length + sonarrServers.length;
@@ -1340,7 +1401,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             librariesList.innerHTML =
               '<div class="libraries-empty">No libraries found.</div>';
           } else {
-            // Get currently enabled libraries (object format: { libraryId: channelId })
+            // Get currently enabled libraries (object format: { libraryId: { channel, isAnime } })
             let libraryChannels = {};
             try {
               const currentValue = notificationLibrariesInput.value;
@@ -1353,13 +1414,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                   const defaultChannel =
                     document.getElementById("JELLYFIN_CHANNEL_ID").value || "";
                   parsed.forEach((libId) => {
-                    libraryChannels[libId] = defaultChannel;
+                    libraryChannels[libId] = { channel: defaultChannel, isAnime: false };
                   });
                 } else if (typeof parsed === "object") {
                   libraryChannels = parsed;
                 }
               }
             } catch (e) {
+              console.error("Failed to parse saved library channel config:", e);
               libraryChannels = {};
             }
 
@@ -1375,9 +1437,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                 // 2. This library ID exists as a key in libraryChannels object
                 const isChecked =
                   allEnabled || libraryChannels.hasOwnProperty(lib.id);
+                const libConfig = libraryChannels[lib.id];
                 const selectedChannel = isChecked
-                  ? libraryChannels[lib.id] || defaultChannel
+                  ? (typeof libConfig === "object" && libConfig !== null
+                      ? libConfig.channel
+                      : libConfig) || defaultChannel
                   : "";
+                const isAnime =
+                  typeof libConfig === "object" && libConfig !== null
+                    ? !!libConfig.isAnime
+                    : false;
 
                 return `
               <div class="library-item">
@@ -1388,17 +1457,27 @@ document.addEventListener("DOMContentLoaded", async () => {
                     class="library-checkbox"
                     ${isChecked ? "checked" : ""}
                   />
-                  <div class="library-info">
-                    <span class="library-name">${escapeHtml(lib.name)}</span>
-                  </div>
+                  <span class="library-name">${escapeHtml(lib.name)}</span>
                 </label>
-                <select
-                  class="library-channel-select"
-                  data-library-id="${escapeHtml(lib.id)}"
-                  ${!isChecked ? "disabled" : ""}
-                >
-                  <option value="">Use Default Channel</option>
-                </select>
+                <div class="library-controls">
+                  <select
+                    class="library-channel-select"
+                    data-library-id="${escapeHtml(lib.id)}"
+                    ${!isChecked ? "disabled" : ""}
+                  >
+                    <option value="">${t("config.use_default_channel")}</option>
+                  </select>
+                  <label class="library-anime-label" title="${t("config.library_anime_title")}">
+                    <input
+                      type="checkbox"
+                      class="library-anime-toggle"
+                      data-library-id="${escapeHtml(lib.id)}"
+                      ${isAnime ? "checked" : ""}
+                      ${!isChecked ? "disabled" : ""}
+                    />
+                    <span class="library-anime-text">${t("config.library_anime_label")}</span>
+                  </label>
+                </div>
               </div>
             `;
               })
@@ -1433,7 +1512,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   class="library-channel-select"
                   ${!episodesEnabled ? "disabled" : ""}
                 >
-                  <option value="">Use Default Channel</option>
+                  <option value="">${t("config.use_default_channel")}</option>
                 </select>
               </div>
 
@@ -1455,7 +1534,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   class="library-channel-select"
                   ${!seasonsEnabled ? "disabled" : ""}
                 >
-                  <option value="">Use Default Channel</option>
+                  <option value="">${t("config.use_default_channel")}</option>
                 </select>
               </div>
             `;
@@ -1472,9 +1551,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                   const select = librariesList.querySelector(
                     `select[data-library-id="${libraryId}"]`
                   );
-                  if (select) {
-                    select.disabled = !e.target.checked;
-                  }
+                  const animeToggle = librariesList.querySelector(
+                    `.library-anime-toggle[data-library-id="${libraryId}"]`
+                  );
+                  if (select) select.disabled = !e.target.checked;
+                  if (animeToggle) animeToggle.disabled = !e.target.checked;
                   updateNotificationLibraries();
                 });
               });
@@ -1484,6 +1565,13 @@ document.addEventListener("DOMContentLoaded", async () => {
               .querySelectorAll(".library-channel-select")
               .forEach((select) => {
                 select.addEventListener("change", updateNotificationLibraries);
+              });
+
+            // Add change listeners to all anime toggles
+            librariesList
+              .querySelectorAll(".library-anime-toggle")
+              .forEach((toggle) => {
+                toggle.addEventListener("change", updateNotificationLibraries);
               });
 
             // Add event listeners for Episodes and Seasons checkboxes
@@ -1550,11 +1638,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       selects.forEach((select) => {
         const libraryId = select.dataset.libraryId;
-        const currentChannel = libraryChannels[libraryId] || "";
+        const libConfig = libraryChannels[libraryId];
+        const currentChannel =
+          typeof libConfig === "object" && libConfig !== null
+            ? libConfig.channel || ""
+            : libConfig || "";
 
         // Clear and populate options
         select.innerHTML =
-          '<option value="">Use Default Channel</option>' +
+          `<option value="">${t("config.use_default_channel")}</option>` +
           channels
             .map((ch) => {
               let icon = "";
@@ -1580,7 +1672,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (episodesSelect) {
         episodesSelect.innerHTML =
-          '<option value="">Use Default Channel</option>' +
+          `<option value="">${t("config.use_default_channel")}</option>` +
           channels
             .map((ch) => {
               let icon = "";
@@ -1598,7 +1690,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (seasonsSelect) {
         seasonsSelect.innerHTML =
-          '<option value="">Use Default Channel</option>' +
+          `<option value="">${t("config.use_default_channel")}</option>` +
           channels
             .map((ch) => {
               let icon = "";
@@ -1613,7 +1705,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           seasonsSelect.value = seasonChannel;
         }
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to populate library channel dropdowns:", error);
+    }
   }
 
   // Update the hidden input with selected notification libraries (object format)
@@ -1631,12 +1725,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       const select = librariesList.querySelector(
         `select[data-library-id="${libraryId}"]`
       );
+      const animeToggle = librariesList.querySelector(
+        `.library-anime-toggle[data-library-id="${libraryId}"]`
+      );
       const channelId = select ? select.value : "";
-      libraryChannels[libraryId] = channelId; // Empty string means "use default"
+      const isAnime = animeToggle ? animeToggle.checked : false;
+      libraryChannels[libraryId] = { channel: channelId, isAnime };
     });
 
-    const jsonValue = JSON.stringify(libraryChannels);
-    notificationLibrariesInput.value = jsonValue;
+    notificationLibrariesInput.value = JSON.stringify(libraryChannels);
   }
 
   // --- Initial Load ---
@@ -1694,6 +1791,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           `<option value="">${t('errors.loading_servers_check_token')}</option>`;
       }
     } catch (error) {
+      console.error("[Discord] Failed to load guilds:", error);
       guildSelect.innerHTML = `<option value="">${t('errors.loading_servers')}</option>`;
     }
   }
@@ -1845,6 +1943,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     } catch (error) {
+      console.error("[Discord] Failed to load channels for guild:", guildId, error);
       if (channelSelect) {
         channelSelect.innerHTML =
           `<option value="">${t('errors.loading_channels')}</option>`;
@@ -1966,6 +2065,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       return data.value;
     } catch (error) {
+      console.debug("Cache read error:", error);
       return null;
     }
   }
@@ -1979,7 +2079,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      // Cache save error
+      console.debug("Cache write error:", error);
     }
   }
 
@@ -2170,7 +2270,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         saveToCache(SEERR_USERS_CACHE_KEY, data.users);
         populateSeerrUserSelect();
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to load Seerr users:", error);
+    }
   }
 
   function populateSeerrUserSelect() {
@@ -2376,7 +2478,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Reload mappings after update
       const response = await fetch("/api/user-mappings");
       currentMappings = await response.json();
-    } catch (error) {}
+    } catch (error) {
+      console.error("[MAPPINGS] Failed to reload after update:", error);
+    }
   }
 
   function displayMappings() {
@@ -2576,7 +2680,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           showToast(`Error: ${result.message}`);
         }
       } catch (error) {
-        showToast("Failed to add mapping.");
+        console.error("Failed to add mapping:", error);
+        showToast(`Failed to add mapping: ${error.message || "Unknown error"}`);
       }
     });
   }
@@ -2921,6 +3026,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           fetch("/api/seerr-users"),
         ]);
 
+        if (!discordResponse.ok) throw new Error(`Discord members: HTTP ${discordResponse.status}`);
+        if (!seerrResponse.ok) throw new Error(`Seerr users: HTTP ${seerrResponse.status}`);
+
         const discordData = await discordResponse.json();
         const seerrData = await seerrResponse.json();
 
@@ -3245,7 +3353,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.getElementById("blocklist-roles").innerHTML =
           `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to load roles:", error);
+      const allowlistEl = document.getElementById("allowlist-roles");
+      const blocklistEl = document.getElementById("blocklist-roles");
+      if (allowlistEl) allowlistEl.innerHTML = `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
+      if (blocklistEl) blocklistEl.innerHTML = `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
+    }
   }
 
   function populateRoleList(containerId, selectedRoles) {
@@ -3459,6 +3573,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     } catch (error) {
+      console.warn("[Status] Seerr connection check failed:", error);
       seerrIndicator.className = "status-dot status-disconnected";
     }
 
@@ -3486,6 +3601,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     } catch (error) {
+      console.warn("[Status] Jellyfin connection check failed:", error);
       jellyfinIndicator.className = "status-dot status-disconnected";
     }
   }
@@ -3504,14 +3620,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         botControlBtnLogs.classList.remove("btn-success");
         botControlBtnLogs.classList.add("btn-danger");
         botControlBtnLogs.querySelector("i").className = "bi bi-pause-fill";
-        botControlTextLogs.textContent = "Stop Bot";
+        botControlTextLogs.textContent = t("bot.actions.stop");
       } else {
         botControlBtnLogs.classList.remove("btn-danger");
         botControlBtnLogs.classList.add("btn-success");
         botControlBtnLogs.querySelector("i").className = "bi bi-play-fill";
-        botControlTextLogs.textContent = "Start Bot";
+        botControlTextLogs.textContent = t("bot.actions.start");
       }
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to fetch bot status for logs page:", error);
+    }
   }
 
   // Bot control button for logs page
@@ -3526,7 +3644,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       botControlBtnLogs.disabled = true;
       const originalText = botControlTextLogs.textContent;
-      botControlTextLogs.textContent = "Processing...";
+      botControlTextLogs.textContent = t("common.processing");
 
       const response = await fetch(endpoint, { method: "POST" });
 

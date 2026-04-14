@@ -11,6 +11,11 @@ import logger from "./utils/logger.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import { findBestBackdrop } from "./api/tmdb.js";
 import { isValidUrl } from "./utils/url.js";
+import {
+  getLibraryChannels,
+  resolveTargetChannel,
+  getLibraryAnimeFlag,
+} from "./jellyfin/libraryResolver.js";
 
 const debouncedSenders = new Map();
 const sentNotifications = new Map();
@@ -111,6 +116,7 @@ function buildJellyfinUrl(_baseUrl, appendPath, hash) {
     }
     return u.toString();
   } catch (_e) {
+    logger.warn(`buildJellyfinUrl: Invalid JELLYFIN_BASE_URL "${effectiveBaseUrl}": ${_e?.message}. Falling back to string concatenation.`);
     const baseNoSlash = String(effectiveBaseUrl || "").replace(/\/+$/, "");
     const pathNoLead = String(appendPath || "").replace(/^\/+/, "");
     const h = hash
@@ -148,7 +154,8 @@ async function processAndSendNotification(
   seasonCount = 0,
   seasonDetails = null,
   isTestNotif = false,
-  onPendingRequestsChanged = null
+  onPendingRequestsChanged = null,
+  isAnimeLibrary = false
 ) {
   const {
     ItemType,
@@ -181,7 +188,7 @@ async function processAndSendNotification(
   const testPrefix = isTestNotif ? "[TEST NOTIFICATION] " : "";
 
   logger.info(
-    `${testPrefix}Webhook received: ItemType=${ItemType}, Name=${Name}, tmdbId=${tmdbId}, Provider_imdb=${data.Provider_imdb}`
+    `${testPrefix}Webhook received: ItemType=${ItemType}, Name=${Name}, tmdbId=${tmdbId}, Provider_imdb=${data.Provider_imdb}${isAnimeLibrary ? " [anime library]" : ""}`
   );
 
   // Get embed customization settings from environment
@@ -263,7 +270,7 @@ async function processAndSendNotification(
         apiCache.set(cacheKey, { data: details, timestamp: now });
         logger.debug(`Cached TMDB data for ${tmdbId}`);
       } catch (e) {
-        logger.warn(`Could not fetch TMDB details for ${tmdbId}`);
+        logger.warn(`Could not fetch TMDB details for ${tmdbId}: ${e?.message || e}`);
       }
     }
   }
@@ -881,78 +888,42 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       }
     }
 
-    // Parse notification libraries from config (supports both array and object format)
-    let notificationLibraries = {};
     let libraryChannelId = null;
+    let isAnimeLibrary = false;
 
     // Check if this is a test notification - if so, use default channel
     if (isTestNotification) {
       libraryChannelId = process.env.JELLYFIN_CHANNEL_ID;
       logger.info(`🧪 Test notification detected. Using default channel: ${libraryChannelId}`);
     } else {
-      // Normal library checking logic
-      try {
-        const parsedLibraries = JSON.parse(
-          process.env.JELLYFIN_NOTIFICATION_LIBRARIES || "{}"
-        );
-
-        // Handle both array (legacy) and object format
-        if (Array.isArray(parsedLibraries)) {
-          // Convert array to object with default channel
-          parsedLibraries.forEach((libId) => {
-            notificationLibraries[libId] = process.env.JELLYFIN_CHANNEL_ID || "";
-          });
-        } else {
-          notificationLibraries = parsedLibraries;
-        }
-      } catch (e) {
-        logger.error("Error parsing JELLYFIN_NOTIFICATION_LIBRARIES:", e);
-        notificationLibraries = {};
-      }
-
-      logger.debug(
-        `Configured libraries: ${JSON.stringify(notificationLibraries)}`
-      );
-
-      // Check if library is enabled and get specific channel
+      const notificationLibraries = getLibraryChannels();
       const libraryKeys = Object.keys(notificationLibraries);
-      if (
-        libraryKeys.length > 0 &&
-        libraryId &&
-        libraryId in notificationLibraries
-      ) {
-        // Library found in configuration - use its specific channel or default if empty
-        libraryChannelId =
-          notificationLibraries[libraryId] || process.env.JELLYFIN_CHANNEL_ID;
+
+      logger.debug(`Configured libraries: ${JSON.stringify(notificationLibraries)}`);
+
+      if (libraryKeys.length > 0 && libraryId) {
+        libraryChannelId = resolveTargetChannel(libraryId, notificationLibraries);
+        if (libraryChannelId === null) {
+          // resolveTargetChannel already logged the skip
+          if (res) {
+            return res.status(200).send("OK: Notification skipped for disabled library.");
+          }
+          return;
+        }
+        isAnimeLibrary = getLibraryAnimeFlag(libraryId, notificationLibraries);
         logger.info(
-          `✅ Using channel: ${libraryChannelId} for configured library: ${libraryId}`
-      );
-    } else if (libraryKeys.length > 0 && libraryId) {
-      // Library detected but not in configuration - disable notifications
-      logger.info(
-        `🚫 Library ${libraryId} not enabled in JELLYFIN_NOTIFICATION_LIBRARIES. Skipping notification.`
-      );
-      if (res) {
-        return res
-          .status(200)
-          .send("OK: Notification skipped for disabled library.");
-      }
-      return;
-    } else if (libraryKeys.length > 0 && !libraryId) {
-      // Libraries are configured but we couldn't detect which library this item belongs to
-      // Use default channel instead of skipping to ensure notification is sent
-      libraryChannelId = process.env.JELLYFIN_CHANNEL_ID;
-      if (!isTestNotification) {
+          `✅ Using channel: ${libraryChannelId} for configured library: ${libraryId}${isAnimeLibrary ? " [anime]" : ""}`
+        );
+      } else if (libraryKeys.length > 0 && !libraryId) {
+        // Libraries are configured but we couldn't detect which library this item belongs to
+        libraryChannelId = process.env.JELLYFIN_CHANNEL_ID;
         logger.warn(
           `⚠️ Could not detect library for item "${data.Name}". Using default channel: ${libraryChannelId}`
         );
-      }
-    } else {
-      // No library filtering configured - use default channel
-      libraryChannelId = process.env.JELLYFIN_CHANNEL_ID;
-      logger.debug(
-        `No library filtering configured. Using default channel: ${libraryChannelId}`
-      );
+      } else {
+        // No library filtering configured - use default channel
+        libraryChannelId = process.env.JELLYFIN_CHANNEL_ID;
+        logger.debug(`No library filtering configured. Using default channel: ${libraryChannelId}`);
       }
     }
 
@@ -983,7 +954,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         0,
         null,
         isTestMovie,
-        onPendingRequestsChanged
+        onPendingRequestsChanged,
+        isAnimeLibrary
       );
 
       // Mark this movie as notified
@@ -1107,7 +1079,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           0,
           null,
           isTestNotification,
-          onPendingRequestsChanged
+          onPendingRequestsChanged,
+          isAnimeLibrary
         );
         if (res)
           return res
@@ -1129,7 +1102,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           0,
           null,
           isTestNotification,
-          onPendingRequestsChanged
+          onPendingRequestsChanged,
+          isAnimeLibrary
         );
         if (res)
           return res
@@ -1204,7 +1178,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
                 seasonCount,
                 seasonDetails,
                 isBatchTestNotif,
-                onPendingRequestsChanged
+                onPendingRequestsChanged,
+                isAnimeLibrary
               );
 
               const levelSent = getItemLevel(latestData.ItemType);
@@ -1491,7 +1466,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       0,
       null,
       isUnknownTest,
-      onPendingRequestsChanged
+      onPendingRequestsChanged,
+      isAnimeLibrary
     );
     if (res) return res.status(200).send("OK: Notification sent.");
   } catch (err) {

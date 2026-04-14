@@ -12,7 +12,9 @@ export function getOptionStringRobust(
     try {
       const v = interaction.options.getString(n);
       if (typeof v === "string" && v.length > 0) return v;
-    } catch (e) { }
+    } catch (e) {
+      logger.debug(`getOptionStringRobust: getString("${n}") threw: ${e?.message}`);
+    }
   }
   try {
     const data = (interaction.options && interaction.options.data) || [];
@@ -22,11 +24,13 @@ export function getOptionStringRobust(
           return String(opt.value);
       }
     }
-  } catch (e) { }
+  } catch (e) {
+    logger.warn(`getOptionStringRobust: options.data fallback threw: ${e?.message}`);
+  }
   return null;
 }
 
-export function parseQualityAndServerOptions(options, mediaType) {
+export function parseQualityAndServerOptions(options, mediaType, isAnime = false) {
   let profileId = null;
   let serverId = null;
 
@@ -78,10 +82,16 @@ export function parseQualityAndServerOptions(options, mediaType) {
 
   // Apply defaults from config if not specified
   if (profileId === null && serverId === null) {
-    const defaultQualityConfig =
-      mediaType === "movie"
+    let defaultQualityConfig;
+    if (isAnime && mediaType === "movie") {
+      defaultQualityConfig = process.env.DEFAULT_QUALITY_PROFILE_ANIME_MOVIE || process.env.DEFAULT_QUALITY_PROFILE_MOVIE;
+    } else if (isAnime) {
+      defaultQualityConfig = process.env.DEFAULT_QUALITY_PROFILE_ANIME || process.env.DEFAULT_QUALITY_PROFILE_TV;
+    } else {
+      defaultQualityConfig = mediaType === "movie"
         ? process.env.DEFAULT_QUALITY_PROFILE_MOVIE
         : process.env.DEFAULT_QUALITY_PROFILE_TV;
+    }
 
     if (defaultQualityConfig) {
       const [dProfileId, dServerId] = defaultQualityConfig.split("|");
@@ -92,7 +102,7 @@ export function parseQualityAndServerOptions(options, mediaType) {
         if (!isNaN(parsedProfileId) && !isNaN(parsedServerId)) {
           profileId = parsedProfileId;
           serverId = parsedServerId;
-          logger.debug(`Using default quality profile ID: ${profileId} from config`);
+          logger.debug(`Using default quality profile ID: ${profileId} from config${isAnime ? " (anime)" : ""}`);
         } else {
           logger.warn(
             `Invalid default quality config format - non-numeric values: profileId=${dProfileId}, serverId=${dServerId}`
@@ -103,10 +113,16 @@ export function parseQualityAndServerOptions(options, mediaType) {
   }
 
   if (serverId === null) {
-    const defaultServerConfig =
-      mediaType === "movie"
+    let defaultServerConfig;
+    if (isAnime && mediaType === "movie") {
+      defaultServerConfig = process.env.DEFAULT_SERVER_ANIME_MOVIE || process.env.DEFAULT_SERVER_MOVIE;
+    } else if (isAnime) {
+      defaultServerConfig = process.env.DEFAULT_SERVER_ANIME || process.env.DEFAULT_SERVER_TV;
+    } else {
+      defaultServerConfig = mediaType === "movie"
         ? process.env.DEFAULT_SERVER_MOVIE
         : process.env.DEFAULT_SERVER_TV;
+    }
 
     if (defaultServerConfig) {
       const [dServerId] = defaultServerConfig.split("|");

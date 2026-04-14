@@ -132,9 +132,17 @@ async function handleSearchOrRequest(
         }
       }
 
+      // Detect anime: Animation genre (id 16) + Japanese origin
+      const isAnime =
+        Array.isArray(details.genres) &&
+        details.genres.some((g) => g.id === 16) &&
+        details.original_language === "ja";
+      if (isAnime) logger.info(`[REQUEST] Detected anime content: ${tmdbId}`);
+
       const { profileId, serverId } = parseQualityAndServerOptions(
         options,
-        mediaType
+        mediaType,
+        isAnime
       );
 
       let seasonsToRequest = ["all"];
@@ -158,6 +166,7 @@ async function handleSearchOrRequest(
         tags: tagIds,
         profileId,
         serverId,
+        isAnime,
         seerrUrl: getSeerrUrl(),
         apiKey: getSeerrApiKey(),
         discordUserId: interaction.user.id,
@@ -165,7 +174,7 @@ async function handleSearchOrRequest(
         isAutoApproved: getSeerrAutoApprove(),
       });
       logger.info(
-        `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}`
+        `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
       );
 
       if (process.env.NOTIFY_ON_AVAILABLE === "true") {
@@ -241,7 +250,7 @@ async function handleSearchOrRequest(
           components.push(tagRow);
         }
       } catch (err) {
-        logger.debug(
+        logger.warn(
           "Failed to fetch tags for movie tag selector:",
           err?.message
         );
@@ -749,7 +758,7 @@ export function registerInteractions(client) {
                 })
                 .filter((id) => id !== null);
             } catch (err) {
-              logger.debug(
+              logger.warn(
                 "Failed to fetch tags for API call:",
                 err?.message
               );
@@ -805,9 +814,17 @@ export function registerInteractions(client) {
             }
           }
 
+          // Detect anime: Animation genre (id 16) + Japanese origin
+          const isAnime =
+            Array.isArray(details.genres) &&
+            details.genres.some((g) => g.id === 16) &&
+            details.original_language === "ja";
+          if (isAnime) logger.info(`[REQUEST BTN] Detected anime content: ${tmdbId}`);
+
           const { profileId, serverId } = parseQualityAndServerOptions(
             {},
-            mediaType
+            mediaType,
+            isAnime
           );
 
           await seerrApi.sendRequest({
@@ -817,6 +834,7 @@ export function registerInteractions(client) {
             tags: selectedTagIds.length > 0 ? selectedTagIds : undefined,
             profileId,
             serverId,
+            isAnime,
             seerrUrl: getSeerrUrl(),
             apiKey: getSeerrApiKey(),
             discordUserId: interaction.user.id,
@@ -824,7 +842,7 @@ export function registerInteractions(client) {
             isAutoApproved: getSeerrAutoApprove(),
           });
           logger.info(
-            `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}`
+            `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
           );
 
           if (process.env.NOTIFY_ON_AVAILABLE === "true") {
@@ -1110,7 +1128,7 @@ export function registerInteractions(client) {
                 components.push(tagRow);
               }
             } catch (err) {
-              logger.debug(
+              logger.warn(
                 "Failed to fetch tags for season selector:",
                 err?.message
               );
@@ -1307,6 +1325,11 @@ export function registerInteractions(client) {
       }
     } catch (outerErr) {
       logger.error("Interaction handler error:", outerErr);
+      try {
+        if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "⚠️ An unexpected error occurred. Please try again.", flags: 64 });
+        }
+      } catch (_) { /* interaction may already be acknowledged */ }
     }
   });
 }
