@@ -7,6 +7,7 @@ import {
   resolveConfigLibraryId,
   getLibraryChannels,
   resolveTargetChannel,
+  getLibraryAnimeFlag,
   deduplicator,
 } from "./jellyfin/libraryResolver.js";
 
@@ -175,6 +176,7 @@ export class JellyfinWebSocketClient {
       logger.info(`✅ Cached ${libraries.length} library mappings`);
     } catch (err) {
       logger.warn("Failed to refresh library mappings:", err?.message || err);
+      logger.warn(`Library ID map is stale (${this.libraryIdMap.size} entries). Channel routing may be incorrect until the next successful refresh.`);
     }
   }
 
@@ -320,9 +322,13 @@ export class JellyfinWebSocketClient {
     const configLibraryId = resolveConfigLibraryId(libraryId, this.libraryIdMap);
     const targetChannelId = resolveTargetChannel(configLibraryId, libraryChannels);
 
-    if (!targetChannelId) return;
+    if (!targetChannelId) {
+      logger.error(`No channel resolved for "${item.Name}" (libraryId: ${configLibraryId}) — set JELLYFIN_CHANNEL_ID or configure library channels`);
+      return;
+    }
 
-    logger.info(`✅ Will send to channel: ${targetChannelId}`);
+    const isAnimeLibrary = getLibraryAnimeFlag(configLibraryId, libraryChannels);
+    logger.info(`✅ Will send to channel: ${targetChannelId}${isAnimeLibrary ? " [anime]" : ""}`);
 
     try {
       const webhookData = jellyfinApi.transformToWebhookFormat(item, baseUrl, serverId);
@@ -331,7 +337,14 @@ export class JellyfinWebSocketClient {
         webhookData,
         this.client,
         this.pendingRequests,
-        targetChannelId
+        targetChannelId,
+        0,
+        null,
+        0,
+        null,
+        false,
+        null,
+        isAnimeLibrary
       );
 
       logger.info(`📤 Notification sent for "${item.Name}"`);
