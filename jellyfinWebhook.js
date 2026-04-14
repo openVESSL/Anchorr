@@ -918,8 +918,13 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         libraryId in notificationLibraries
       ) {
         // Library found in configuration - use its specific channel or default if empty
-        libraryChannelId =
-          notificationLibraries[libraryId] || process.env.JELLYFIN_CHANNEL_ID;
+        // Supports both legacy string format and new object format { channel, isAnime }
+        const libConfig = notificationLibraries[libraryId];
+        if (typeof libConfig === "object" && libConfig !== null) {
+          libraryChannelId = libConfig.channel || process.env.JELLYFIN_CHANNEL_ID;
+        } else {
+          libraryChannelId = libConfig || process.env.JELLYFIN_CHANNEL_ID;
+        }
         logger.info(
           `✅ Using channel: ${libraryChannelId} for configured library: ${libraryId}`
       );

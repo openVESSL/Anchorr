@@ -1388,7 +1388,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             librariesList.innerHTML =
               '<div class="libraries-empty">No libraries found.</div>';
           } else {
-            // Get currently enabled libraries (object format: { libraryId: channelId })
+            // Get currently enabled libraries (object format: { libraryId: { channel, isAnime } })
             let libraryChannels = {};
             try {
               const currentValue = notificationLibrariesInput.value;
@@ -1401,7 +1401,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   const defaultChannel =
                     document.getElementById("JELLYFIN_CHANNEL_ID").value || "";
                   parsed.forEach((libId) => {
-                    libraryChannels[libId] = defaultChannel;
+                    libraryChannels[libId] = { channel: defaultChannel, isAnime: false };
                   });
                 } else if (typeof parsed === "object") {
                   libraryChannels = parsed;
@@ -1423,9 +1423,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                 // 2. This library ID exists as a key in libraryChannels object
                 const isChecked =
                   allEnabled || libraryChannels.hasOwnProperty(lib.id);
+                const libConfig = libraryChannels[lib.id];
                 const selectedChannel = isChecked
-                  ? libraryChannels[lib.id] || defaultChannel
+                  ? (typeof libConfig === "object" && libConfig !== null
+                      ? libConfig.channel
+                      : libConfig) || defaultChannel
                   : "";
+                const isAnime =
+                  typeof libConfig === "object" && libConfig !== null
+                    ? !!libConfig.isAnime
+                    : false;
 
                 return `
               <div class="library-item">
@@ -1436,17 +1443,27 @@ document.addEventListener("DOMContentLoaded", async () => {
                     class="library-checkbox"
                     ${isChecked ? "checked" : ""}
                   />
-                  <div class="library-info">
-                    <span class="library-name">${escapeHtml(lib.name)}</span>
-                  </div>
+                  <span class="library-name">${escapeHtml(lib.name)}</span>
                 </label>
-                <select
-                  class="library-channel-select"
-                  data-library-id="${escapeHtml(lib.id)}"
-                  ${!isChecked ? "disabled" : ""}
-                >
-                  <option value="">Use Default Channel</option>
-                </select>
+                <div class="library-controls">
+                  <select
+                    class="library-channel-select"
+                    data-library-id="${escapeHtml(lib.id)}"
+                    ${!isChecked ? "disabled" : ""}
+                  >
+                    <option value="">Use Default Channel</option>
+                  </select>
+                  <label class="library-anime-label" title="Mark as anime library">
+                    <input
+                      type="checkbox"
+                      class="library-anime-toggle"
+                      data-library-id="${escapeHtml(lib.id)}"
+                      ${isAnime ? "checked" : ""}
+                      ${!isChecked ? "disabled" : ""}
+                    />
+                    <span class="library-anime-text">Anime</span>
+                  </label>
+                </div>
               </div>
             `;
               })
@@ -1520,9 +1537,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                   const select = librariesList.querySelector(
                     `select[data-library-id="${libraryId}"]`
                   );
-                  if (select) {
-                    select.disabled = !e.target.checked;
-                  }
+                  const animeToggle = librariesList.querySelector(
+                    `.library-anime-toggle[data-library-id="${libraryId}"]`
+                  );
+                  if (select) select.disabled = !e.target.checked;
+                  if (animeToggle) animeToggle.disabled = !e.target.checked;
                   updateNotificationLibraries();
                 });
               });
@@ -1532,6 +1551,13 @@ document.addEventListener("DOMContentLoaded", async () => {
               .querySelectorAll(".library-channel-select")
               .forEach((select) => {
                 select.addEventListener("change", updateNotificationLibraries);
+              });
+
+            // Add change listeners to all anime toggles
+            librariesList
+              .querySelectorAll(".library-anime-toggle")
+              .forEach((toggle) => {
+                toggle.addEventListener("change", updateNotificationLibraries);
               });
 
             // Add event listeners for Episodes and Seasons checkboxes
@@ -1598,7 +1624,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       selects.forEach((select) => {
         const libraryId = select.dataset.libraryId;
-        const currentChannel = libraryChannels[libraryId] || "";
+        const libConfig = libraryChannels[libraryId];
+        const currentChannel =
+          typeof libConfig === "object" && libConfig !== null
+            ? libConfig.channel || ""
+            : libConfig || "";
 
         // Clear and populate options
         select.innerHTML =
@@ -1679,12 +1709,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       const select = librariesList.querySelector(
         `select[data-library-id="${libraryId}"]`
       );
+      const animeToggle = librariesList.querySelector(
+        `.library-anime-toggle[data-library-id="${libraryId}"]`
+      );
       const channelId = select ? select.value : "";
-      libraryChannels[libraryId] = channelId; // Empty string means "use default"
+      const isAnime = animeToggle ? animeToggle.checked : false;
+      libraryChannels[libraryId] = { channel: channelId, isAnime };
     });
 
-    const jsonValue = JSON.stringify(libraryChannels);
-    notificationLibrariesInput.value = jsonValue;
+    notificationLibrariesInput.value = JSON.stringify(libraryChannels);
   }
 
   // --- Initial Load ---

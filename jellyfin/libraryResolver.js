@@ -62,16 +62,35 @@ export function getLibraryChannels() {
 
 /**
  * Resolves the target Discord channel for a given configLibraryId.
+ * Supports both legacy string format ({ libraryId: channelId }) and
+ * new object format ({ libraryId: { channel, isAnime } }).
  * Returns null if the library is not in the notification list.
  */
 export function resolveTargetChannel(configLibraryId, libraryChannels) {
   const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID;
-  if (Object.keys(libraryChannels).length > 0 && !libraryChannels[configLibraryId]) {
+  const libConfig = libraryChannels[configLibraryId];
+  if (Object.keys(libraryChannels).length > 0 && libConfig === undefined) {
     logger.info(`❌ Skipping item from library ${configLibraryId} (not in notification list)`);
     logger.info(`   Available libraries: ${Object.keys(libraryChannels).join(", ")}`);
     return null;
   }
-  return libraryChannels[configLibraryId] || defaultChannelId || null;
+  const channelId =
+    typeof libConfig === "object" && libConfig !== null
+      ? libConfig.channel
+      : libConfig;
+  return channelId || defaultChannelId || null;
+}
+
+/**
+ * Returns whether the given library is marked as an anime library.
+ * Only meaningful with the new object format; returns false for legacy configs.
+ */
+export function getLibraryAnimeFlag(configLibraryId, libraryChannels) {
+  const libConfig = libraryChannels[configLibraryId];
+  if (typeof libConfig === "object" && libConfig !== null) {
+    return !!libConfig.isAnime;
+  }
+  return false;
 }
 
 /**
