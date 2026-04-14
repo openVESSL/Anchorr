@@ -624,7 +624,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await fetch("/api/auth/logout", { method: "POST" });
         location.reload();
       } catch (error) {
-        // Logout error handling
+        console.error("Logout request failed:", error);
+        showToast("Logout failed. Please try again.");
       }
     });
   }
@@ -1783,6 +1784,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           `<option value="">${t('errors.loading_servers_check_token')}</option>`;
       }
     } catch (error) {
+      console.error("[Discord] Failed to load guilds:", error);
       guildSelect.innerHTML = `<option value="">${t('errors.loading_servers')}</option>`;
     }
   }
@@ -1934,6 +1936,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     } catch (error) {
+      console.error("[Discord] Failed to load channels for guild:", guildId, error);
       if (channelSelect) {
         channelSelect.innerHTML =
           `<option value="">${t('errors.loading_channels')}</option>`;
@@ -3341,6 +3344,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (error) {
       console.error("Failed to load roles:", error);
+      const allowlistEl = document.getElementById("allowlist-roles");
+      const blocklistEl = document.getElementById("blocklist-roles");
+      if (allowlistEl) allowlistEl.innerHTML = `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
+      if (blocklistEl) blocklistEl.innerHTML = `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
     }
   }
 
@@ -3555,6 +3562,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     } catch (error) {
+      console.warn("[Status] Seerr connection check failed:", error);
       seerrIndicator.className = "status-dot status-disconnected";
     }
 
@@ -3582,6 +3590,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     } catch (error) {
+      console.warn("[Status] Jellyfin connection check failed:", error);
       jellyfinIndicator.className = "status-dot status-disconnected";
     }
   }

@@ -270,7 +270,7 @@ async function processAndSendNotification(
         apiCache.set(cacheKey, { data: details, timestamp: now });
         logger.debug(`Cached TMDB data for ${tmdbId}`);
       } catch (e) {
-        logger.warn(`Could not fetch TMDB details for ${tmdbId}`);
+        logger.warn(`Could not fetch TMDB details for ${tmdbId}: ${e?.message || e}`);
       }
     }
   }
