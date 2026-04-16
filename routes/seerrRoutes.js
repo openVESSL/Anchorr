@@ -20,6 +20,18 @@ function isAllowedUrl(url) {
   }
 }
 
+// Returns true only if the submitted URL resolves to the same host:port as the
+// configured URL. Used to prevent credential exfiltration: the real stored API
+// key must never be forwarded to a host the user controls.
+function isSameConfiguredHost(submittedUrl, configuredUrl) {
+  if (!configuredUrl) return false;
+  try {
+    return new URL(submittedUrl).host.toLowerCase() === new URL(configuredUrl).host.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 router.get("/seerr-users", authenticateToken, async (req, res) => {
   try {
     logger.debug("[SEERR USERS API] Request received");
@@ -99,7 +111,11 @@ router.get("/seerr-users", authenticateToken, async (req, res) => {
 
 router.post("/test-seerr", authenticateToken, async (req, res) => {
   const { url, apiKey } = req.body;
-  const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
+  const isMasked = isMaskedValue(apiKey);
+  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
+    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
+  }
+  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
   }
@@ -128,7 +144,11 @@ router.post("/test-seerr", authenticateToken, async (req, res) => {
 
 router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
   const { url, apiKey } = req.body;
-  const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
+  const isMasked = isMaskedValue(apiKey);
+  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
+    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
+  }
+  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
   }
@@ -149,7 +169,11 @@ router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
 
 router.post("/seerr/servers", authenticateToken, async (req, res) => {
   const { url, apiKey } = req.body;
-  const effectiveApiKey = isMaskedValue(apiKey) ? process.env.SEERR_API_KEY : apiKey;
+  const isMasked = isMaskedValue(apiKey);
+  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
+    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
+  }
+  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
   }
