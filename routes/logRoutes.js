@@ -65,7 +65,7 @@ router.get("/logs/error", authenticateToken, (req, res) => {
       errorLogPath = path.join(logsDir, errorFiles[0]);
     }
   } catch (e) {
-    // Fallback to default path
+    logger.warn(`Failed to enumerate log directory for error logs: ${e.message} — using default path`);
   }
 
   const { entries, truncated } = parseLogFile(errorLogPath);
@@ -92,7 +92,7 @@ router.get("/logs/all", authenticateToken, (req, res) => {
       combinedLogPath = path.join(logsDir, combinedFiles[0]);
     }
   } catch (e) {
-    // Fallback to default path
+    logger.warn(`Failed to enumerate log directory for combined logs: ${e.message} — using default path`);
   }
 
   const { entries, truncated } = parseLogFile(combinedLogPath);

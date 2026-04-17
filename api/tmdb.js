@@ -180,7 +180,7 @@ export async function tmdbGetRandomMedia(apiKey) {
         results = await getDiscoverNicheMedia(apiKey);
       }
     } catch (err) {
-      // Strategy failed, fallback below
+      logger.warn(`TMDB strategy "${strategy}" failed: ${err.message}`);
     }
 
     if (results.length === 0) {
@@ -218,6 +218,7 @@ export async function tmdbGetRandomMedia(apiKey) {
         details,
       };
     } catch (err) {
+      logger.warn(`Failed to fetch TMDB details for item ${randomItem?.id}: ${err.message}`);
       return randomItem;
     }
   } catch (error) {
@@ -235,6 +236,7 @@ async function getTrendingMedia(apiKey) {
     }
     return trendingResults;
   } catch (error) {
+    logger.warn(`getTrendingMedia failed: ${error.message}`);
     return [];
   }
 }

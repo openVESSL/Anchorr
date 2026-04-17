@@ -57,7 +57,7 @@ const getNewConfigPath = () => {
       // /config is writable, use it
       return "/config/config.json";
     } catch (e) {
-      // /config exists but not writable, continue to next option
+      logger.warn(`/config exists but is not writable (${e.code || e.message}) — falling back to internal config path`);
     }
   }
 
@@ -318,7 +318,13 @@ export function loadConfigToEnv() {
     jellyseerrDisplayName: "seerrDisplayName",
   };
   const rawMappings = config.USER_MAPPINGS;
-  const mappings = typeof rawMappings === "string" ? JSON.parse(rawMappings) : rawMappings;
+  let mappings;
+  try {
+    mappings = typeof rawMappings === "string" ? JSON.parse(rawMappings) : rawMappings;
+  } catch (err) {
+    logger.error(`Failed to parse USER_MAPPINGS in config — skipping migration: ${err.message}`);
+    mappings = null;
+  }
   if (mappings && typeof mappings === "object") {
     let mappingsMigrated = false;
     for (const mapping of Object.values(mappings)) {

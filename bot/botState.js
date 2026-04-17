@@ -48,6 +48,13 @@ export function loadPendingRequests() {
     }
     logger.info(`✅ Loaded ${pendingRequests.size} pending request(s) from disk`);
   } catch (err) {
-    logger.warn(`⚠️ Failed to load pending requests from disk: ${err.message}`);
+    logger.error(`Failed to load pending requests from disk: ${err.message}`);
+    try {
+      const corruptPath = PENDING_REQUESTS_PATH.replace(".json", `.corrupt.${Date.now()}.json`);
+      fs.renameSync(PENDING_REQUESTS_PATH, corruptPath);
+      logger.warn(`Corrupted pending requests file moved to ${path.basename(corruptPath)} — starting with empty state`);
+    } catch (_) {
+      // Cannot rename; original file stays in place
+    }
   }
 }
