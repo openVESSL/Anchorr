@@ -345,7 +345,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       updateWebhookUrl();
     } catch (error) {
       console.error("[Anchorr] fetchConfig failed:", error);
-      showToast("Error fetching configuration.");
+      showToast(t('errors.fetch_config'));
     }
   }
 
@@ -708,7 +708,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (error) {
       console.error("Autostart check failed, proceeding with save:", error);
-      showToast("Warning: Could not check bot autostart state. Saving anyway.");
+      showToast(t('errors.autostart_check'));
       await saveConfig(config);
     }
   });
@@ -938,12 +938,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("copy-webhook-secret-btn").addEventListener("click", () => {
     const textToCopy = document.getElementById("WEBHOOK_SECRET")?.value || "";
     if (!textToCopy) {
-      showToast("No webhook secret configured.");
+      showToast(t('errors.no_webhook_secret'));
       return;
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(textToCopy)
-        .then(() => showToast("Webhook secret copied to clipboard!"))
+        .then(() => showToast(t('success.webhook_secret_copied')))
         .catch(() => fallbackCopyTextToClipboard(textToCopy));
     } else {
       fallbackCopyTextToClipboard(textToCopy);
@@ -959,7 +959,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       navigator.clipboard
         .writeText(textToCopy)
         .then(() => {
-          showToast("Webhook URL copied to clipboard!");
+          showToast(t('success.webhook_url_copied'));
         })
         .catch(() => {
           // Fallback if clipboard API fails
@@ -992,12 +992,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const successful = document.execCommand("copy");
       if (successful) {
-        showToast("Webhook URL copied to clipboard!");
+        showToast(t('success.webhook_url_copied'));
       } else {
-        showToast("Failed to copy URL. Please copy manually.");
+        showToast(t('errors.copy_url_failed'));
       }
     } catch (err) {
-      showToast("Failed to copy URL. Please copy manually.");
+      showToast(t('errors.copy_url_failed'));
     }
 
     document.body.removeChild(textArea);
@@ -1367,12 +1367,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const apiKey = document.getElementById("JELLYFIN_API_KEY").value;
 
       if (!url || !url.trim()) {
-        showToast("Please enter Jellyfin URL first.");
+        showToast(t('errors.jellyfin_url_required'));
         return;
       }
 
       if (!apiKey || !apiKey.trim()) {
-        showToast("Please enter Jellyfin API Key first.");
+        showToast(t('errors.jellyfin_api_key_required'));
         return;
       }
 
@@ -2433,7 +2433,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       displayMappings();
     } catch (error) {
       console.error("[MAPPINGS] Failed to reload mappings:", error);
-      showToast("Mappings updated, but failed to refresh the list. Please reload the page.");
+      showToast(t('errors.mapping_refresh_failed'));
     }
   }
 
@@ -2569,13 +2569,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       const result = await response.json();
 
       if (result.success) {
-        showToast("Mapping removed successfully!");
+        showToast(t('user_mapping.mapping_removed'));
         await loadMappings();
       } else {
         showToast(`Error: ${result.message}`);
       }
     } catch (error) {
-      showToast("Failed to remove mapping.");
+      showToast(t('errors.remove_mapping_failed'));
     }
   };
 
@@ -2591,7 +2591,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const seerrUserId = seerrSelect.dataset.value;
 
       if (!discordUserId || !seerrUserId) {
-        showToast("Please select both a Discord user and a Seerr user.");
+        showToast(t('user_mapping.select_users'));
         return;
       }
 
@@ -2615,7 +2615,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
           }
         } catch (_err) {
-          showToast("Failed to look up Discord user.");
+          showToast(t('errors.discord_user_lookup_failed'));
           return;
         }
       }
@@ -2642,7 +2642,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const result = await response.json();
 
         if (result.success) {
-          showToast("Mapping added successfully!");
+          showToast(t('user_mapping.mapping_added'));
 
           // Reset Discord custom select
           delete discordSelect.dataset.value;
@@ -2747,7 +2747,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         modal.style.display = "flex";
       } catch (err) {
         console.error("[AUTO-MAP] Preview fetch error:", err);
-        showToast("Failed to fetch auto-map preview.");
+        showToast(t('errors.automap_preview_failed'));
       } finally {
         autoMapSeerrBtn.disabled = false;
         autoMapSeerrBtn.innerHTML = originalHtml;
@@ -2784,7 +2784,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const selected = checked.map((cb) => candidates[parseInt(cb.dataset.index, 10)]).filter(Boolean);
 
       if (selected.length === 0) {
-        showToast("No mappings selected.");
+        showToast(t('user_mapping.no_mappings_selected'));
         return;
       }
 
@@ -2813,7 +2813,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       } catch (err) {
         console.error("[AUTO-MAP] Save error:", err);
-        showToast("Failed to save mappings.");
+        showToast(t('errors.save_mappings_failed'));
       } finally {
         autoMapSaveBtn.disabled = false;
         autoMapSaveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Save Mappings';
@@ -2947,7 +2947,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         syncSeerrModal.style.display = "flex";
       } catch (err) {
         console.error("[SYNC] Preview fetch error:", err);
-        showToast("Failed to fetch sync preview.");
+        showToast(t('errors.sync_preview_failed'));
       } finally {
         syncSeerrBtn.disabled = false;
         syncSeerrBtn.innerHTML = originalHtml;
@@ -2962,7 +2962,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const selected = checked.map((cb) => stale[parseInt(cb.dataset.index, 10)]).filter(Boolean);
 
       if (selected.length === 0) {
-        showToast("No mappings selected.");
+        showToast(t('user_mapping.no_mappings_selected'));
         return;
       }
 
@@ -2996,7 +2996,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       } catch (err) {
         console.error("[SYNC] Remove error:", err);
-        showToast("Failed to remove mappings.");
+        showToast(t('errors.remove_mappings_failed'));
       } finally {
         syncSeerrRemoveBtn.disabled = false;
         syncSeerrRemoveBtn.innerHTML = '<i class="bi bi-trash"></i> Remove Selected';
@@ -3077,7 +3077,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       } catch (error) {
         console.error("Refresh users error:", error);
-        showToast("Failed to refresh users. Check connections.");
+        showToast(t('errors.refresh_users_failed'));
       } finally {
         refreshAllUsersBtn.disabled = false;
         refreshAllUsersBtn.innerHTML = originalHtml;
@@ -3663,7 +3663,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }, 1000);
       }
     } catch (error) {
-      showToast(`Failed to control bot.`);
+      showToast(t('errors.bot_control_failed'));
       botControlBtnLogs.disabled = false;
     }
   });

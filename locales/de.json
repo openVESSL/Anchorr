@@ -366,7 +366,33 @@
     "loading_logs": "Fehler beim Laden der Logs",
     "bot_must_be_running": "Bot muss laufen, um Rollen zu laden",
     "no_roles_available": "Keine Rollen verfügbar",
-    "logout_failed": "Abmeldung fehlgeschlagen. Bitte erneut versuchen."
+    "logout_failed": "Abmeldung fehlgeschlagen. Bitte erneut versuchen.",
+    "language_load_failed": "UI-Sprache konnte nicht geladen werden. Einige Beschriftungen fehlen möglicherweise.",
+    "fetch_config": "Fehler beim Abrufen der Konfiguration.",
+    "autostart_check": "Warnung: Bot-Autostart konnte nicht geprüft werden. Wird trotzdem gespeichert.",
+    "no_webhook_secret": "Kein Webhook-Secret konfiguriert.",
+    "copy_url_failed": "URL kopieren fehlgeschlagen. Bitte manuell kopieren.",
+    "jellyfin_url_required": "Bitte zuerst Jellyfin-URL eingeben.",
+    "jellyfin_api_key_required": "Bitte zuerst Jellyfin-API-Key eingeben.",
+    "mapping_refresh_failed": "Zuordnungen gespeichert, aber Aktualisierung fehlgeschlagen. Bitte Seite neu laden.",
+    "discord_user_lookup_failed": "Discord-Nutzer konnte nicht gefunden werden.",
+    "automap_preview_failed": "Auto-Map-Vorschau konnte nicht abgerufen werden.",
+    "sync_preview_failed": "Sync-Vorschau konnte nicht abgerufen werden.",
+    "refresh_users_failed": "Nutzer konnten nicht aktualisiert werden. Verbindungen prüfen.",
+    "bot_control_failed": "Bot-Steuerung fehlgeschlagen.",
+    "remove_mapping_failed": "Zuordnung konnte nicht entfernt werden.",
+    "save_mappings_failed": "Zuordnungen konnten nicht gespeichert werden.",
+    "remove_mappings_failed": "Zuordnungen konnten nicht entfernt werden."
+  },
+  "success": {
+    "webhook_secret_copied": "Webhook-Secret in Zwischenablage kopiert!",
+    "webhook_url_copied": "Webhook-URL in Zwischenablage kopiert!"
+  },
+  "user_mapping": {
+    "mapping_removed": "Zuordnung erfolgreich entfernt!",
+    "mapping_added": "Zuordnung erfolgreich hinzugefügt!",
+    "no_mappings_selected": "Keine Zuordnungen ausgewählt.",
+    "select_users": "Bitte sowohl Discord- als auch Seerr-Nutzer auswählen."
   },
   "modals": {
     "start_bot_yes": "Ja, Bot starten",

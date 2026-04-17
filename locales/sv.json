@@ -294,7 +294,33 @@
     "loading_logs": "Fel vid laddning av loggar",
     "bot_must_be_running": "Boten måste köras för att ladda roller",
     "no_roles_available": "Inga roller tillgängliga",
-    "logout_failed": "Utloggning misslyckades. Försök igen."
+    "logout_failed": "Utloggning misslyckades. Försök igen.",
+    "language_load_failed": "UI-språk kunde inte laddas. Vissa etiketter kan saknas.",
+    "fetch_config": "Fel vid hämtning av konfigurationen.",
+    "autostart_check": "Varning: Kunde inte kontrollera bot-autostart. Sparar ändå.",
+    "no_webhook_secret": "Ingen webhook-hemlighet konfigurerad.",
+    "copy_url_failed": "Misslyckades att kopiera URL. Kopiera manuellt.",
+    "jellyfin_url_required": "Ange Jellyfin-URL först.",
+    "jellyfin_api_key_required": "Ange Jellyfin API-nyckel först.",
+    "mapping_refresh_failed": "Mappningar sparade, men misslyckades med att uppdatera listan. Ladda om sidan.",
+    "discord_user_lookup_failed": "Misslyckades att hitta Discord-användaren.",
+    "automap_preview_failed": "Misslyckades att hämta auto-map förhandsvisning.",
+    "sync_preview_failed": "Misslyckades att hämta synkförhandsvisning.",
+    "refresh_users_failed": "Misslyckades att uppdatera användare. Kontrollera anslutningarna.",
+    "bot_control_failed": "Misslyckades att styra boten.",
+    "remove_mapping_failed": "Misslyckades att ta bort mappning.",
+    "save_mappings_failed": "Misslyckades att spara mappningar.",
+    "remove_mappings_failed": "Misslyckades att ta bort mappningar."
+  },
+  "success": {
+    "webhook_secret_copied": "Webhook-hemlighet kopierad till urklipp!",
+    "webhook_url_copied": "Webhook-URL kopierad till urklipp!"
+  },
+  "user_mapping": {
+    "mapping_removed": "Mappning borttagen!",
+    "mapping_added": "Mappning tillagd!",
+    "no_mappings_selected": "Inga mappningar valda.",
+    "select_users": "Välj en Discord-användare och en Seerr-användare."
   },
   "modals": {
     "start_bot_yes": "Ja, starta bot",
