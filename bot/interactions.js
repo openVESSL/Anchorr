@@ -36,7 +36,12 @@ async function handleSearchOrRequest(
   try {
     await interaction.deferReply({ ephemeral: isPrivateMode });
   } catch (err) {
-    logger.error(`Failed to defer reply: ${err.message}`);
+    logger.error(`Failed to defer reply for "${interaction.commandName}": ${err.message}`);
+    try {
+      await interaction.reply({ content: "⚠️ Something went wrong. Please try again.", ephemeral: true });
+    } catch (_) {
+      // Interaction token already invalid
+    }
     return;
   }
 

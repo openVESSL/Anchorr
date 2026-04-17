@@ -152,12 +152,12 @@ export function checkRolePermission(member) {
   try {
     allowlist = process.env.ROLE_ALLOWLIST ? JSON.parse(process.env.ROLE_ALLOWLIST) : [];
   } catch (e) {
-    logger.warn("Invalid JSON in ROLE_ALLOWLIST, defaulting to empty list");
+    logger.error(`Invalid JSON in ROLE_ALLOWLIST — allowlist disabled, all users permitted: ${e.message}`);
   }
   try {
     blocklist = process.env.ROLE_BLOCKLIST ? JSON.parse(process.env.ROLE_BLOCKLIST) : [];
   } catch (e) {
-    logger.warn("Invalid JSON in ROLE_BLOCKLIST, defaulting to empty list");
+    logger.error(`Invalid JSON in ROLE_BLOCKLIST — blocklist disabled, no users blocked: ${e.message}`);
   }
 
   const userRoles = member.roles.cache.map((r) => r.id);
