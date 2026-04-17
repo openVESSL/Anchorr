@@ -294,7 +294,33 @@
     "loading_logs": "Error loading logs",
     "bot_must_be_running": "Bot must be running to load roles",
     "no_roles_available": "No roles available",
-    "logout_failed": "Logout failed. Please try again."
+    "logout_failed": "Logout failed. Please try again.",
+    "language_load_failed": "UI language could not be loaded. Some labels may be missing.",
+    "fetch_config": "Error fetching configuration.",
+    "autostart_check": "Warning: Could not check bot autostart state. Saving anyway.",
+    "no_webhook_secret": "No webhook secret configured.",
+    "copy_url_failed": "Failed to copy URL. Please copy manually.",
+    "jellyfin_url_required": "Please enter Jellyfin URL first.",
+    "jellyfin_api_key_required": "Please enter Jellyfin API Key first.",
+    "mapping_refresh_failed": "Mappings updated, but failed to refresh the list. Please reload the page.",
+    "discord_user_lookup_failed": "Failed to look up Discord user.",
+    "automap_preview_failed": "Failed to fetch auto-map preview.",
+    "sync_preview_failed": "Failed to fetch sync preview.",
+    "refresh_users_failed": "Failed to refresh users. Check connections.",
+    "bot_control_failed": "Failed to control bot.",
+    "remove_mapping_failed": "Failed to remove mapping.",
+    "save_mappings_failed": "Failed to save mappings.",
+    "remove_mappings_failed": "Failed to remove mappings."
+  },
+  "success": {
+    "webhook_secret_copied": "Webhook secret copied to clipboard!",
+    "webhook_url_copied": "Webhook URL copied to clipboard!"
+  },
+  "user_mapping": {
+    "mapping_removed": "Mapping removed successfully!",
+    "mapping_added": "Mapping added successfully!",
+    "no_mappings_selected": "No mappings selected.",
+    "select_users": "Please select both a Discord user and a Seerr user."
   },
   "modals": {
     "start_bot_yes": "Yes, Start Bot",
