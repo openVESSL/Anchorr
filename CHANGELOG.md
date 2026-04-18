@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.1] - 2026-04-16
+
+### 🔒 Security
+
+- **Fix credential exfiltration via SSRF in config-test endpoints** (GHSA-ph98-5xm3-37w3): The `POST /test-seerr`, `/seerr/quality-profiles`, `/seerr/servers`, and `POST /jellyfin-libraries` endpoints would forward the real stored API key to any URL supplied by an authenticated user. The real key is now only substituted when the submitted URL's host matches the currently configured server host — if they differ, the request is rejected with 403. Thanks to [@whoopsi-daisy](https://github.com/whoopsi-daisy) for the responsible disclosure.
+
+---
+
 ## [1.5.0] - 2026-04-14
 
 ### ✨ Added

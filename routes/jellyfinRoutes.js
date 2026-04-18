@@ -17,12 +17,27 @@ function isAllowedUrl(url) {
   }
 }
 
+// Returns true only if the submitted URL resolves to the same host:port as the
+// configured URL. Used to prevent credential exfiltration: the real stored API
+// key must never be forwarded to a host the user controls.
+function isSameConfiguredHost(submittedUrl, configuredUrl) {
+  if (!configuredUrl) return false;
+  try {
+    return new URL(submittedUrl).host.toLowerCase() === new URL(configuredUrl).host.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 // Fetch Jellyfin libraries given a URL + API key (used by config UI before saving)
 router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
   try {
     const { url } = req.body;
     let { apiKey } = req.body;
     if (isMaskedValue(apiKey)) {
+      if (!isSameConfiguredHost(url, process.env.JELLYFIN_BASE_URL)) {
+        return res.status(403).json({ success: false, message: "URL does not match the configured Jellyfin server." });
+      }
       apiKey = process.env.JELLYFIN_API_KEY;
     }
 
