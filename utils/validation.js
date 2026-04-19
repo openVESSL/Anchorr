@@ -21,7 +21,16 @@ export const configSchema = Joi.object({
   JELLYFIN_CHANNEL_ID: Joi.string().allow("").optional(),
   JELLYFIN_NOTIFICATION_LIBRARIES: Joi.alternatives(
     Joi.array().items(Joi.string()), // Legacy array format
-    Joi.object().pattern(Joi.string(), Joi.string().allow("")) // New object format: { libraryId: channelId }, allow empty channel IDs
+    Joi.object().pattern(
+      Joi.string(),
+      Joi.alternatives(
+        Joi.string().allow(""), // Legacy: { libraryId: channelId }
+        Joi.object({
+          channel: Joi.string().allow("").optional(),
+          isAnime: Joi.boolean().optional(),
+        }) // Current: { libraryId: { channel, isAnime } }
+      )
+    )
   ).optional(),
   JELLYFIN_NOTIFY_MOVIES: Joi.string().valid("true", "false").optional(),
   JELLYFIN_NOTIFY_SERIES: Joi.string().valid("true", "false").optional(),

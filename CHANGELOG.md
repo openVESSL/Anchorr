@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Fixed
 
+- **Dashboard save broken for library notification mapping**: Saving the Jellyfin library-to-channel mapping failed with `does not match any of the allowed types` after the per-library anime toggle was added. The Joi validator only accepted the legacy `{ libraryId: channelId }` shape and rejected the current `{ libraryId: { channel, isAnime } }` shape, so the mapping never persisted and per-library notifications fell back to the default channel
 - **Config startup crash**: A corrupted or malformed `USER_MAPPINGS` value in `config.json` no longer crashes the app on startup — the migration step is now skipped with a clear error log instead
 - **Config volume detection**: When `/config` exists but is not writable, a warning is now logged showing the exact reason (`EACCES`, `EROFS`, etc.) so Docker users understand why the fallback path is used
 - **Bot start failure HTTP status**: The `/api/config` endpoint now returns HTTP 500 (instead of 200) when the bot fails to auto-start after config save, allowing the dashboard to correctly surface the error
