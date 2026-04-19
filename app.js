@@ -698,7 +698,7 @@ function configureWebServer() {
             });
           } catch (error) {
             logger.error("Auto-start failed:", error.message);
-            res.status(200).json({
+            res.status(500).json({
               message: `Configuration saved, but bot failed to start: ${error.message}. Check credentials and try starting manually.`,
             });
           }

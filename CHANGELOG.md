@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.2] - 2026-04-17
+
+### 🐛 Fixed
+
+- **Dashboard save broken for library notification mapping**: Saving the Jellyfin library-to-channel mapping failed with `does not match any of the allowed types` after the per-library anime toggle was added. The Joi validator only accepted the legacy `{ libraryId: channelId }` shape and rejected the current `{ libraryId: { channel, isAnime } }` shape, so the mapping never persisted and per-library notifications fell back to the default channel
+- **Config startup crash**: A corrupted or malformed `USER_MAPPINGS` value in `config.json` no longer crashes the app on startup — the migration step is now skipped with a clear error log instead
+- **Config volume detection**: When `/config` exists but is not writable, a warning is now logged showing the exact reason (`EACCES`, `EROFS`, etc.) so Docker users understand why the fallback path is used
+- **Bot start failure HTTP status**: The `/api/config` endpoint now returns HTTP 500 (instead of 200) when the bot fails to auto-start after config save, allowing the dashboard to correctly surface the error
+- **ROLE_ALLOWLIST / ROLE_BLOCKLIST parse failure**: A malformed role list in config now logs at `error` level (previously `warn`) with an explicit note that enforcement is disabled — avoids silently granting access to all users
+- **Discord command registration failure**: When global command registration fails and no `GUILD_ID` is set, the error is now logged at `error` level with the failure reason, making it clear that slash commands may not appear
+- **Pending requests corruption**: If the pending-requests state file on disk is unreadable, the corrupted file is renamed to a timestamped backup before starting fresh — prevents repeated parse failures on restart
+- **TMDB strategy failures**: Failed random-pick strategies, detail enrichment, and trending fetch now log at `warn` level instead of failing silently — operators can see when TMDB is returning errors (rate limit, bad key, etc.)
+- **Log route fallback**: When the log directory cannot be enumerated (e.g. permission issue), the fallback to the default log path is now logged as a warning instead of silently applied
+- **deferReply failure feedback**: When deferring a Discord interaction fails, the bot now attempts a direct ephemeral reply so the user sees an error message instead of Discord's generic "interaction failed" screen
+
+### 🌍 Internationalization
+
+- **Dashboard toast messages translated**: All previously hardcoded English status and error messages in the web dashboard are now routed through the i18n system. Affected messages include copy confirmations, mapping add/remove feedback, connection validation warnings, user lookup failures, auto-map/sync previews, bot control errors, and more — 22 strings in total
+- **New locale keys** added to all supported languages (en, de, sv) and the translation template: `errors.fetch_config`, `errors.autostart_check`, `errors.no_webhook_secret`, `errors.copy_url_failed`, `errors.jellyfin_url_required`, `errors.jellyfin_api_key_required`, `errors.mapping_refresh_failed`, `errors.discord_user_lookup_failed`, `errors.automap_preview_failed`, `errors.sync_preview_failed`, `errors.refresh_users_failed`, `errors.bot_control_failed`, `errors.remove_mapping_failed`, `errors.save_mappings_failed`, `errors.remove_mappings_failed`, `errors.language_load_failed`, `success.webhook_secret_copied`, `success.webhook_url_copied`, `user_mapping.mapping_removed`, `user_mapping.mapping_added`, `user_mapping.no_mappings_selected`, `user_mapping.select_users`
+
+---
+
 ## [1.5.1] - 2026-04-16
 
 ### 🔒 Security

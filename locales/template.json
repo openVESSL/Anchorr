@@ -294,7 +294,33 @@
     "loading_logs": "",
     "bot_must_be_running": "",
     "no_roles_available": "",
-    "logout_failed": ""
+    "logout_failed": "",
+    "language_load_failed": "",
+    "fetch_config": "",
+    "autostart_check": "",
+    "no_webhook_secret": "",
+    "copy_url_failed": "",
+    "jellyfin_url_required": "",
+    "jellyfin_api_key_required": "",
+    "mapping_refresh_failed": "",
+    "discord_user_lookup_failed": "",
+    "automap_preview_failed": "",
+    "sync_preview_failed": "",
+    "refresh_users_failed": "",
+    "bot_control_failed": "",
+    "remove_mapping_failed": "",
+    "save_mappings_failed": "",
+    "remove_mappings_failed": ""
+  },
+  "success": {
+    "webhook_secret_copied": "",
+    "webhook_url_copied": ""
+  },
+  "user_mapping": {
+    "mapping_removed": "",
+    "mapping_added": "",
+    "no_mappings_selected": "",
+    "select_users": ""
   },
   "modals": {
     "start_bot_yes": "",

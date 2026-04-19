@@ -91,16 +91,13 @@ export async function registerCommands(rest, botId, guildId, logger) {
     } catch (globalErr) {
       // Only attempt guild-specific fallback if guildId is provided
       if (!guildId) {
-        logger.warn(
-          `⚠️ Global command registration failed. GUILD_ID is not configured in config.json.`
+        logger.error(
+          `Global command registration failed: ${globalErr.message} — slash commands may not appear in Discord.`
         );
         logger.warn(
-          `Commands will be available globally once Discord syncs them (can take up to 1 hour).`
+          `To fix: add your server ID as GUILD_ID in config.json for immediate guild-specific registration.`
         );
-        logger.warn(
-          `To enable faster command registration for this server, add your server ID as GUILD_ID in config.json`
-        );
-        return; // Allow bot to continue, commands will work eventually
+        return;
       }
 
       logger.warn(
