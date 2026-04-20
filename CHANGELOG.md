@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.3] - 2026-04-20
+
+### 🐛 Fixed
+
+- **Missing backdrop image on single-episode Discord notifications**: When Jellyfin sent an episode webhook, the TMDB lookup used the episode's own TMDB ID (not the series'), which typically returned no data. The fallback then tried to load a backdrop from the episode item in Jellyfin — but episodes don't carry their own backdrop image, only the parent series does. The notification was rendered with a blank image. Episode notifications now fall back to the parent series' backdrop (`Items/{SeriesId}/Images/Backdrop`) when TMDB data isn't available, matching the visual consistency of movie and series notifications.
+
+---
+
 ## [1.5.2] - 2026-04-17
 
 ### 🐛 Fixed
