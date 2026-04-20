@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.3] - 2026-04-20
 
+### 🔒 Security
+
+- **Pin `follow-redirects` to `^1.16.0`** (GHSA-r4q5-vmmm-2653): Versions `<= 1.15.11` only strip `authorization`, `proxy-authorization`, and `cookie` headers on cross-domain redirects, so custom auth headers (`X-Api-Key` for Jellyseerr, `X-MediaBrowser-Token` for Jellyfin) would have leaked to the redirect target. Exploitability in Anchorr is low — the affected hosts are user-configured self-hosted services — but the patched version strips custom auth headers on cross-domain redirect by default. Pinned via `overrides` in `package.json` since `follow-redirects` is a transitive dependency of `axios`.
+
 ### 🐛 Fixed
 
 - **Missing backdrop image on single-episode Discord notifications**: When Jellyfin sent an episode webhook, the TMDB lookup used the episode's own TMDB ID (not the series'), which typically returned no data. The fallback then tried to load a backdrop from the episode item in Jellyfin — but episodes don't carry their own backdrop image, only the parent series does. The notification was rendered with a blank image. Episode notifications now fall back to the parent series' backdrop (`Items/{SeriesId}/Images/Backdrop`) when TMDB data isn't available, matching the visual consistency of movie and series notifications.
