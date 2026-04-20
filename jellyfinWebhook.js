@@ -527,6 +527,11 @@ async function processAndSendNotification(
 
   const backdropPath = details ? findBestBackdrop(details) : null;
   // Episodes don't have their own backdrop in Jellyfin — fall back to the series.
+  if (ItemType === "Episode" && !SeriesId) {
+    logger.warn(
+      `Episode webhook missing SeriesId; backdrop fallback will use ItemId and likely 404. ItemId=${ItemId}, Name=${Name}`
+    );
+  }
   const fallbackBackdropItemId =
     ItemType === "Episode" && SeriesId ? SeriesId : ItemId;
   const backdrop = backdropPath
