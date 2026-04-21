@@ -7,6 +7,10 @@ on:
       - dev
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - main
+      - dev
   workflow_dispatch:
 
 jobs:
@@ -32,6 +36,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: audit
+    if: github.event_name != 'pull_request'
 
     permissions:
       contents: read
