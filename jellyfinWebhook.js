@@ -11,6 +11,7 @@ import logger from "./utils/logger.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import { findBestBackdrop } from "./api/tmdb.js";
 import { isValidUrl } from "./utils/url.js";
+import { buildJellyfinUrl } from "./utils/jellyfinUrl.js";
 import {
   getLibraryChannels,
   resolveTargetChannel,
@@ -97,36 +98,6 @@ function getItemLevel(itemType) {
   }
 }
 
-// Build a Jellyfin URL that preserves a potential subpath (e.g., /jellyfin)
-// and appends the provided path and optional hash fragment safely.
-// Always uses the configured JELLYFIN_BASE_URL — the webhook-provided ServerUrl
-// is not trusted as it could be poisoned via Jellyfin metadata.
-function buildJellyfinUrl(_baseUrl, appendPath, hash) {
-  const effectiveBaseUrl = process.env.JELLYFIN_BASE_URL;
-
-  try {
-    const u = new URL(effectiveBaseUrl);
-    let p = u.pathname || "/";
-    if (!p.endsWith("/")) p += "/";
-    const pathClean = String(appendPath || "").replace(/^\/+/, "");
-    u.pathname = p + pathClean;
-    if (hash != null) {
-      const h = String(hash);
-      u.hash = h.startsWith("#") ? h.slice(1) : h;
-    }
-    return u.toString();
-  } catch (_e) {
-    logger.warn(`buildJellyfinUrl: Invalid JELLYFIN_BASE_URL "${effectiveBaseUrl}": ${_e?.message}. Falling back to string concatenation.`);
-    const baseNoSlash = String(effectiveBaseUrl || "").replace(/\/+$/, "");
-    const pathNoLead = String(appendPath || "").replace(/^\/+/, "");
-    const h = hash
-      ? String(hash).startsWith("#")
-        ? String(hash)
-        : `#${hash}`
-      : "";
-    return `${baseNoSlash}/${pathNoLead}${h}`;
-  }
-}
 
 /**
  * Clean title by removing Jellyfin/TMDB metadata like [tvdbid-123], [imdbid-123], (?), etc.
@@ -425,7 +396,6 @@ async function processAndSendNotification(
 
   // Only set URL if ServerUrl is valid
   const jellyfinUrl = buildJellyfinUrl(
-    ServerUrl,
     "web/index.html",
     `!/details?id=${ItemId}&serverId=${ServerId}`
   );
@@ -536,7 +506,7 @@ async function processAndSendNotification(
     ItemType === "Episode" && SeriesId ? SeriesId : ItemId;
   const backdrop = backdropPath
     ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
-    : buildJellyfinUrl(ServerUrl, `Items/${fallbackBackdropItemId}/Images/Backdrop`);
+    : buildJellyfinUrl(`Items/${fallbackBackdropItemId}/Images/Backdrop`);
   
   if (showBackdrop && isValidUrl(backdrop)) {
     embed.setImage(backdrop);
@@ -578,7 +548,6 @@ async function processAndSendNotification(
 
   if (showButtonWatch) {
     const watchUrl = buildJellyfinUrl(
-      ServerUrl,
       "web/index.html",
       `!/details?id=${ItemId}&serverId=${ServerId}`
     );
@@ -729,7 +698,6 @@ async function processAndSendNotification(
           .setTitle(embedTitle);
 
         const dmJellyfinUrl = buildJellyfinUrl(
-          ServerUrl,
           "web/index.html",
           `!/details?id=${ItemId}&serverId=${ServerId}`
         );
