@@ -36,6 +36,10 @@ export function buildJellyfinUrl(appendPath, hash) {
         ? String(hash)
         : `#${hash}`
       : "";
-    return `${baseNoSlash}/${pathNoLead}${h}`;
+    // Guarantee a syntactically valid URL so downstream consumers (e.g.
+    // ButtonBuilder.setURL) fail loudly on a clear sentinel instead of an
+    // opaque "invalid URL" error that hides the misconfig.
+    const scheme = /^https?:\/\//i.test(baseNoSlash) ? "" : "http://invalid.local/";
+    return `${scheme}${baseNoSlash}/${pathNoLead}${h}`;
   }
 }

@@ -430,7 +430,18 @@ async function buildRoundupEmbed(grouped, rawItems) {
 async function resolveLibraryNames(libraryIds) {
   const apiKey = process.env.JELLYFIN_API_KEY;
   const baseUrl = process.env.JELLYFIN_BASE_URL;
-  const libs = await jellyfinApi.fetchLibraries(apiKey, baseUrl);
+  let libs;
+  try {
+    libs = await jellyfinApi.fetchLibraries(apiKey, baseUrl);
+  } catch (err) {
+    // Item data already came back fine; don't nuke the whole roundup just
+    // because the library-names lookup blipped. Fall back to the generic
+    // label for each library id.
+    logger.warn(
+      `Weekly Roundup: failed to resolve library names, using fallback label: ${err?.message}`
+    );
+    return {};
+  }
   const map = {};
   for (const lib of libs || []) {
     const id = lib.ItemId || lib.Id;
@@ -453,7 +464,10 @@ function formatDate(d) {
       month: "long",
       year: "numeric",
     });
-  } catch {
+  } catch (err) {
+    logger.warn(
+      `Weekly Roundup: formatDate fell back to ISO for lang '${lang}': ${err?.message}`
+    );
     return d.toISOString().slice(0, 10);
   }
 }
