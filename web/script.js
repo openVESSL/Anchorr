@@ -1801,6 +1801,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const episodeChannelSelect = document.getElementById("JELLYFIN_EPISODE_CHANNEL_ID");
     const seasonChannelSelect = document.getElementById("JELLYFIN_SEASON_CHANNEL_ID");
     const dailyRandomPickChannelSelect = document.getElementById("DAILY_RANDOM_PICK_CHANNEL_ID");
+    const weeklyRoundupChannelSelect = document.getElementById("WEEKLY_ROUNDUP_CHANNEL_ID");
 
     if (!guildId) {
       if (channelSelect) {
@@ -1819,6 +1820,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         dailyRandomPickChannelSelect.innerHTML =
           '<option value="">Select a channel...</option>';
       }
+      if (weeklyRoundupChannelSelect) {
+        weeklyRoundupChannelSelect.innerHTML =
+          '<option value="">Select a channel...</option>';
+      }
       return;
     }
 
@@ -1834,6 +1839,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     if (dailyRandomPickChannelSelect) {
       dailyRandomPickChannelSelect.innerHTML = '<option value="">Loading channels...</option>';
+    }
+    if (weeklyRoundupChannelSelect) {
+      weeklyRoundupChannelSelect.innerHTML = '<option value="">Loading channels...</option>';
     }
 
     try {
@@ -1924,6 +1932,26 @@ document.addEventListener("DOMContentLoaded", async () => {
             dailyRandomPickChannelSelect.value = currentValue;
           }
         }
+
+        // Populate weekly roundup channel select
+        if (weeklyRoundupChannelSelect) {
+          weeklyRoundupChannelSelect.innerHTML =
+            '<option value="">Select a channel...</option>';
+          data.channels.forEach((channel) => {
+            const option = document.createElement("option");
+            option.value = channel.id;
+            let icon = "";
+            if (channel.type === "announcement") icon = " 📢";
+            else if (channel.type === "forum-thread") icon = " 🧵";
+            option.textContent = `#${channel.name}${icon}`;
+            weeklyRoundupChannelSelect.appendChild(option);
+          });
+
+          const currentValue = weeklyRoundupChannelSelect.dataset.savedValue;
+          if (currentValue) {
+            weeklyRoundupChannelSelect.value = currentValue;
+          }
+        }
       } else {
         if (channelSelect) {
           channelSelect.innerHTML =
@@ -1939,6 +1967,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (dailyRandomPickChannelSelect) {
           dailyRandomPickChannelSelect.innerHTML =
+            '<option value="">Select a channel...</option>';
+        }
+        if (weeklyRoundupChannelSelect) {
+          weeklyRoundupChannelSelect.innerHTML =
             '<option value="">Select a channel...</option>';
         }
       }
@@ -1960,6 +1992,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         dailyRandomPickChannelSelect.innerHTML =
           '<option value="">Select a channel...</option>';
       }
+      if (weeklyRoundupChannelSelect) {
+        weeklyRoundupChannelSelect.innerHTML =
+          '<option value="">Select a channel...</option>';
+      }
     }
   }
 
@@ -1974,7 +2010,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const episodeChannelSelect = document.getElementById("JELLYFIN_EPISODE_CHANNEL_ID");
         const seasonChannelSelect = document.getElementById("JELLYFIN_SEASON_CHANNEL_ID");
         const dailyRandomPickChannelSelect = document.getElementById("DAILY_RANDOM_PICK_CHANNEL_ID");
-        
+        const weeklyRoundupChannelSelect = document.getElementById("WEEKLY_ROUNDUP_CHANNEL_ID");
+
         if (channelSelect) {
           channelSelect.innerHTML =
             '<option value="">Select a server first...</option>';
@@ -1989,6 +2026,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (dailyRandomPickChannelSelect) {
           dailyRandomPickChannelSelect.innerHTML =
+            '<option value="">Select a channel...</option>';
+        }
+        if (weeklyRoundupChannelSelect) {
+          weeklyRoundupChannelSelect.innerHTML =
             '<option value="">Select a channel...</option>';
         }
       }
