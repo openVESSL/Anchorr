@@ -3,6 +3,7 @@ import * as jellyfinApi from "../api/jellyfin.js";
 import { getLibraryChannels } from "../jellyfin/libraryResolver.js";
 import { buildJellyfinUrl } from "../utils/jellyfinUrl.js";
 import { updateConfig } from "../utils/configFile.js";
+import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
 
 // Hourly tick interval — do not change without updating the idempotency guard.
@@ -145,7 +146,7 @@ function groupItems(items) {
         const existing = episodesBySeries.get(key) || {
           libraryId,
           seriesId: item.SeriesId,
-          seriesName: item.SeriesName || "Unknown Series",
+          seriesName: item.SeriesName || t("roundup.unknown_series"),
           seasons: new Map(),
           latestCreated: new Date(0),
         };
@@ -185,21 +186,22 @@ function groupItems(items) {
 }
 
 function renderMovie(item) {
-  const title = item.Name || "Unknown";
+  const title = item.Name || t("roundup.unknown_title");
   const year = item.ProductionYear ? ` (${item.ProductionYear})` : "";
   const url = itemDeeplink(item.Id);
   return `🎬 [**${escapeMd(title)}**${escapeMd(year)}](${url})`;
 }
 
 function renderSeries(item) {
-  const title = item.Name || "Unknown";
+  const title = item.Name || t("roundup.unknown_title");
   const url = itemDeeplink(item.Id);
   return `📺 [**${escapeMd(title)}**](${url})`;
 }
 
 function renderSeason(item) {
-  const seriesName = item.SeriesName || "Unknown Series";
-  const seasonLabel = item.Name || `Season ${item.IndexNumber ?? "?"}`;
+  const seriesName = item.SeriesName || t("roundup.unknown_series");
+  const seasonLabel =
+    item.Name || t("roundup.season_fallback", { n: item.IndexNumber ?? "?" });
   const url = itemDeeplink(item.Id);
   return `📺 [**${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}](${url})`;
 }
@@ -213,14 +215,22 @@ function renderEpisodeGroup(group) {
 
   let seasonLabel;
   if (seasonNumbers.length === 1) {
-    seasonLabel = `Season ${seasonNumbers[0]}`;
+    seasonLabel = t("roundup.season_label_single", { a: seasonNumbers[0] });
   } else if (seasonNumbers.length === 2) {
-    seasonLabel = `Seasons ${seasonNumbers[0]} & ${seasonNumbers[1]}`;
+    seasonLabel = t("roundup.season_label_pair", {
+      a: seasonNumbers[0],
+      b: seasonNumbers[1],
+    });
   } else {
-    seasonLabel = `Seasons ${seasonNumbers.join(", ")}`;
+    seasonLabel = t("roundup.season_label_multi", {
+      list: seasonNumbers.join(", "),
+    });
   }
 
-  const episodesLabel = episodeTotal === 1 ? "1 episode" : `${episodeTotal} episodes`;
+  const episodesLabel =
+    episodeTotal === 1
+      ? t("roundup.episodes_label_one")
+      : t("roundup.episodes_label_many", { count: episodeTotal });
 
   const url = group.seriesId ? itemDeeplink(group.seriesId) : null;
   if (url) {
@@ -310,7 +320,7 @@ async function buildRoundupEmbed(grouped, rawItems) {
   const color = resolveColor();
 
   const embed = new EmbedBuilder()
-    .setTitle("📦 New this week")
+    .setTitle(t("roundup.embed_title"))
     .setDescription(dateRange)
     .setColor(color);
 
@@ -327,17 +337,22 @@ async function buildRoundupEmbed(grouped, rawItems) {
   );
 
   for (const [libraryId, bucket] of grouped.perLibrary.entries()) {
-    const name = libraryNames[libraryId] || "Library";
+    const name = libraryNames[libraryId] || t("roundup.library_fallback");
     const value = bucket.entries.join("\n").slice(0, 1024);
     embed.addFields({ name, value });
   }
 
   if (grouped.overflow > 0) {
     embed.setFooter({
-      text: `${grouped.totalCount} new items · … and ${grouped.overflow} more`,
+      text: t("roundup.footer_overflow", {
+        count: grouped.totalCount,
+        overflow: grouped.overflow,
+      }),
     });
   } else {
-    embed.setFooter({ text: `${grouped.totalCount} new items` });
+    embed.setFooter({
+      text: t("roundup.footer_total", { count: grouped.totalCount }),
+    });
   }
 
   return embed;

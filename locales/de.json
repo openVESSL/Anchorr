@@ -2,7 +2,9 @@
   "_meta": {
     "language_name": "Deutsch",
     "language_code": "de",
-    "contributors": ["@retardgerman"],
+    "contributors": [
+      "@retardgerman"
+    ],
     "completion": "100%",
     "last_updated": "2025-12-27",
     "notes": "Vollständige deutsche Übersetzung mit Du-Form - alle fehlenden Übersetzungen hinzugefügt"
@@ -148,7 +150,7 @@
     "auto_start_bot": "Bot automatisch starten",
     "auto_start_bot_help": "Den Bot automatisch starten, wenn die Anwendung gestartet wird.",
     "notify_on_available": "Bei Verfügbarkeit benachrichtigen",
-    "notify_on_available_help": "Benachrichtigungen senden, wenn angeforderte Inhalte verfügbar werden.",
+    "notify_on_available_help": "Wenn aktiviert, erhalten Benutzer eine private Nachricht, wenn ihr angeforderter Inhalt auf Jellyfin verfügbar wird.",
     "private_message_mode": "Private Nachrichten",
     "private_message_mode_help": "Benachrichtigungen als private Nachrichten an Benutzer senden.",
     "debug": "Debug-Modus",
@@ -251,7 +253,6 @@
     "auto_start_label": "Bot beim Server-Start automatisch starten",
     "auto_start_help": "Wenn aktiviert, startet der Bot automatisch, wenn der Container/Server neu startet und gültige Discord-Zugangsdaten vorhanden sind.",
     "notify_on_available_label": "PM senden, wenn Anfrage verfügbar ist",
-    "notify_on_available_help": "Wenn aktiviert, erhalten Benutzer eine private Nachricht, wenn ihr angeforderter Inhalt auf Jellyfin verfügbar wird.",
     "ephemeral_mode_label": "Ephemerer Nachrichten-Modus",
     "ephemeral_mode_help": "Wenn aktiviert, werden alle Bot-Antworten als ephemere Nachrichten gesendet (nur für den Benutzer sichtbar, der den Befehl verwendet hat). Wenn deaktiviert, sind erfolgreiche Ergebnisse für alle im Kanal sichtbar.",
     "auto_approve_label": "Seerr Anfragen automatisch genehmigen",
@@ -432,5 +433,19 @@
     "copy_secret": "Secret kopieren",
     "webhook_secret_desc": "Dieses Secret sichert deinen Webhook-Endpunkt ab. Kopiere es und trage es als HTTP-Header X-Webhook-Secret in deinem Jellyfin-Webhook-Plugin ein:",
     "notification_testing_info": "Diese Tests laufen intern und umgehen den Webhook-Endpunkt — sie funktionieren auch ohne den X-Webhook-Secret-Header. Denk trotzdem daran, das Secret in deinem Jellyfin-Webhook-Plugin einzutragen, damit echte Benachrichtigungen von Jellyfin ankommen."
+  },
+  "roundup": {
+    "embed_title": "📦 Neu diese Woche",
+    "footer_total": "{count} neue Inhalte",
+    "footer_overflow": "{count} neue Inhalte · … und {overflow} weitere",
+    "season_label_single": "Staffel {a}",
+    "season_label_pair": "Staffeln {a} & {b}",
+    "season_label_multi": "Staffeln {list}",
+    "episodes_label_one": "1 Folge",
+    "episodes_label_many": "{count} Folgen",
+    "unknown_series": "Unbekannte Serie",
+    "season_fallback": "Staffel {n}",
+    "library_fallback": "Bibliothek",
+    "unknown_title": "Unbekannt"
   }
 }

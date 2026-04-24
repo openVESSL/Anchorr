@@ -2,7 +2,10 @@
   "_meta": {
     "language_name": "Svenska",
     "language_code": "sv",
-    "contributors": ["Simon Eklundh", "GitHub Copilot"],
+    "contributors": [
+      "Simon Eklundh",
+      "GitHub Copilot"
+    ],
     "completion": "100%",
     "last_updated": "2025-12-23",
     "notes": "Complete Swedish translation - all sections translated, merged PR improvements"
@@ -360,5 +363,19 @@
     "copy_secret": "Kopiera Secret",
     "webhook_secret_desc": "Ditt webhook-secret används för att säkra inkommande förfrågningar. Kopiera det nedan — du behöver lägga till det som en anpassad HTTP-header i Jellyfin webhook-pluginet:",
     "notification_testing_info": "Dessa tester kringgår webhook-endpointen och körs internt — de fungerar utan X-Webhook-Secret-headern. Se till att du ändå har kopierat secret och lagt till det i ditt Jellyfin webhook-plugin så att riktiga notifieringar från Jellyfin accepteras."
+  },
+  "roundup": {
+    "embed_title": "📦 Nytt den här veckan",
+    "footer_total": "{count} nya objekt",
+    "footer_overflow": "{count} nya objekt · … och {overflow} till",
+    "season_label_single": "Säsong {a}",
+    "season_label_pair": "Säsong {a} & {b}",
+    "season_label_multi": "Säsonger {list}",
+    "episodes_label_one": "1 avsnitt",
+    "episodes_label_many": "{count} avsnitt",
+    "unknown_series": "Okänd serie",
+    "season_fallback": "Säsong {n}",
+    "library_fallback": "Bibliotek",
+    "unknown_title": "Okänd"
   }
 }

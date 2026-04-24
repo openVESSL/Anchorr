@@ -2,7 +2,9 @@
   "_meta": {
     "language_name": "English",
     "language_code": "en",
-    "contributors": ["nairdah"],
+    "contributors": [
+      "nairdah"
+    ],
     "completion": "100%",
     "last_updated": "2025-12-15",
     "notes": "Base English translations"
@@ -253,7 +255,7 @@
     },
     "actions": {
       "start": "Start Bot",
-      "stop": "Stop Bot", 
+      "stop": "Stop Bot",
       "restart": "Restart Bot"
     },
     "messages": {
@@ -360,5 +362,19 @@
     "copy_secret": "Copy Secret",
     "webhook_secret_desc": "Your webhook secret is used to secure incoming requests. Copy it below — you'll need to add it as a custom HTTP header in the Jellyfin webhook plugin:",
     "notification_testing_info": "These tests bypass the webhook endpoint and run internally — they work without the X-Webhook-Secret header. Make sure you've still copied the secret and added it to your Jellyfin webhook plugin so that real notifications from Jellyfin are accepted."
+  },
+  "roundup": {
+    "embed_title": "📦 New this week",
+    "footer_total": "{count} new items",
+    "footer_overflow": "{count} new items · … and {overflow} more",
+    "season_label_single": "Season {a}",
+    "season_label_pair": "Seasons {a} & {b}",
+    "season_label_multi": "Seasons {list}",
+    "episodes_label_one": "1 episode",
+    "episodes_label_many": "{count} episodes",
+    "unknown_series": "Unknown Series",
+    "season_fallback": "Season {n}",
+    "library_fallback": "Library",
+    "unknown_title": "Unknown"
   }
 }

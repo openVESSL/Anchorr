@@ -2,7 +2,9 @@
   "_meta": {
     "language_name": "Language Name",
     "language_code": "xx",
-    "contributors": ["Your Name"],
+    "contributors": [
+      "Your Name"
+    ],
     "completion": "0%",
     "last_updated": "YYYY-MM-DD",
     "notes": "Translation notes or specific considerations"
@@ -360,5 +362,19 @@
     "copy_secret": "",
     "webhook_secret_desc": "",
     "notification_testing_info": ""
+  },
+  "roundup": {
+    "embed_title": "📦 New this week",
+    "footer_total": "{count} new items",
+    "footer_overflow": "{count} new items · … and {overflow} more",
+    "season_label_single": "Season {a}",
+    "season_label_pair": "Seasons {a} & {b}",
+    "season_label_multi": "Seasons {list}",
+    "episodes_label_one": "1 episode",
+    "episodes_label_many": "{count} episodes",
+    "unknown_series": "Unknown Series",
+    "season_fallback": "Season {n}",
+    "library_fallback": "Library",
+    "unknown_title": "Unknown"
   }
 }
