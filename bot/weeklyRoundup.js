@@ -368,15 +368,15 @@ async function sendWeeklyRoundup(client, channelId, now) {
 
 async function markPosted(now) {
   const nowIso = now.toISOString();
+  // Always set the in-memory env var so this process won't re-post within the
+  // same week, even if disk persistence fails. The roundup already went out —
+  // don't count persistence failure as a send failure.
+  process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT = nowIso;
   try {
     updateConfig({ WEEKLY_ROUNDUP_LAST_POSTED_AT: nowIso });
-    process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT = nowIso;
   } catch (err) {
-    // Persistence failed — do NOT set env var, so a restart will retry
-    // instead of silently skipping the next window.
-    bumpFailure(now);
     logger.error(
-      `Weekly Roundup: failed to persist lastPostedAt, will retry: ${err?.message}`
+      `Weekly Roundup: posted successfully but failed to persist lastPostedAt; a restart this week could trigger a duplicate post: ${err?.message}`
     );
   }
 }
