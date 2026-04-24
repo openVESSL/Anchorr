@@ -274,6 +274,7 @@
     "weekly_roundup_hour_label": "Stunde (0–23, Serverzeit)",
     "weekly_roundup_color_label": "Embed-Farbe (optional)",
     "weekly_roundup_color_help": "Hex-Farbe für das Roundup-Embed. Leer lassen, um die Standard-Serienfarbe zu verwenden.",
+    "test_weekly_roundup": "Wöchentliche Zusammenfassung testen",
     "weekday_sunday": "Sonntag",
     "weekday_monday": "Montag",
     "weekday_tuesday": "Dienstag",

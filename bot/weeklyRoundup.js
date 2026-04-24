@@ -307,18 +307,33 @@ function escapeMd(s) {
   return String(s).replace(/([\[\]\(\)\\*_~`])/g, "\\$1");
 }
 
-async function sendWeeklyRoundup(client, channelId, now) {
+async function sendWeeklyRoundup(client, channelId, now, options = {}) {
+  const isTest = options.test === true;
+  const logPrefix = isTest ? "Weekly Roundup (test)" : "Weekly Roundup";
+
+  // In test mode we rethrow errors so the /api/test-weekly-roundup handler
+  // can surface them to the dashboard, and we skip all state side effects
+  // (failure counter, lastPostedAt) so a test run never masks or replaces a
+  // real scheduled post.
+  const onError = (err, msg) => {
+    if (isTest) throw err instanceof Error ? err : new Error(msg);
+    bumpFailure(now);
+  };
+
   let items;
   try {
     items = await fetchWindowItems();
   } catch (err) {
-    bumpFailure(now);
-    logger.error(`Weekly Roundup: failed to fetch items: ${err?.message}`);
+    logger.error(`${logPrefix}: failed to fetch items: ${err?.message}`);
+    onError(err, `Failed to fetch items: ${err?.message}`);
     return;
   }
 
   if (items.length === 0) {
-    logger.info("Weekly Roundup: no new items this week — skipping post");
+    logger.info(`${logPrefix}: no new items this week — skipping post`);
+    if (isTest) {
+      throw new Error("No new items in the past week — nothing to post.");
+    }
     resetFailures(now);
     await markPosted(now);
     return;
@@ -330,17 +345,17 @@ async function sendWeeklyRoundup(client, channelId, now) {
   try {
     channel = await client.channels.fetch(channelId);
   } catch (err) {
-    bumpFailure(now);
     logger.warn(
-      `Weekly Roundup: failed to fetch channel ${channelId}: ${err?.message}`
+      `${logPrefix}: failed to fetch channel ${channelId}: ${err?.message}`
     );
+    onError(err, `Failed to fetch channel ${channelId}: ${err?.message}`);
     return;
   }
   if (!channel) {
+    const msg = `Channel ${channelId} not found or bot lacks access`;
+    logger.warn(`${logPrefix}: ${msg}`);
+    if (isTest) throw new Error(msg);
     bumpFailure(now);
-    logger.warn(
-      `Weekly Roundup: channel ${channelId} not found or bot lacks access`
-    );
     return;
   }
 
@@ -348,22 +363,28 @@ async function sendWeeklyRoundup(client, channelId, now) {
   try {
     embed = await buildRoundupEmbed(grouped, items);
   } catch (err) {
-    bumpFailure(now);
-    logger.error(`Weekly Roundup: failed to build embed: ${err?.message}`);
+    logger.error(`${logPrefix}: failed to build embed: ${err?.message}`);
+    onError(err, `Failed to build embed: ${err?.message}`);
     return;
   }
 
   try {
     await channel.send({ embeds: [embed] });
     logger.info(
-      `Weekly Roundup posted: ${grouped.totalCount} items across ${grouped.perLibrary.size} libraries`
+      `${logPrefix} posted: ${grouped.totalCount} items across ${grouped.perLibrary.size} libraries`
     );
-    resetFailures(now);
-    await markPosted(now);
+    if (!isTest) {
+      resetFailures(now);
+      await markPosted(now);
+    }
   } catch (err) {
-    bumpFailure(now);
-    logger.error(`Weekly Roundup: failed to send embed: ${err?.message}`);
+    logger.error(`${logPrefix}: failed to send embed: ${err?.message}`);
+    onError(err, `Failed to send embed: ${err?.message}`);
   }
+}
+
+export async function sendWeeklyRoundupTest(client, channelId) {
+  await sendWeeklyRoundup(client, channelId, new Date(), { test: true });
 }
 
 async function markPosted(now) {

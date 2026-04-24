@@ -9,6 +9,7 @@ import rateLimit from "express-rate-limit";
 import { handleJellyfinWebhook } from "./jellyfinWebhook.js";
 import { configTemplate } from "./lib/config.js";
 import { sendDailyRandomPick } from "./bot/dailyPick.js";
+import { sendWeeklyRoundupTest } from "./bot/weeklyRoundup.js";
 
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -1013,6 +1014,40 @@ function configureWebServer() {
       res.status(500).json({
         success: false,
         message: error.message || "Failed to send random pick. Check logs for details.",
+      });
+    }
+  });
+
+  app.post("/api/test-weekly-roundup", authenticateToken, async (_req, res) => {
+    try {
+      if (!botState.discordClient || !botState.discordClient.isReady()) {
+        return res.status(400).json({
+          success: false,
+          message: "Discord bot is not running. Please start the bot first.",
+        });
+      }
+
+      const channelId = process.env.WEEKLY_ROUNDUP_CHANNEL_ID;
+      if (!channelId) {
+        return res.status(400).json({
+          success: false,
+          message: "Weekly Roundup channel must be configured first.",
+        });
+      }
+
+      await sendWeeklyRoundupTest(botState.discordClient, channelId);
+
+      res.json({
+        success: true,
+        message: "Weekly roundup sent successfully! Check your Discord channel.",
+      });
+    } catch (error) {
+      logger.error("Failed to send test weekly roundup:", error);
+      res.status(500).json({
+        success: false,
+        message:
+          error.message ||
+          "Failed to send weekly roundup. Check logs for details.",
       });
     }
   });

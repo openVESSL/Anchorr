@@ -1351,6 +1351,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Test Weekly Roundup Button
+  const testWeeklyRoundupBtn = document.getElementById("test-weekly-roundup-btn");
+  if (testWeeklyRoundupBtn) {
+    testWeeklyRoundupBtn.addEventListener("click", async () => {
+      testWeeklyRoundupBtn.disabled = true;
+      const originalText = testWeeklyRoundupBtn.innerHTML;
+      testWeeklyRoundupBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending...';
+
+      try {
+        const response = await fetch("/api/test-weekly-roundup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          testWeeklyRoundupBtn.style.backgroundColor = "var(--green)";
+          testWeeklyRoundupBtn.innerHTML = '<i class="bi bi-check-circle"></i> Sent!';
+          setTimeout(() => {
+            testWeeklyRoundupBtn.innerHTML = originalText;
+            testWeeklyRoundupBtn.style.backgroundColor = "";
+            testWeeklyRoundupBtn.disabled = false;
+          }, 2000);
+        } else {
+          throw new Error(result.message || "Failed to send weekly roundup");
+        }
+      } catch (error) {
+        testWeeklyRoundupBtn.style.backgroundColor = "#f38ba8";
+        testWeeklyRoundupBtn.innerHTML = `<i class="bi bi-exclamation-circle"></i> ${escapeHtml(error.message)}`;
+        setTimeout(() => {
+          testWeeklyRoundupBtn.innerHTML = originalText;
+          testWeeklyRoundupBtn.style.backgroundColor = "";
+          testWeeklyRoundupBtn.disabled = false;
+        }, 3000);
+      }
+    });
+  }
+
   // Fetch and display Jellyfin libraries for notifications
   const fetchLibrariesBtn = document.getElementById("fetch-libraries-btn");
   const fetchLibrariesStatus = document.getElementById(
