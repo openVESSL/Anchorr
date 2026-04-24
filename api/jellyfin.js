@@ -433,7 +433,7 @@ export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50, minDateCre
       Recursive: true,
     };
     if (minDateCreated) {
-      params.MinDateLastSaved = minDateCreated;
+      params.MinDateCreated = minDateCreated;
     }
     const response = await axios.get(url, {
       headers: { "X-MediaBrowser-Token": apiKey },
@@ -453,7 +453,7 @@ export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50, minDateCre
       "Failed to fetch recently added items from Jellyfin:",
       err?.message || err
     );
-    return [];
+    throw err;
   }
 }
 

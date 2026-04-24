@@ -4,9 +4,18 @@ import logger from "./logger.js";
 
 const LOCALES_DIR = path.join(process.cwd(), "locales");
 const FALLBACK_LANG = "en";
+// Accept only conservative locale codes (e.g. "en", "de", "pt_BR"). Prevents
+// path traversal or JSON-read of arbitrary files if LANGUAGE is somehow
+// attacker-influenced in the future.
+const LANG_CODE_RE = /^[a-zA-Z]{2,3}(?:[_-][a-zA-Z0-9]{2,8})?$/;
 
 let translations = null;
 let loadedLang = null;
+
+function safeLang(raw) {
+  if (!raw || typeof raw !== "string") return FALLBACK_LANG;
+  return LANG_CODE_RE.test(raw) ? raw : FALLBACK_LANG;
+}
 
 function loadLocaleFile(lang) {
   const file = path.join(LOCALES_DIR, `${lang}.json`);
@@ -20,7 +29,7 @@ function loadLocaleFile(lang) {
 }
 
 function ensureLoaded() {
-  const lang = process.env.LANGUAGE || FALLBACK_LANG;
+  const lang = safeLang(process.env.LANGUAGE || FALLBACK_LANG);
   if (translations && loadedLang === lang) return;
 
   const primary = loadLocaleFile(lang);

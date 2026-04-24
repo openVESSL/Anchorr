@@ -23,7 +23,34 @@ const MAX_ENTRIES = 25;
 const FETCH_LIMIT = 200;
 
 let roundupTimer = null;
-let consecutiveFailures = 0;
+let failureState = { weekKey: null, count: 0 };
+
+function weekKeyFor(date) {
+  // ISO-like week marker: YYYY-MM-DD of the Sunday that started this week.
+  // Used to scope consecutive-failure counting to the current week only.
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d.toISOString().slice(0, 10);
+}
+
+function bumpFailure(now) {
+  const key = weekKeyFor(now);
+  if (failureState.weekKey !== key) {
+    failureState = { weekKey: key, count: 0 };
+  }
+  failureState.count += 1;
+  return failureState.count;
+}
+
+function resetFailures(now) {
+  failureState = { weekKey: weekKeyFor(now), count: 0 };
+}
+
+function currentFailures(now) {
+  if (failureState.weekKey !== weekKeyFor(now)) return 0;
+  return failureState.count;
+}
 
 export function scheduleWeeklyRoundup(client) {
   if (roundupTimer) {
@@ -33,9 +60,23 @@ export function scheduleWeeklyRoundup(client) {
   logger.info("📦 Weekly Roundup scheduler started (hourly tick)");
 
   // Initial tick after startup so startup logs settle first.
-  setTimeout(() => runTick(client), 10_000);
+  setTimeout(() => {
+    runTick(client).catch((err) =>
+      logger.error(`Weekly Roundup initial tick error: ${err?.message || err}`)
+    );
+  }, 10_000);
 
-  roundupTimer = setInterval(() => runTick(client), TICK_INTERVAL_MS);
+  roundupTimer = setInterval(() => {
+    runTick(client).catch((err) =>
+      logger.error(`Weekly Roundup tick error: ${err?.message || err}`)
+    );
+  }, TICK_INTERVAL_MS);
+}
+
+function parseIntInRange(raw, fallback, min, max) {
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n) || n < min || n > max) return fallback;
+  return n;
 }
 
 async function runTick(client) {
@@ -51,12 +92,22 @@ async function runTick(client) {
       return;
     }
 
-    const targetWeekday = parseInt(process.env.WEEKLY_ROUNDUP_WEEKDAY || "0", 10);
-    const targetHour = parseInt(process.env.WEEKLY_ROUNDUP_HOUR || "18", 10);
+    const targetWeekday = parseIntInRange(
+      process.env.WEEKLY_ROUNDUP_WEEKDAY,
+      0,
+      0,
+      6
+    );
+    const targetHour = parseIntInRange(
+      process.env.WEEKLY_ROUNDUP_HOUR,
+      18,
+      0,
+      23
+    );
     const now = new Date();
 
     if (now.getDay() !== targetWeekday) return;
-    if (now.getHours() < targetHour) return;
+    if (now.getHours() !== targetHour) return;
 
     const lastPostedAtStr = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT || "";
     if (lastPostedAtStr) {
@@ -67,14 +118,14 @@ async function runTick(client) {
       }
     }
 
-    if (consecutiveFailures >= 3) {
+    if (currentFailures(now) >= 3) {
       logger.warn(
-        "Weekly Roundup skipped: 3 consecutive failures this week. Will retry next window."
+        "Weekly Roundup skipped: 3 consecutive failures this week. Will retry next week."
       );
       return;
     }
 
-    await sendWeeklyRoundup(client, channelId);
+    await sendWeeklyRoundup(client, channelId, now);
   } catch (err) {
     logger.error(`Weekly Roundup tick error: ${err?.message || err}`);
   }
@@ -248,66 +299,84 @@ function itemDeeplink(itemId) {
 }
 
 /**
- * Escape Discord markdown special characters that would break link syntax.
- * Only the minimal set relevant to bracketed link titles is covered.
+ * Escape Discord markdown so user-supplied titles cannot break link syntax
+ * or trigger unintended formatting (bold/italic/strikethrough/code) inside
+ * the bracketed label.
  */
 function escapeMd(s) {
-  return String(s).replace(/([\[\]\(\)\\])/g, "\\$1");
+  return String(s).replace(/([\[\]\(\)\\*_~`])/g, "\\$1");
 }
 
-async function sendWeeklyRoundup(client, channelId) {
+async function sendWeeklyRoundup(client, channelId, now) {
   let items;
   try {
     items = await fetchWindowItems();
   } catch (err) {
-    consecutiveFailures++;
+    bumpFailure(now);
     logger.error(`Weekly Roundup: failed to fetch items: ${err?.message}`);
     return;
   }
 
   if (items.length === 0) {
     logger.info("Weekly Roundup: no new items this week — skipping post");
-    consecutiveFailures = 0;
-    await markPosted();
+    resetFailures(now);
+    await markPosted(now);
     return;
   }
 
   const grouped = groupItems(items);
 
-  const channel = await client.channels.fetch(channelId).catch((err) => {
-    logger.error(
-      `[ROUNDUP] Failed to fetch channel ${channelId}: ${err?.message}`
+  let channel;
+  try {
+    channel = await client.channels.fetch(channelId);
+  } catch (err) {
+    bumpFailure(now);
+    logger.warn(
+      `Weekly Roundup: failed to fetch channel ${channelId}: ${err?.message}`
     );
-    return null;
-  });
+    return;
+  }
   if (!channel) {
-    consecutiveFailures++;
+    bumpFailure(now);
+    logger.warn(
+      `Weekly Roundup: channel ${channelId} not found or bot lacks access`
+    );
     return;
   }
 
-  const embed = await buildRoundupEmbed(grouped, items);
+  let embed;
+  try {
+    embed = await buildRoundupEmbed(grouped, items);
+  } catch (err) {
+    bumpFailure(now);
+    logger.error(`Weekly Roundup: failed to build embed: ${err?.message}`);
+    return;
+  }
 
   try {
     await channel.send({ embeds: [embed] });
     logger.info(
       `Weekly Roundup posted: ${grouped.totalCount} items across ${grouped.perLibrary.size} libraries`
     );
-    consecutiveFailures = 0;
-    await markPosted();
+    resetFailures(now);
+    await markPosted(now);
   } catch (err) {
-    consecutiveFailures++;
+    bumpFailure(now);
     logger.error(`Weekly Roundup: failed to send embed: ${err?.message}`);
   }
 }
 
-async function markPosted() {
-  const nowIso = new Date().toISOString();
-  process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT = nowIso;
+async function markPosted(now) {
+  const nowIso = now.toISOString();
   try {
     updateConfig({ WEEKLY_ROUNDUP_LAST_POSTED_AT: nowIso });
+    process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT = nowIso;
   } catch (err) {
+    // Persistence failed — do NOT set env var, so a restart will retry
+    // instead of silently skipping the next window.
+    bumpFailure(now);
     logger.error(
-      `Weekly Roundup: failed to persist lastPostedAt: ${err?.message}`
+      `Weekly Roundup: failed to persist lastPostedAt, will retry: ${err?.message}`
     );
   }
 }
@@ -361,27 +430,24 @@ async function buildRoundupEmbed(grouped, rawItems) {
 async function resolveLibraryNames(libraryIds) {
   const apiKey = process.env.JELLYFIN_API_KEY;
   const baseUrl = process.env.JELLYFIN_BASE_URL;
-  try {
-    const libs = await jellyfinApi.fetchLibraries(apiKey, baseUrl);
-    const map = {};
-    for (const lib of libs || []) {
-      const id = lib.ItemId || lib.Id;
-      if (id && libraryIds.includes(id)) {
-        map[id] = lib.Name;
-      }
+  const libs = await jellyfinApi.fetchLibraries(apiKey, baseUrl);
+  const map = {};
+  for (const lib of libs || []) {
+    const id = lib.ItemId || lib.Id;
+    if (id && libraryIds.includes(id)) {
+      map[id] = lib.Name;
     }
-    return map;
-  } catch (err) {
-    logger.warn(
-      `Weekly Roundup: failed to resolve library names: ${err?.message}`
-    );
-    return {};
   }
+  return map;
 }
 
 function formatDate(d) {
+  // LANGUAGE uses locale-file keys (en/de/sv) — these happen to be valid
+  // BCP-47 primary tags today. Normalize anything else (e.g. "pt_BR") to
+  // its primary subtag so Intl does not throw on an unknown locale.
+  const raw = process.env.LANGUAGE || "en";
+  const lang = /^[a-zA-Z]{2,3}$/.test(raw) ? raw : "en";
   try {
-    const lang = process.env.LANGUAGE || "en";
     return d.toLocaleDateString(lang, {
       day: "numeric",
       month: "long",

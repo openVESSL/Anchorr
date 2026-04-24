@@ -25,9 +25,9 @@ export function buildJellyfinUrl(appendPath, hash) {
       u.hash = h.startsWith("#") ? h.slice(1) : h;
     }
     return u.toString();
-  } catch (_e) {
-    logger.warn(
-      `buildJellyfinUrl: Invalid JELLYFIN_BASE_URL "${effectiveBaseUrl}": ${_e?.message}. Falling back to string concatenation.`
+  } catch (err) {
+    logger.error(
+      `buildJellyfinUrl: invalid JELLYFIN_BASE_URL (${err?.message}). Falling back to string concatenation; links may be malformed.`
     );
     const baseNoSlash = String(effectiveBaseUrl || "").replace(/\/+$/, "");
     const pathNoLead = String(appendPath || "").replace(/^\/+/, "");
