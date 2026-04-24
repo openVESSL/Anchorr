@@ -204,7 +204,6 @@ function renderSeason(item) {
   return `📺 [**${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}](${url})`;
 }
 
-// i18n in Task 6: "Staffel"/"Folge(n)" labels
 function renderEpisodeGroup(group) {
   const seasonNumbers = Array.from(group.seasons.keys()).sort((a, b) => a - b);
   const episodeTotal = Array.from(group.seasons.values()).reduce(
@@ -214,14 +213,14 @@ function renderEpisodeGroup(group) {
 
   let seasonLabel;
   if (seasonNumbers.length === 1) {
-    seasonLabel = `Staffel ${seasonNumbers[0]}`;
+    seasonLabel = `Season ${seasonNumbers[0]}`;
   } else if (seasonNumbers.length === 2) {
-    seasonLabel = `Staffeln ${seasonNumbers[0]} & ${seasonNumbers[1]}`;
+    seasonLabel = `Seasons ${seasonNumbers[0]} & ${seasonNumbers[1]}`;
   } else {
-    seasonLabel = `Staffeln ${seasonNumbers.join(", ")}`;
+    seasonLabel = `Seasons ${seasonNumbers.join(", ")}`;
   }
 
-  const episodesLabel = episodeTotal === 1 ? "1 Folge" : `${episodeTotal} Folgen`;
+  const episodesLabel = episodeTotal === 1 ? "1 episode" : `${episodeTotal} episodes`;
 
   const url = group.seriesId ? itemDeeplink(group.seriesId) : null;
   if (url) {
@@ -310,9 +309,8 @@ async function buildRoundupEmbed(grouped, rawItems) {
   const dateRange = `${formatDate(start)} – ${formatDate(now)}`;
   const color = resolveColor();
 
-  // i18n in Task 6: "Neu diese Woche"
   const embed = new EmbedBuilder()
-    .setTitle("📦 Neu diese Woche")
+    .setTitle("📦 New this week")
     .setDescription(dateRange)
     .setColor(color);
 
@@ -334,13 +332,12 @@ async function buildRoundupEmbed(grouped, rawItems) {
     embed.addFields({ name, value });
   }
 
-  // i18n in Task 6: footer text
   if (grouped.overflow > 0) {
     embed.setFooter({
-      text: `${grouped.totalCount} neue Inhalte · … und ${grouped.overflow} weitere`,
+      text: `${grouped.totalCount} new items · … and ${grouped.overflow} more`,
     });
   } else {
-    embed.setFooter({ text: `${grouped.totalCount} neue Inhalte` });
+    embed.setFooter({ text: `${grouped.totalCount} new items` });
   }
 
   return embed;
