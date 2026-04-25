@@ -157,7 +157,7 @@ async function fetchWindowItems() {
   // / AncestorIds) and VirtualFolderItemId (stored in
   // JELLYFIN_NOTIFICATION_LIBRARIES). Translate before comparing — same trick
   // the webhook flow uses via resolveConfigLibraryId().
-  const { libraryIdMap } = await fetchLibraryMap();
+  const { libraryIdMap, libraryIds } = await fetchLibraryMap();
 
   for (const item of rawItems) {
     const ancestorIds = Array.isArray(item.AncestorIds) ? item.AncestorIds : [];
@@ -169,6 +169,19 @@ async function fetchWindowItems() {
   }
 
   const filtered = rawItems.filter((item) => item._configLibraryId !== null);
+
+  // One-shot diagnostic when filter ate everything: dump configured IDs +
+  // the first item's actual IDs so the mismatch is visible.
+  if (rawItems.length > 0 && filtered.length === 0) {
+    const sample = rawItems[0];
+    const sampleAncestors = Array.isArray(sample.AncestorIds)
+      ? sample.AncestorIds
+      : [];
+    const sampleCandidates = [sample.ParentId, ...sampleAncestors].filter(Boolean);
+    logger.warn(
+      `Weekly Roundup: library mismatch — configured ids: [${[...allowedLibraryIds].join(", ")}], known Jellyfin library ids (both forms): [${[...libraryIds].join(", ")}], sample item "${sample.Name}" (Type=${sample.Type}) had ParentId+AncestorIds=[${sampleCandidates.join(", ")}], translated=[${sampleCandidates.map((id) => resolveConfigLibraryId(id, libraryIdMap)).join(", ")}]`
+    );
+  }
 
   logger.info(
     `Weekly Roundup: Jellyfin returned ${rawItems.length} items since ${cutoff}, ${filtered.length} matched configured notification libraries (${allowedLibraryIds.size} library ids configured)`
