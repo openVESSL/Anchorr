@@ -1,6 +1,10 @@
 import { EmbedBuilder } from "discord.js";
 import * as jellyfinApi from "../api/jellyfin.js";
-import { getLibraryChannels } from "../jellyfin/libraryResolver.js";
+import {
+  getLibraryChannels,
+  fetchLibraryMap,
+  resolveConfigLibraryId,
+} from "../jellyfin/libraryResolver.js";
 import { buildJellyfinUrl } from "../utils/jellyfinUrl.js";
 import { updateConfig } from "../utils/configFile.js";
 import { t } from "../utils/i18n.js";
@@ -146,14 +150,25 @@ async function fetchWindowItems() {
     cutoff
   );
 
-  const libraryMap = getLibraryChannels() || {};
-  const allowedLibraryIds = new Set(Object.keys(libraryMap));
+  const libraryChannels = getLibraryChannels() || {};
+  const allowedLibraryIds = new Set(Object.keys(libraryChannels));
 
-  const filtered = rawItems.filter((item) => {
+  // Jellyfin libraries have two IDs: CollectionId (referenced by Item.ParentId
+  // / AncestorIds) and VirtualFolderItemId (stored in
+  // JELLYFIN_NOTIFICATION_LIBRARIES). Translate before comparing — same trick
+  // the webhook flow uses via resolveConfigLibraryId().
+  const { libraryIdMap } = await fetchLibraryMap();
+
+  for (const item of rawItems) {
     const ancestorIds = Array.isArray(item.AncestorIds) ? item.AncestorIds : [];
     const candidateIds = [item.ParentId, ...ancestorIds].filter(Boolean);
-    return candidateIds.some((id) => allowedLibraryIds.has(id));
-  });
+    item._configLibraryId =
+      candidateIds
+        .map((id) => resolveConfigLibraryId(id, libraryIdMap))
+        .find((id) => allowedLibraryIds.has(id)) || null;
+  }
+
+  const filtered = rawItems.filter((item) => item._configLibraryId !== null);
 
   logger.info(
     `Weekly Roundup: Jellyfin returned ${rawItems.length} items since ${cutoff}, ${filtered.length} matched configured notification libraries (${allowedLibraryIds.size} library ids configured)`
@@ -174,13 +189,9 @@ async function fetchWindowItems() {
  * Returns { perLibrary: Map<libraryId, { entries: string[] }>, totalCount, overflow }.
  */
 function groupItems(items) {
-  const libraryMap = getLibraryChannels() || {};
-
-  const getLibraryIdFor = (item) => {
-    const ancestorIds = Array.isArray(item.AncestorIds) ? item.AncestorIds : [];
-    const candidateIds = [item.ParentId, ...ancestorIds].filter(Boolean);
-    return candidateIds.find((id) => libraryMap[id] !== undefined) || null;
-  };
+  // Items have already been tagged with _configLibraryId by fetchWindowItems,
+  // which translates between Jellyfin's two library-ID forms.
+  const getLibraryIdFor = (item) => item._configLibraryId || null;
 
   const episodesBySeries = new Map(); // key: libraryId|seriesId
   const entriesOut = []; // { libraryId, createdAt, render }
