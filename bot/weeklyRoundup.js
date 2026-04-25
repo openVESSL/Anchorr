@@ -149,11 +149,21 @@ async function fetchWindowItems() {
   const libraryMap = getLibraryChannels() || {};
   const allowedLibraryIds = new Set(Object.keys(libraryMap));
 
-  return rawItems.filter((item) => {
+  const filtered = rawItems.filter((item) => {
     const ancestorIds = Array.isArray(item.AncestorIds) ? item.AncestorIds : [];
     const candidateIds = [item.ParentId, ...ancestorIds].filter(Boolean);
     return candidateIds.some((id) => allowedLibraryIds.has(id));
   });
+
+  logger.info(
+    `Weekly Roundup: Jellyfin returned ${rawItems.length} items since ${cutoff}, ${filtered.length} matched configured notification libraries (${allowedLibraryIds.size} library ids configured)`
+  );
+
+  // Stash diagnostics on the array so the caller can build a smarter
+  // "nothing to post" message in test mode without re-querying Jellyfin.
+  filtered.rawCount = rawItems.length;
+  filtered.allowedLibraryCount = allowedLibraryIds.size;
+  return filtered;
 }
 
 /**
@@ -332,7 +342,17 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   if (items.length === 0) {
     logger.info(`${logPrefix}: no new items this week — skipping post`);
     if (isTest) {
-      throw new Error("No new items in the past week — nothing to post.");
+      const rawCount = items.rawCount ?? 0;
+      const allowedCount = items.allowedLibraryCount ?? 0;
+      let msg;
+      if (allowedCount === 0) {
+        msg = "No notification libraries configured. Add libraries under Jellyfin notifications in the dashboard.";
+      } else if (rawCount > 0) {
+        msg = `Jellyfin returned ${rawCount} new items in the past week, but none are in your ${allowedCount} configured notification libraries. Check the library list in Jellyfin notifications.`;
+      } else {
+        msg = "Jellyfin returned no new items (Movie/Series/Season/Episode) in the past 7 days.";
+      }
+      throw new Error(msg);
     }
     resetFailures(now);
     await markPosted(now);
