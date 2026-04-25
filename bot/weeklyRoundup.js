@@ -196,6 +196,23 @@ async function fetchWindowItems() {
     `Weekly Roundup: queried ${configuredIds.length} configured libraries since ${cutoff}, got ${totalRaw} items (${filtered.length} after dedupe)`
   );
 
+  // One-shot diagnostic: dump the raw identity fields for each episode so
+  // we can see why dedup might fail (missing IndexNumber, varying Name,
+  // multiple item ids for the same episode, ...).
+  const episodes = filtered.filter((it) => it.Type === "Episode");
+  if (episodes.length > 0) {
+    const dump = episodes
+      .slice(0, 30)
+      .map(
+        (e) =>
+          `{id:${e.Id}, series:"${e.SeriesName}", S${e.ParentIndexNumber}E${e.IndexNumber}${e.IndexNumberEnd != null ? `-${e.IndexNumberEnd}` : ""}, name:"${e.Name}", created:${e.DateCreated}}`
+      )
+      .join("\n  ");
+    logger.info(
+      `Weekly Roundup: episode raw fields (first 30 of ${episodes.length}):\n  ${dump}`
+    );
+  }
+
   filtered.rawCount = totalRaw;
   filtered.allowedLibraryCount = configuredIds.length;
   return filtered;
@@ -239,18 +256,31 @@ function groupItems(items) {
           libraryId,
           seriesId: item.SeriesId,
           seriesName: item.SeriesName || t("roundup.unknown_series"),
-          // seasons: Map<seasonNum, Set<episodeNum>> — Set so a Sonarr quality
+          // seasons: Map<seasonNum, Set<episodeKey>> — Set so a Sonarr quality
           // upgrade that re-imports the same episode multiple times in a week
           // counts once instead of inflating the season count.
           seasons: new Map(),
           latestCreated: new Date(0),
         };
         const seasonNum = item.ParentIndexNumber ?? 0;
-        const episodeNum = item.IndexNumber ?? null;
         const set = existing.seasons.get(seasonNum) || new Set();
-        // Fall back to item.Id for episodes without a numbered IndexNumber
-        // (e.g. specials) so they are still deduped per Jellyfin item.
-        set.add(episodeNum != null ? `e${episodeNum}` : `id:${item.Id}`);
+        // Build a dedupe key from the strongest stable identity available.
+        // Prefer (IndexNumber + IndexNumberEnd) for ranged 2-parters, then
+        // IndexNumber alone, then the episode Name (Sonarr re-imports keep
+        // the title), then finally the Jellyfin item id as last resort.
+        const idxStart = item.IndexNumber;
+        const idxEnd = item.IndexNumberEnd;
+        let episodeKey;
+        if (idxStart != null && idxEnd != null && idxEnd !== idxStart) {
+          episodeKey = `e${idxStart}-${idxEnd}`;
+        } else if (idxStart != null) {
+          episodeKey = `e${idxStart}`;
+        } else if (item.Name) {
+          episodeKey = `n:${item.Name.toLowerCase().trim()}`;
+        } else {
+          episodeKey = `id:${item.Id}`;
+        }
+        set.add(episodeKey);
         existing.seasons.set(seasonNum, set);
         if (createdAt > existing.latestCreated) existing.latestCreated = createdAt;
         episodesBySeries.set(key, existing);
