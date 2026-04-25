@@ -419,7 +419,7 @@ export async function findLibraryId(
  *   When provided, only items created at or after this time are returned.
  * @returns {Promise<Array>} Array of recently added items
  */
-export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50, minDateCreated) {
+export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50, minDateCreated, parentId) {
   try {
     const safeBase = new URL(baseUrl);
     safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
@@ -434,6 +434,9 @@ export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50, minDateCre
     };
     if (minDateCreated) {
       params.MinDateCreated = minDateCreated;
+    }
+    if (parentId) {
+      params.ParentId = parentId;
     }
     const response = await axios.get(url, {
       headers: { "X-MediaBrowser-Token": apiKey },

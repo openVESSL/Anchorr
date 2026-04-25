@@ -1,10 +1,6 @@
 import { EmbedBuilder } from "discord.js";
 import * as jellyfinApi from "../api/jellyfin.js";
-import {
-  getLibraryChannels,
-  fetchLibraryMap,
-  resolveConfigLibraryId,
-} from "../jellyfin/libraryResolver.js";
+import { getLibraryChannels } from "../jellyfin/libraryResolver.js";
 import { buildJellyfinUrl } from "../utils/jellyfinUrl.js";
 import { updateConfig } from "../utils/configFile.js";
 import { t } from "../utils/i18n.js";
@@ -143,54 +139,65 @@ async function fetchWindowItems() {
   }
 
   const cutoff = new Date(Date.now() - WINDOW_MS).toISOString();
-  const rawItems = await jellyfinApi.fetchRecentlyAdded(
-    apiKey,
-    baseUrl,
-    FETCH_LIMIT,
-    cutoff
-  );
-
   const libraryChannels = getLibraryChannels() || {};
-  const allowedLibraryIds = new Set(Object.keys(libraryChannels));
 
-  // Jellyfin libraries have two IDs: CollectionId (referenced by Item.ParentId
-  // / AncestorIds) and VirtualFolderItemId (stored in
-  // JELLYFIN_NOTIFICATION_LIBRARIES). Translate before comparing — same trick
-  // the webhook flow uses via resolveConfigLibraryId().
-  const { libraryIdMap, libraryIds } = await fetchLibraryMap();
-
-  for (const item of rawItems) {
-    const ancestorIds = Array.isArray(item.AncestorIds) ? item.AncestorIds : [];
-    const candidateIds = [item.ParentId, ...ancestorIds].filter(Boolean);
-    item._configLibraryId =
-      candidateIds
-        .map((id) => resolveConfigLibraryId(id, libraryIdMap))
-        .find((id) => allowedLibraryIds.has(id)) || null;
-  }
-
-  const filtered = rawItems.filter((item) => item._configLibraryId !== null);
-
-  // One-shot diagnostic when filter ate everything: dump configured IDs +
-  // the first item's actual IDs so the mismatch is visible.
-  if (rawItems.length > 0 && filtered.length === 0) {
-    const sample = rawItems[0];
-    const sampleAncestors = Array.isArray(sample.AncestorIds)
-      ? sample.AncestorIds
-      : [];
-    const sampleCandidates = [sample.ParentId, ...sampleAncestors].filter(Boolean);
+  // Jellyfin item IDs are 32-char hex. Skip anything else (e.g. a stray "on"
+  // value that leaked in from a checkbox).
+  const validId = (id) => /^[0-9a-f]{32}$/i.test(id);
+  const configuredIds = Object.keys(libraryChannels).filter(validId);
+  const skipped = Object.keys(libraryChannels).filter((id) => !validId(id));
+  if (skipped.length > 0) {
     logger.warn(
-      `Weekly Roundup: library mismatch — configured ids: [${[...allowedLibraryIds].join(", ")}], known Jellyfin library ids (both forms): [${[...libraryIds].join(", ")}], sample item "${sample.Name}" (Type=${sample.Type}) had ParentId+AncestorIds=[${sampleCandidates.join(", ")}], translated=[${sampleCandidates.map((id) => resolveConfigLibraryId(id, libraryIdMap)).join(", ")}]`
+      `Weekly Roundup: ignoring invalid library ids in JELLYFIN_NOTIFICATION_LIBRARIES: [${skipped.join(", ")}]`
     );
   }
 
+  // Query Jellyfin once per configured library with ParentId + Recursive — this
+  // sidesteps the issue that items reference internal CollectionIds (or even
+  // BoxSet ids) that don't appear in /Library/VirtualFolders. The library
+  // membership is implicit in the query, so no post-fetch translation needed.
+  // Both the VirtualFolderItemId and CollectionId forms are valid ParentId
+  // values on Jellyfin's /Items endpoint, so passing the configured ids
+  // directly works regardless of which form was stored.
+  const all = [];
+  let totalRaw = 0;
+  for (const libId of configuredIds) {
+    let items;
+    try {
+      items = await jellyfinApi.fetchRecentlyAdded(
+        apiKey,
+        baseUrl,
+        FETCH_LIMIT,
+        cutoff,
+        libId
+      );
+    } catch (err) {
+      throw new Error(
+        `Failed to fetch recent items for library ${libId}: ${err?.message}`
+      );
+    }
+    totalRaw += items.length;
+    for (const item of items) {
+      item._configLibraryId = libId;
+      all.push(item);
+    }
+  }
+
+  // Dedupe by item.Id — an item could in theory live in multiple configured
+  // libraries; keep the first occurrence (libraries iterate in config order).
+  const seen = new Set();
+  const filtered = all.filter((item) => {
+    if (!item.Id || seen.has(item.Id)) return false;
+    seen.add(item.Id);
+    return true;
+  });
+
   logger.info(
-    `Weekly Roundup: Jellyfin returned ${rawItems.length} items since ${cutoff}, ${filtered.length} matched configured notification libraries (${allowedLibraryIds.size} library ids configured)`
+    `Weekly Roundup: queried ${configuredIds.length} configured libraries since ${cutoff}, got ${totalRaw} items (${filtered.length} after dedupe)`
   );
 
-  // Stash diagnostics on the array so the caller can build a smarter
-  // "nothing to post" message in test mode without re-querying Jellyfin.
-  filtered.rawCount = rawItems.length;
-  filtered.allowedLibraryCount = allowedLibraryIds.size;
+  filtered.rawCount = totalRaw;
+  filtered.allowedLibraryCount = configuredIds.length;
   return filtered;
 }
 
