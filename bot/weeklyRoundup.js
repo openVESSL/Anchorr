@@ -239,14 +239,19 @@ function groupItems(items) {
           libraryId,
           seriesId: item.SeriesId,
           seriesName: item.SeriesName || t("roundup.unknown_series"),
+          // seasons: Map<seasonNum, Set<episodeNum>> — Set so a Sonarr quality
+          // upgrade that re-imports the same episode multiple times in a week
+          // counts once instead of inflating the season count.
           seasons: new Map(),
           latestCreated: new Date(0),
         };
         const seasonNum = item.ParentIndexNumber ?? 0;
-        existing.seasons.set(
-          seasonNum,
-          (existing.seasons.get(seasonNum) || 0) + 1
-        );
+        const episodeNum = item.IndexNumber ?? null;
+        const set = existing.seasons.get(seasonNum) || new Set();
+        // Fall back to item.Id for episodes without a numbered IndexNumber
+        // (e.g. specials) so they are still deduped per Jellyfin item.
+        set.add(episodeNum != null ? `e${episodeNum}` : `id:${item.Id}`);
+        existing.seasons.set(seasonNum, set);
         if (createdAt > existing.latestCreated) existing.latestCreated = createdAt;
         episodesBySeries.set(key, existing);
         break;
@@ -301,7 +306,7 @@ function renderSeason(item) {
 function renderEpisodeGroup(group) {
   const seasonNumbers = Array.from(group.seasons.keys()).sort((a, b) => a - b);
   const episodeTotal = Array.from(group.seasons.values()).reduce(
-    (a, b) => a + b,
+    (a, set) => a + set.size,
     0
   );
 
