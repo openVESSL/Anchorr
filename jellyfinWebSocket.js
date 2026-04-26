@@ -279,22 +279,19 @@ export class JellyfinWebSocketClient {
     libraryChannels,
     defaultChannelId
   ) {
-    // Deduplication
-    if (deduplicator.checkAndRecord(itemId)) {
-      const lastSeen = deduplicator.seenItems.get(itemId);
-      logger.info(
-        `⏭️ Skipping item ${itemId} - already notified recently (${Math.round(
-          (Date.now() - lastSeen) / 60000
-        )} minutes ago)`
-      );
-      return;
-    }
-
     logger.info(`🔍 Processing newly added item: ${itemId}`);
 
     const item = await jellyfinApi.fetchItemDetails(itemId, apiKey, baseUrl);
     if (!item) {
       logger.warn(`Failed to fetch details for item ${itemId}`);
+      return;
+    }
+
+    // Deduplication after fetch — identity key needs item type, providers, S/E
+    if (deduplicator.checkAndRecord(item)) {
+      logger.info(
+        `⏭️ Skipping item ${itemId} ("${item.Name}") - already notified recently (identity dedup)`
+      );
       return;
     }
 

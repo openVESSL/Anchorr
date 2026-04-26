@@ -159,9 +159,9 @@ class JellyfinPoller {
           continue;
         }
 
-        // Deduplication
-        if (deduplicator.checkAndRecord(itemId)) {
-          logger.info(`⏭️ Skipping ${itemType} "${item.Name}" - already notified recently`);
+        // Deduplication — pass the item so identity key survives Sonarr/Radarr upgrades
+        if (deduplicator.checkAndRecord(item)) {
+          logger.info(`⏭️ Skipping ${itemType} "${item.Name}" - already notified recently (identity dedup)`);
           continue;
         }
 
