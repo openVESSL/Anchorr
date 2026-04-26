@@ -1,8 +1,8 @@
 import * as jellyfinApi from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
+import { PersistentMap } from "../utils/persistentMap.js";
 
 const SEEN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — survive Sonarr/Radarr upgrade cycles
-const CLEANUP_AGE_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 /**
  * Fetches all libraries from Jellyfin and returns the library array,
@@ -177,13 +177,17 @@ export function buildIdentityKey(item) {
 }
 
 /**
- * Shared in-memory deduplication store for seen Jellyfin item IDs.
+ * Persistent deduplication store for seen Jellyfin items.
  * Shared between the poller and WebSocket client so that an item
- * detected by both within 24 hours is only notified once.
+ * detected by both within SEEN_THRESHOLD_MS is only notified once.
+ *
+ * State is persisted to disk so it survives container restarts —
+ * otherwise a restart would re-notify everything in the recently-added
+ * window via the next poll/WS reconnect.
  */
 export class ItemDeduplicator {
   constructor() {
-    this.seenItems = new Map(); // itemId → timestamp
+    this.store = new PersistentMap("seen-items", SEEN_THRESHOLD_MS);
   }
 
   /**
@@ -207,21 +211,13 @@ export class ItemDeduplicator {
         return false;
       }
     }
-    const now = Date.now();
-    const lastSeen = this.seenItems.get(key);
-    if (lastSeen && now - lastSeen < SEEN_THRESHOLD_MS) {
-      return true;
-    }
-    this.seenItems.set(key, now);
+    if (this.store.has(key)) return true;
+    this.store.set(key, true);
     return false;
   }
 
-  /** Remove entries older than 7 days to prevent unbounded growth. */
   cleanup() {
-    const cutoff = Date.now() - CLEANUP_AGE_MS;
-    for (const [id, ts] of this.seenItems) {
-      if (ts < cutoff) this.seenItems.delete(id);
-    }
+    this.store.cleanup();
   }
 }
 
