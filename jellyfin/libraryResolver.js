@@ -105,6 +105,78 @@ export function getLibraryAnimeFlag(configLibraryId, libraryChannels) {
 }
 
 /**
+ * Build a stable identity key for an item that survives Sonarr/Radarr upgrades.
+ *
+ * File replacements give the item a new Jellyfin ItemId, so dedup by ItemId
+ * misfires. This key is keyed off content identity (TMDB/SeriesId + S/E)
+ * instead of file identity.
+ *
+ * Accepts both:
+ *   - Webhook payload shape: { ItemType, Provider_tmdb, SeriesId, Name, Year,
+ *     SeasonNumber, EpisodeNumber, IndexNumber, ParentIndexNumber, ItemId }
+ *   - Jellyfin API shape:    { Type, ProviderIds: { Tmdb }, SeriesId, Name,
+ *     ProductionYear, IndexNumber, ParentIndexNumber, Id }
+ *
+ * Falls back to `id:{ItemId}` if no stable identity is derivable — that
+ * preserves legacy behavior for unidentified items rather than silently
+ * grouping them.
+ */
+export function buildIdentityKey(item) {
+  if (!item) return null;
+
+  const type = item.ItemType || item.Type;
+  const tmdb = item.Provider_tmdb || item.ProviderIds?.Tmdb;
+  const seriesId = item.SeriesId;
+  const seasonNum = item.SeasonNumber ?? item.ParentIndexNumber;
+  const episodeNum = item.EpisodeNumber ?? item.IndexNumber;
+  const name = item.Name;
+  const year = item.Year || item.ProductionYear;
+  const itemId = item.ItemId || item.Id;
+
+  switch (type) {
+    case "Movie":
+      if (tmdb) return `movie:tmdb:${tmdb}`;
+      if (name) return `movie:name:${name}:${year ?? "?"}`;
+      return itemId ? `id:${itemId}` : null;
+
+    case "Series":
+      if (tmdb) return `series:tmdb:${tmdb}`;
+      if (seriesId) return `series:id:${seriesId}`;
+      if (name) return `series:name:${name}`;
+      return itemId ? `id:${itemId}` : null;
+
+    case "Season": {
+      const seriesKey = tmdb
+        ? `tmdb:${tmdb}`
+        : seriesId
+        ? `id:${seriesId}`
+        : name
+        ? `name:${name}`
+        : null;
+      if (seriesKey && seasonNum != null) return `series:${seriesKey}:s${seasonNum}`;
+      return itemId ? `id:${itemId}` : null;
+    }
+
+    case "Episode": {
+      const seriesKey = tmdb
+        ? `tmdb:${tmdb}`
+        : seriesId
+        ? `id:${seriesId}`
+        : item.SeriesName
+        ? `name:${item.SeriesName}`
+        : null;
+      if (seriesKey && seasonNum != null && episodeNum != null) {
+        return `series:${seriesKey}:s${seasonNum}e${episodeNum}`;
+      }
+      return itemId ? `id:${itemId}` : null;
+    }
+
+    default:
+      return itemId ? `id:${itemId}` : null;
+  }
+}
+
+/**
  * Shared in-memory deduplication store for seen Jellyfin item IDs.
  * Shared between the poller and WebSocket client so that an item
  * detected by both within 24 hours is only notified once.
