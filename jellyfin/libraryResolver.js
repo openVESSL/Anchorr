@@ -187,7 +187,9 @@ export function buildIdentityKey(item) {
  */
 export class ItemDeduplicator {
   constructor() {
-    this.store = new PersistentMap("seen-items", SEEN_THRESHOLD_MS);
+    this.store = new PersistentMap("seen-items", SEEN_THRESHOLD_MS, {
+      validateValue: (v) => v === true,
+    });
   }
 
   /**

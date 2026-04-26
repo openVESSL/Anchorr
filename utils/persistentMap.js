@@ -39,49 +39,90 @@ function installShutdownHooks() {
  *
  * Used for dedup state — losing a few seconds of writes on hard crash
  * is acceptable; the worst outcome is one extra Discord notification.
+ *
+ * Options:
+ *   - validateValue(value): optional predicate. Entries whose value fails
+ *     the check are dropped on load (defends against tampered/corrupt files).
  */
 export class PersistentMap {
-  constructor(name, defaultTtlMs) {
+  constructor(name, defaultTtlMs, options = {}) {
     this.name = name;
     this.defaultTtlMs = defaultTtlMs;
+    this.validateValue = options.validateValue;
     this.filePath = path.join(path.dirname(CONFIG_PATH), `dedup-${name}.json`);
     this.entries = new Map();
     this.flushTimer = null;
     this.dirty = false;
+    this.consecutiveFlushFailures = 0;
     this._load();
     registry.add(this);
     installShutdownHooks();
   }
 
-  _load() {
+  _quarantine(reason) {
     try {
-      if (!fs.existsSync(this.filePath)) return;
-      const raw = fs.readFileSync(this.filePath, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        logger.warn(`PersistentMap[${this.name}]: file content is not an array, ignoring`);
-        return;
-      }
-      const now = Date.now();
-      let loaded = 0;
-      let dropped = 0;
-      for (const entry of parsed) {
-        if (!entry || typeof entry !== "object") continue;
-        const { key, value, expiresAt } = entry;
-        if (typeof key !== "string" || typeof expiresAt !== "number") continue;
-        if (expiresAt <= now) {
-          dropped++;
-          continue;
-        }
-        this.entries.set(key, { value, expiresAt });
-        loaded++;
-      }
-      logger.info(
-        `PersistentMap[${this.name}]: loaded ${loaded} entries from ${this.filePath} (dropped ${dropped} expired)`
+      const dest = `${this.filePath}.corrupt-${Date.now()}`;
+      fs.renameSync(this.filePath, dest);
+      logger.warn(
+        `PersistentMap[${this.name}]: quarantined corrupt file to ${dest} (${reason})`
       );
     } catch (err) {
-      logger.warn(`PersistentMap[${this.name}]: failed to load (${err?.message || err})`);
+      logger.warn(
+        `PersistentMap[${this.name}]: failed to quarantine corrupt file (${err?.message || err})`
+      );
     }
+  }
+
+  _load() {
+    if (!fs.existsSync(this.filePath)) return;
+    let raw;
+    try {
+      raw = fs.readFileSync(this.filePath, "utf-8");
+    } catch (err) {
+      // IO error — keep file as-is so it isn't overwritten on first flush.
+      logger.warn(`PersistentMap[${this.name}]: read failed (${err?.message || err})`);
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      this._quarantine(`parse error: ${err?.message || err}`);
+      return;
+    }
+    if (!Array.isArray(parsed)) {
+      this._quarantine("file content is not an array");
+      return;
+    }
+    const now = Date.now();
+    let loaded = 0;
+    let dropped = 0;
+    let invalid = 0;
+    for (const entry of parsed) {
+      if (!entry || typeof entry !== "object") {
+        invalid++;
+        continue;
+      }
+      const { key, value, expiresAt } = entry;
+      if (typeof key !== "string" || typeof expiresAt !== "number") {
+        invalid++;
+        continue;
+      }
+      if (expiresAt <= now) {
+        dropped++;
+        continue;
+      }
+      if (this.validateValue && !this.validateValue(value)) {
+        invalid++;
+        continue;
+      }
+      this.entries.set(key, { value, expiresAt });
+      loaded++;
+    }
+    logger.info(
+      `PersistentMap[${this.name}]: loaded ${loaded} entries from ${this.filePath} (dropped ${dropped} expired, ${invalid} invalid)`
+    );
+    if (invalid > 0) this._scheduleFlush(); // rewrite without bad entries
   }
 
   _scheduleFlush() {
@@ -110,9 +151,20 @@ export class PersistentMap {
       const tmpPath = `${this.filePath}.tmp`;
       fs.writeFileSync(tmpPath, JSON.stringify(data), { mode: 0o600 });
       fs.renameSync(tmpPath, this.filePath);
+      if (this.consecutiveFlushFailures > 0) {
+        logger.info(
+          `PersistentMap[${this.name}]: flush recovered after ${this.consecutiveFlushFailures} failure(s)`
+        );
+        this.consecutiveFlushFailures = 0;
+      }
     } catch (err) {
-      logger.warn(`PersistentMap[${this.name}]: flush failed (${err?.message || err})`);
       this.dirty = true;
+      this.consecutiveFlushFailures++;
+      // First failure visible at warn; subsequent ones at debug to avoid
+      // log floods (e.g. disk full + bursty writes every 2s).
+      const msg = `PersistentMap[${this.name}]: flush failed #${this.consecutiveFlushFailures} (${err?.message || err})`;
+      if (this.consecutiveFlushFailures === 1) logger.warn(msg);
+      else logger.debug(msg);
     }
   }
 

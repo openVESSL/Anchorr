@@ -24,7 +24,8 @@ const debouncedSenders = new Map();
 // re-notifies anything in the recently-added window via the next poll/WS reconnect).
 const sentNotifications = new PersistentMap(
   "sent-notifications",
-  7 * 24 * 60 * 60 * 1000 // 7 days — survive Sonarr/Radarr upgrade cycles
+  7 * 24 * 60 * 60 * 1000, // 7 days — survive Sonarr/Radarr upgrade cycles
+  { validateValue: (v) => v && typeof v.level === "number" }
 );
 
 // Sweep stale "in-progress" markers (level: -1) from a previous run. Their
