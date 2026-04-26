@@ -1,8 +1,8 @@
 import * as jellyfinApi from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
 
-const SEEN_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
-const CLEANUP_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SEEN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — survive Sonarr/Radarr upgrade cycles
+const CLEANUP_AGE_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 /**
  * Fetches all libraries from Jellyfin and returns the library array,
@@ -188,15 +188,31 @@ export class ItemDeduplicator {
 
   /**
    * Returns true if the item was seen recently (within SEEN_THRESHOLD_MS).
-   * If not seen recently, records it and returns false.
+   * Accepts either an item object (poller/WS pass the raw Jellyfin item)
+   * or a pre-built identity key string.
+   *
+   * If no stable key can be derived, falls back to logging a warning and
+   * returning false so we never silently skip dedup entirely.
    */
-  checkAndRecord(itemId) {
-    const now = Date.now();
-    const lastSeen = this.seenItems.get(itemId);
-    if (lastSeen && now - lastSeen < SEEN_THRESHOLD_MS) {
-      return true; // already seen
+  checkAndRecord(itemOrKey) {
+    let key;
+    if (typeof itemOrKey === "string") {
+      key = itemOrKey;
+    } else {
+      key = buildIdentityKey(itemOrKey);
+      if (!key) {
+        logger.warn(
+          "ItemDeduplicator.checkAndRecord called with un-keyable input; treating as not-seen"
+        );
+        return false;
+      }
     }
-    this.seenItems.set(itemId, now);
+    const now = Date.now();
+    const lastSeen = this.seenItems.get(key);
+    if (lastSeen && now - lastSeen < SEEN_THRESHOLD_MS) {
+      return true;
+    }
+    this.seenItems.set(key, now);
     return false;
   }
 
