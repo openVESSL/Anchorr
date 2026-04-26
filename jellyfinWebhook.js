@@ -959,7 +959,6 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       const isTestMovie = ItemId && ItemId.startsWith("test-");
       const movieKey = isTestMovie ? `test:${ItemId}` : (buildIdentityKey(data) || `id:${ItemId}`);
 
-      // Check if we already sent a notification for this movie (identity-keyed, survives upgrades)
       if (sentNotifications.has(movieKey)) {
         logger.info(
           `[DEDUP] Duplicate movie notification suppressed for "${data.Name}" (key: ${movieKey})`
@@ -986,10 +985,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         isAnimeLibrary
       );
 
-      // Mark this movie as notified — TTL handled by PersistentMap, survives restart
-      sentNotifications.set(movieKey, {
-        level: 0, // Movies don't have hierarchy levels
-      });
+      sentNotifications.set(movieKey, { level: 0 });
 
       if (res) return res.status(200).send("OK: Movie notification sent.");
       return; // Exit early to prevent fallthrough to unknown item type handler
@@ -1004,8 +1000,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       const SeriesId =
         data.SeriesId || (data.ItemType === "Series" ? data.ItemId : null);
 
-      // Build an upgrade-stable series-level identity key for sentNotifications.
-      // Episodes/Seasons fold into the series-level entry by reusing the Series identity.
+      // Episodes/Seasons fold into a series-level entry by reusing the Series identity.
       const seriesIdentityInput = {
         ItemType: "Series",
         Provider_tmdb: data.Provider_tmdb,
@@ -1216,7 +1211,6 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
 
               const levelSent = getItemLevel(latestData.ItemType);
 
-              // Mark series as notified — TTL handled by PersistentMap, survives restart.
               // Overwrites any temporary level=-1 marker.
               sentNotifications.set(seriesKey, {
                 level: levelSent,
