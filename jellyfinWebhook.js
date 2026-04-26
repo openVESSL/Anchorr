@@ -26,6 +26,18 @@ const sentNotifications = new PersistentMap(
   "sent-notifications",
   7 * 24 * 60 * 60 * 1000 // 7 days — survive Sonarr/Radarr upgrade cycles
 );
+
+// Sweep stale "in-progress" markers (level: -1) from a previous run. Their
+// associated debouncer is gone after restart, so the marker would otherwise
+// block notifications for that series until its 5-min TTL expires.
+const staleMarkers = sentNotifications.prune(
+  (_key, value) => value?.level === -1
+);
+if (staleMarkers > 0) {
+  logger.info(
+    `[DEDUP] Cleared ${staleMarkers} stale in-progress markers from previous run`
+  );
+}
 const episodeMessages = new Map(); // Track Discord messages for editing: SeriesId -> { messageId, channelId }
 const creatingDebouncers = new Set(); // Prevent race condition: track SeriesIds currently creating debouncers
 

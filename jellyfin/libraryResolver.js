@@ -205,8 +205,10 @@ export class ItemDeduplicator {
     } else {
       key = buildIdentityKey(itemOrKey);
       if (!key) {
+        const type = itemOrKey?.Type || itemOrKey?.ItemType;
+        const name = itemOrKey?.Name;
         logger.warn(
-          "ItemDeduplicator.checkAndRecord called with un-keyable input; treating as not-seen"
+          `ItemDeduplicator.checkAndRecord: un-keyable input (Type=${type}, Name=${name}); dedup bypassed for this item`
         );
         return false;
       }

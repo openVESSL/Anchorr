@@ -20,6 +20,10 @@ function installShutdownHooks() {
       }
     }
   };
+  // Process termination is owned by app.js (which calls process.exit(0) after
+  // server.close). These additional listeners run synchronously alongside it
+  // to flush dirty state before exit; we deliberately do not call exit here
+  // to avoid racing app.js's graceful shutdown.
   process.on("SIGTERM", flushAll);
   process.on("SIGINT", flushAll);
   process.on("beforeExit", flushAll);
@@ -149,6 +153,19 @@ export class PersistentMap {
     let removed = 0;
     for (const [key, entry] of this.entries) {
       if (entry.expiresAt <= now) {
+        this.entries.delete(key);
+        removed++;
+      }
+    }
+    if (removed > 0) this._scheduleFlush();
+    return removed;
+  }
+
+  /** Drop entries matching the predicate. Returns count removed. */
+  prune(predicate) {
+    let removed = 0;
+    for (const [key, entry] of this.entries) {
+      if (predicate(key, entry.value)) {
         this.entries.delete(key);
         removed++;
       }
