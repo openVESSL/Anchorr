@@ -17,9 +17,15 @@ import {
   getLibraryAnimeFlag,
   buildIdentityKey,
 } from "./jellyfin/libraryResolver.js";
+import { PersistentMap } from "./utils/persistentMap.js";
 
 const debouncedSenders = new Map();
-const sentNotifications = new Map();
+// Persistent so dedup state survives container restarts (otherwise a restart
+// re-notifies anything in the recently-added window via the next poll/WS reconnect).
+const sentNotifications = new PersistentMap(
+  "sent-notifications",
+  7 * 24 * 60 * 60 * 1000 // 7 days — survive Sonarr/Radarr upgrade cycles
+);
 const episodeMessages = new Map(); // Track Discord messages for editing: SeriesId -> { messageId, channelId }
 const creatingDebouncers = new Set(); // Prevent race condition: track SeriesIds currently creating debouncers
 
@@ -53,7 +59,6 @@ const CLEANUP_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000; // 14 days — periodic c
 const DEFAULT_DEBOUNCE_MS = 60000; // 60 seconds
 const NEW_SERIES_DEBOUNCE_MS = 120000; // 2 minutes - longer debounce for episodes/seasons of new series
 const SEASON_NOTIFICATION_DELAY_MS = 3 * 60 * 1000; // 3 minutes - allow season notifications after this delay
-const SENT_NOTIFICATION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — survive Sonarr/Radarr upgrade cycles
 
 // Periodic cleanup for old debouncer entries and API cache (prevent memory leaks on long-running servers)
 setInterval(() => {
@@ -969,17 +974,9 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         isAnimeLibrary
       );
 
-      // Mark this movie as notified — 7d TTL covers typical Sonarr/Radarr upgrade window
-      const cleanupTimer = setTimeout(() => {
-        sentNotifications.delete(movieKey);
-        logger.debug(
-          `Cleaned up movie notification state for key: ${movieKey}`
-        );
-      }, SENT_NOTIFICATION_TTL_MS);
-
+      // Mark this movie as notified — TTL handled by PersistentMap, survives restart
       sentNotifications.set(movieKey, {
         level: 0, // Movies don't have hierarchy levels
-        cleanupTimer: cleanupTimer,
       });
 
       if (res) return res.status(200).send("OK: Movie notification sent.");
@@ -1207,27 +1204,11 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
 
               const levelSent = getItemLevel(latestData.ItemType);
 
-              // Clear any existing cleanup timer (from temporary marker)
-              if (sentNotifications.has(seriesKey)) {
-                const existingNotification = sentNotifications.get(seriesKey);
-                if (existingNotification.cleanupTimer) {
-                  clearTimeout(existingNotification.cleanupTimer);
-                }
-              }
-
-              // Set a cleanup timer for the 'sent' notification state
-              // Use a longer duration to prevent duplicate notifications from delayed webhooks
-              const cleanupTimer = setTimeout(() => {
-                sentNotifications.delete(seriesKey);
-                logger.debug(
-                  `Cleaned up sent notification state for SeriesId: ${SeriesId}`
-                );
-              }, SENT_NOTIFICATION_TTL_MS);
-
+              // Mark series as notified — TTL handled by PersistentMap, survives restart.
+              // Overwrites any temporary level=-1 marker.
               sentNotifications.set(seriesKey, {
                 level: levelSent,
                 timestamp: Date.now(),
-                cleanupTimer: cleanupTimer,
               });
               logger.info(
                 `[SENT NOTIFICATION] Set sentLevel=${levelSent} for SeriesId ${SeriesId} (${latestData.Name})`
@@ -1244,10 +1225,9 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
               // Cleanup all maps on error so future webhooks for this series are not blocked
               debouncedSenders.delete(seriesKey);
               creatingDebouncers.delete(seriesKey);
-              // Clear temp marker (-1) so the series is not blocked for 24h after a failed notification
+              // Clear temp marker (-1) so the series is not blocked after a failed notification
               if (sentNotifications.has(seriesKey)) {
                 const existing = sentNotifications.get(seriesKey);
-                if (existing.cleanupTimer) clearTimeout(existing.cleanupTimer);
                 if (existing.level === -1) sentNotifications.delete(seriesKey);
               }
             }
@@ -1270,30 +1250,18 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         // Remove from creatingDebouncers now that it's been added to debouncedSenders
         creatingDebouncers.delete(seriesKey);
 
-        // Mark this series as being processed immediately to prevent duplicate debouncers
-        // This will be updated with the final level once the debounced notification is sent
-        const tempCleanupTimer = setTimeout(() => {
-          // Only clean up if debouncer is no longer active
-          if (
-            !debouncedSenders.has(seriesKey) &&
-            sentNotifications.has(seriesKey)
-          ) {
-            const notification = sentNotifications.get(seriesKey);
-            // Only delete if this is still the temp marker (level: -1)
-            if (notification.level === -1) {
-              sentNotifications.delete(seriesKey);
-              logger.debug(
-                `Cleaned up temporary notification marker for SeriesId: ${SeriesId}`
-              );
-            }
-          }
-        }, 5 * 60 * 1000); // 5 minutes — short enough that a failed debounce doesn't block the series for long
-
-        sentNotifications.set(seriesKey, {
-          level: -1, // Temporary marker indicating processing is in progress
-          timestamp: Date.now(),
-          cleanupTimer: tempCleanupTimer,
-        });
+        // Mark this series as being processed immediately to prevent duplicate debouncers.
+        // 5-minute per-entry TTL: if the debouncer fires (typically within 60-120s),
+        // the entry gets overwritten with the real level; if it never fires (stuck or
+        // crashed), the marker expires on its own so the series isn't blocked indefinitely.
+        sentNotifications.set(
+          seriesKey,
+          {
+            level: -1, // Temporary marker indicating processing is in progress
+            timestamp: Date.now(),
+          },
+          5 * 60 * 1000
+        );
       }
 
       // Update the data to be sent with the highest-level notification received so far.
