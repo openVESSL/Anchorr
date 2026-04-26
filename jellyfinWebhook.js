@@ -15,6 +15,7 @@ import {
   getLibraryChannels,
   resolveTargetChannel,
   getLibraryAnimeFlag,
+  buildIdentityKey,
 } from "./jellyfin/libraryResolver.js";
 
 const debouncedSenders = new Map();
@@ -48,10 +49,11 @@ const libraryCache = {
 
 // Cleanup configuration
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const CLEANUP_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CLEANUP_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000; // 14 days — periodic cleanup of stale debouncers
 const DEFAULT_DEBOUNCE_MS = 60000; // 60 seconds
 const NEW_SERIES_DEBOUNCE_MS = 120000; // 2 minutes - longer debounce for episodes/seasons of new series
 const SEASON_NOTIFICATION_DELAY_MS = 3 * 60 * 1000; // 3 minutes - allow season notifications after this delay
+const SENT_NOTIFICATION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — survive Sonarr/Radarr upgrade cycles
 
 // Periodic cleanup for old debouncer entries and API cache (prevent memory leaks on long-running servers)
 setInterval(() => {
@@ -938,11 +940,12 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
     if (data.ItemType === "Movie") {
       const { ItemId } = data;
       const isTestMovie = ItemId && ItemId.startsWith("test-");
+      const movieKey = isTestMovie ? `test:${ItemId}` : (buildIdentityKey(data) || `id:${ItemId}`);
 
-      // Check if we already sent a notification for this movie
-      if (sentNotifications.has(ItemId)) {
-        logger.debug(
-          `Duplicate movie notification detected for: ${data.Name} (${ItemId}). Skipping.`
+      // Check if we already sent a notification for this movie (identity-keyed, survives upgrades)
+      if (sentNotifications.has(movieKey)) {
+        logger.info(
+          `[DEDUP] Duplicate movie notification suppressed for "${data.Name}" (key: ${movieKey})`
         );
         if (res) {
           return res
@@ -966,15 +969,15 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         isAnimeLibrary
       );
 
-      // Mark this movie as notified
+      // Mark this movie as notified — 7d TTL covers typical Sonarr/Radarr upgrade window
       const cleanupTimer = setTimeout(() => {
-        sentNotifications.delete(ItemId);
+        sentNotifications.delete(movieKey);
         logger.debug(
-          `Cleaned up movie notification state for ItemId: ${ItemId}`
+          `Cleaned up movie notification state for key: ${movieKey}`
         );
-      }, 24 * 60 * 60 * 1000); // 24 hours
+      }, SENT_NOTIFICATION_TTL_MS);
 
-      sentNotifications.set(ItemId, {
+      sentNotifications.set(movieKey, {
         level: 0, // Movies don't have hierarchy levels
         cleanupTimer: cleanupTimer,
       });
@@ -991,6 +994,18 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       // For Series type, SeriesId is undefined, so use ItemId instead
       const SeriesId =
         data.SeriesId || (data.ItemType === "Series" ? data.ItemId : null);
+
+      // Build an upgrade-stable series-level identity key for sentNotifications.
+      // Episodes/Seasons fold into the series-level entry by reusing the Series identity.
+      const seriesIdentityInput = {
+        ItemType: "Series",
+        Provider_tmdb: data.Provider_tmdb,
+        SeriesId: SeriesId,
+        Name: data.SeriesName || (data.ItemType === "Series" ? data.Name : null),
+        ItemId: SeriesId,
+      };
+      const seriesKey = buildIdentityKey(seriesIdentityInput) || `id:${SeriesId}`;
+      logger.debug(`[DEDUP] Series identity key for "${data.Name}": ${seriesKey} (raw SeriesId: ${SeriesId})`);
       
       // Initialize variables outside the if block so they're accessible later
       let sentNotificationData = null;
@@ -1003,7 +1018,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       const skipDuplicateCheck = data.ItemId && data.ItemId.startsWith("test-");
       
       if (!skipDuplicateCheck) {
-        sentNotificationData = sentNotifications.get(SeriesId);
+        sentNotificationData = sentNotifications.get(seriesKey);
         sentLevel = sentNotificationData ? sentNotificationData.level : 0;
         sentTimestamp = sentNotificationData
           ? sentNotificationData.timestamp
@@ -1023,7 +1038,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       // If sentLevel === -1 (temporary marker), it means notification is being processed
       // Only block if there's no active debouncer (which would allow batching)
       if (sentLevel === -1) {
-        if (!debouncedSenders.has(SeriesId)) {
+        if (!debouncedSenders.has(seriesKey)) {
           shouldBlock = true;
           logger.debug(`[BLOCKED] Notification for ${data.ItemType} "${data.Name}" blocked: already processing this series with no active debouncer (sentLevel: ${sentLevel})`);
         } else {
@@ -1125,8 +1140,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       // This prevents duplicate notifications from delayed webhooks
       // ALSO: Check if we're already creating a debouncer to prevent race condition
       if (
-        !debouncedSenders.has(SeriesId) &&
-        !creatingDebouncers.has(SeriesId)
+        !debouncedSenders.has(seriesKey) &&
+        !creatingDebouncers.has(seriesKey)
       ) {
         // Check if we already sent a notification for this series
         if (sentLevel > 0) {
@@ -1144,7 +1159,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         }
 
         // Mark this SeriesId as currently creating a debouncer
-        creatingDebouncers.add(SeriesId);
+        creatingDebouncers.add(seriesKey);
 
         // Check if this is a batch test notification
         const isBatchTest = data.ItemId && data.ItemId.startsWith("batch-");
@@ -1193,8 +1208,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
               const levelSent = getItemLevel(latestData.ItemType);
 
               // Clear any existing cleanup timer (from temporary marker)
-              if (sentNotifications.has(SeriesId)) {
-                const existingNotification = sentNotifications.get(SeriesId);
+              if (sentNotifications.has(seriesKey)) {
+                const existingNotification = sentNotifications.get(seriesKey);
                 if (existingNotification.cleanupTimer) {
                   clearTimeout(existingNotification.cleanupTimer);
                 }
@@ -1203,13 +1218,13 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
               // Set a cleanup timer for the 'sent' notification state
               // Use a longer duration to prevent duplicate notifications from delayed webhooks
               const cleanupTimer = setTimeout(() => {
-                sentNotifications.delete(SeriesId);
+                sentNotifications.delete(seriesKey);
                 logger.debug(
                   `Cleaned up sent notification state for SeriesId: ${SeriesId}`
                 );
-              }, 2 * 60 * 60 * 1000); // 2 hours instead of 24 hours - enough to block duplicates but not too long
+              }, SENT_NOTIFICATION_TTL_MS);
 
-              sentNotifications.set(SeriesId, {
+              sentNotifications.set(seriesKey, {
                 level: levelSent,
                 timestamp: Date.now(),
                 cleanupTimer: cleanupTimer,
@@ -1219,28 +1234,28 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
               );
 
               // The debounced function has fired, we can remove it.
-              debouncedSenders.delete(SeriesId);
-              creatingDebouncers.delete(SeriesId); // Also cleanup from creatingDebouncers
+              debouncedSenders.delete(seriesKey);
+              creatingDebouncers.delete(seriesKey); // Also cleanup from creatingDebouncers
             } catch (error) {
               logger.error(
                 `Error in debounced notification for series ${SeriesId}:`,
                 error
               );
               // Cleanup all maps on error so future webhooks for this series are not blocked
-              debouncedSenders.delete(SeriesId);
-              creatingDebouncers.delete(SeriesId);
+              debouncedSenders.delete(seriesKey);
+              creatingDebouncers.delete(seriesKey);
               // Clear temp marker (-1) so the series is not blocked for 24h after a failed notification
-              if (sentNotifications.has(SeriesId)) {
-                const existing = sentNotifications.get(SeriesId);
+              if (sentNotifications.has(seriesKey)) {
+                const existing = sentNotifications.get(seriesKey);
                 if (existing.cleanupTimer) clearTimeout(existing.cleanupTimer);
-                if (existing.level === -1) sentNotifications.delete(SeriesId);
+                if (existing.level === -1) sentNotifications.delete(seriesKey);
               }
             }
           },
           debounceMs
         );
 
-        debouncedSenders.set(SeriesId, {
+        debouncedSenders.set(seriesKey, {
           sender: newDebouncedSender,
           latestData: data,
           episodeCount: 0,
@@ -1253,20 +1268,20 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         });
 
         // Remove from creatingDebouncers now that it's been added to debouncedSenders
-        creatingDebouncers.delete(SeriesId);
+        creatingDebouncers.delete(seriesKey);
 
         // Mark this series as being processed immediately to prevent duplicate debouncers
         // This will be updated with the final level once the debounced notification is sent
         const tempCleanupTimer = setTimeout(() => {
           // Only clean up if debouncer is no longer active
           if (
-            !debouncedSenders.has(SeriesId) &&
-            sentNotifications.has(SeriesId)
+            !debouncedSenders.has(seriesKey) &&
+            sentNotifications.has(seriesKey)
           ) {
-            const notification = sentNotifications.get(SeriesId);
+            const notification = sentNotifications.get(seriesKey);
             // Only delete if this is still the temp marker (level: -1)
             if (notification.level === -1) {
-              sentNotifications.delete(SeriesId);
+              sentNotifications.delete(seriesKey);
               logger.debug(
                 `Cleaned up temporary notification marker for SeriesId: ${SeriesId}`
               );
@@ -1274,7 +1289,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           }
         }, 5 * 60 * 1000); // 5 minutes — short enough that a failed debounce doesn't block the series for long
 
-        sentNotifications.set(SeriesId, {
+        sentNotifications.set(seriesKey, {
           level: -1, // Temporary marker indicating processing is in progress
           timestamp: Date.now(),
           cleanupTimer: tempCleanupTimer,
@@ -1282,11 +1297,11 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       }
 
       // Update the data to be sent with the highest-level notification received so far.
-      logger.info(`[DEBOUNCER] Getting existing debouncer for SeriesId: ${SeriesId}, exists: ${debouncedSenders.has(SeriesId)}`);
-      const debouncer = debouncedSenders.get(SeriesId);
-      
+      logger.info(`[DEBOUNCER] Getting existing debouncer for SeriesId: ${SeriesId}, exists: ${debouncedSenders.has(seriesKey)}`);
+      const debouncer = debouncedSenders.get(seriesKey);
+
       if (!debouncer) {
-        logger.error(`[DEBOUNCER] ERROR: Debouncer not found for SeriesId: ${SeriesId} even though has() returned ${debouncedSenders.has(SeriesId)}`);
+        logger.error(`[DEBOUNCER] ERROR: Debouncer not found for SeriesId: ${SeriesId} even though has() returned ${debouncedSenders.has(seriesKey)}`);
         if (res) return res.status(500).send("Internal error: debouncer not found");
         return;
       }
