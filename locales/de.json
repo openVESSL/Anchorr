@@ -463,6 +463,8 @@
     "unknown_series": "Unbekannte Serie",
     "season_fallback": "Staffel {n}",
     "library_fallback": "Bibliothek",
+    "library_names_unavailable": "Bibliotheksnamen nicht verfügbar",
+    "field_more": "_… und {count} weitere_",
     "unknown_title": "Unbekannt"
   }
 }

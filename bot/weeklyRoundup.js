@@ -106,7 +106,11 @@ async function runTick(client) {
   const now = new Date();
 
   if (now.getDay() !== targetWeekday) return;
-  if (now.getHours() !== targetHour) return;
+  // `>=` instead of strict equality: if the bot was down or the hourly tick
+  // drifted past the boundary, post on the next tick within the same day
+  // rather than skipping the entire week. The 6-day idempotency guard below
+  // still prevents duplicates on re-tick.
+  if (now.getHours() < targetHour) return;
 
   const lastPostedAtStr = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT || "";
   if (lastPostedAtStr) {
@@ -199,9 +203,10 @@ async function fetchWindowItems() {
     `Weekly Roundup: queried ${configuredIds.length} configured libraries since ${cutoff}, got ${totalRaw} items (${filtered.length} after dedupe)`
   );
 
-  // One-shot diagnostic: dump the raw identity fields for each episode so
-  // we can see why dedup might fail (missing IndexNumber, varying Name,
-  // multiple item ids for the same episode, ...).
+  // Diagnostic: dump the raw identity fields for each episode so we can see
+  // why dedup might fail (missing IndexNumber, varying Name, multiple item
+  // ids for the same episode, ...). Debug-level — only useful when actively
+  // chasing a dedup mismatch; noise during normal operation.
   const episodes = filtered.filter((it) => it.Type === "Episode");
   if (episodes.length > 0) {
     const dump = episodes
@@ -211,7 +216,7 @@ async function fetchWindowItems() {
           `{id:${e.Id}, series:"${e.SeriesName}", S${e.ParentIndexNumber}E${e.IndexNumber}${e.IndexNumberEnd != null ? `-${e.IndexNumberEnd}` : ""}, name:"${e.Name}", created:${e.DateCreated}}`
       )
       .join("\n  ");
-    logger.info(
+    logger.debug(
       `Weekly Roundup: episode raw fields (first 30 of ${episodes.length}):\n  ${dump}`
     );
   }
@@ -399,6 +404,30 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     bumpFailure(now);
   };
 
+  // Preflight: a malformed JELLYFIN_BASE_URL causes buildJellyfinUrl to emit
+  // an http://invalid.local/... sentinel. Catching that here means the user
+  // never sees a digest full of unclickable links — they get an ops log and
+  // the failure counter advances normally. Reaching this with no value at
+  // all (empty/undefined) is also misconfig: bail the same way.
+  const baseUrl = process.env.JELLYFIN_BASE_URL;
+  let baseUrlOk = false;
+  try {
+    if (baseUrl) {
+      // eslint-disable-next-line no-new
+      new URL(baseUrl);
+      baseUrlOk = true;
+    }
+  } catch {
+    /* fall through */
+  }
+  if (!baseUrlOk) {
+    const msg = `JELLYFIN_BASE_URL is missing or not a valid URL ("${baseUrl ?? ""}")`;
+    logger.error(`${logPrefix}: ${msg}`);
+    if (isTest) throw new Error(msg);
+    bumpFailure(now);
+    return;
+  }
+
   let items;
   try {
     items = await fetchWindowItems();
@@ -517,30 +546,53 @@ async function buildRoundupEmbed(grouped, rawItems) {
     embed.setThumbnail(thumbUrl);
   }
 
-  const libraryNames = await resolveLibraryNames(
-    Array.from(grouped.perLibrary.keys())
-  );
+  const { map: libraryNames, failed: libraryNamesFailed } =
+    await resolveLibraryNames(Array.from(grouped.perLibrary.keys()));
 
   for (const [libraryId, bucket] of grouped.perLibrary.entries()) {
     const name = libraryNames[libraryId] || t("roundup.library_fallback");
-    const value = bucket.entries.join("\n").slice(0, 1024);
-    embed.addFields({ name, value });
+    embed.addFields({ name, value: renderFieldValue(bucket.entries) });
   }
 
-  if (grouped.overflow > 0) {
-    embed.setFooter({
-      text: t("roundup.footer_overflow", {
-        count: grouped.totalCount,
-        overflow: grouped.overflow,
-      }),
-    });
-  } else {
-    embed.setFooter({
-      text: t("roundup.footer_total", { count: grouped.totalCount }),
-    });
+  let footerText =
+    grouped.overflow > 0
+      ? t("roundup.footer_overflow", {
+          count: grouped.totalCount,
+          overflow: grouped.overflow,
+        })
+      : t("roundup.footer_total", { count: grouped.totalCount });
+  // If we couldn't resolve real library names AND there are multiple
+  // sections, every section header reads the same generic fallback — note
+  // that in the footer so Discord viewers understand why headers look alike.
+  if (libraryNamesFailed && grouped.perLibrary.size > 1) {
+    footerText += " · " + t("roundup.library_names_unavailable");
   }
+  embed.setFooter({ text: footerText });
 
   return embed;
+}
+
+// Discord embed field values are capped at 1024 chars. Joining everything and
+// byte-slicing can cut a markdown link in half (e.g. `[**Title**](http://…`),
+// producing a broken field. Build entry-by-entry until the next entry would
+// overflow, then append a translated overflow hint if anything was dropped.
+const FIELD_VALUE_BUDGET = 1024;
+function renderFieldValue(entries) {
+  let value = "";
+  let dropped = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const next = (value ? "\n" : "") + entries[i];
+    if (value.length + next.length > FIELD_VALUE_BUDGET) {
+      dropped = entries.length - i;
+      break;
+    }
+    value += next;
+  }
+  if (dropped > 0) {
+    const moreLine = "\n" + t("roundup.field_more", { count: dropped });
+    if (value.length + moreLine.length <= FIELD_VALUE_BUDGET) value += moreLine;
+  }
+  return value;
 }
 
 async function resolveLibraryNames(libraryIds) {
@@ -552,11 +604,11 @@ async function resolveLibraryNames(libraryIds) {
   } catch (err) {
     // Item data already came back fine; don't nuke the whole roundup just
     // because the library-names lookup blipped. Fall back to the generic
-    // label for each library id.
+    // label and signal the caller so the embed footer can note it.
     logger.warn(
       `Weekly Roundup: failed to resolve library names, using fallback label: ${err?.message}`
     );
-    return {};
+    return { map: {}, failed: true };
   }
   const map = {};
   for (const lib of libs || []) {
@@ -565,7 +617,7 @@ async function resolveLibraryNames(libraryIds) {
       map[id] = lib.Name;
     }
   }
-  return map;
+  return { map, failed: false };
 }
 
 function formatDate(d) {

@@ -1043,10 +1043,16 @@ function configureWebServer() {
       });
     } catch (error) {
       logger.error("Failed to send test weekly roundup:", error);
+      // Cap message length and coerce to string defensively — these strings
+      // come from upstream throws (Jellyfin axios errors, Discord client
+      // errors) whose shape we don't control. Keeps the dashboard response
+      // bounded even if a future upgrade changes error.message.
+      const raw =
+        typeof error?.message === "string" ? error.message : String(error);
       res.status(500).json({
         success: false,
         message:
-          error.message ||
+          raw.slice(0, 500) ||
           "Failed to send weekly roundup. Check logs for details.",
       });
     }

@@ -1,8 +1,15 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import logger from "./logger.js";
 
-const LOCALES_DIR = path.join(process.cwd(), "locales");
+// Resolve relative to this module so the loader works regardless of cwd
+// (e.g. when the bot is launched from a different working directory).
+const LOCALES_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "locales"
+);
 const FALLBACK_LANG = "en";
 // Accept only conservative locale codes (e.g. "en", "de", "pt_BR"). Prevents
 // path traversal or JSON-read of arbitrary files if LANGUAGE is somehow
@@ -19,11 +26,14 @@ function safeLang(raw) {
 
 function loadLocaleFile(lang) {
   const file = path.join(LOCALES_DIR, `${lang}.json`);
-  if (!fs.existsSync(file)) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch (err) {
-    logger.error(`[i18n] Failed to parse ${file}:`, err.message);
+    // ENOENT is the "missing locale" path; everything else (EACCES, parse
+    // errors, etc.) is a real failure that should be loud in the logs so
+    // empty translations aren't silently blamed on a missing file.
+    if (err.code === "ENOENT") return null;
+    logger.error(`[i18n] Failed to read/parse ${file}: ${err.message}`);
     return null;
   }
 }

@@ -392,6 +392,8 @@
     "unknown_series": "Unknown Series",
     "season_fallback": "Season {n}",
     "library_fallback": "Library",
+    "library_names_unavailable": "library names unavailable",
+    "field_more": "_… and {count} more_",
     "unknown_title": "Unknown"
   }
 }

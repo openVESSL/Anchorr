@@ -393,6 +393,8 @@
     "unknown_series": "Okänd serie",
     "season_fallback": "Säsong {n}",
     "library_fallback": "Bibliotek",
+    "library_names_unavailable": "biblioteksnamn är inte tillgängliga",
+    "field_more": "_… och {count} till_",
     "unknown_title": "Okänd"
   }
 }
