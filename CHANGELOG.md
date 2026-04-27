@@ -7,11 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.5.4] - 2026-04-24
+## [1.5.5] - 2026-04-27
 
 ### ✨ Added
 
 - **Weekly Roundup**: Optional scheduled Discord post that summarizes new Jellyfin content from the last 7 days. Disabled by default. Configurable via the dashboard (channel, weekday, hour, embed color). The roundup groups items by library and collapses episodes of the same series into one line (e.g. _"My Show — Seasons 1 & 2 (12 episodes)"_). Item titles link directly to Jellyfin. A hourly scheduler tick with a persisted `WEEKLY_ROUNDUP_LAST_POSTED_AT` timestamp makes the post idempotent across Docker restarts.
+
+---
+
+## [1.5.4] - 2026-04-26
+
+### 🐛 Fixed
+
+- **Sonarr/Radarr quality upgrades no longer trigger duplicate "new content" Discord notifications.** When Sonarr or Radarr replaced an existing file with a higher-quality release, Jellyfin assigned a new internal `ItemId` to the re-imported file. Anchorr's dedup keyed off that ItemId and treated the upgrade as a brand-new item. The dedup layer now keys items by a stable identity (TMDB ID + season/episode for shows, TMDB ID for movies) that survives file replacement. Dedup window extended to 7 days to cover typical upgrade cycles.
+- **Dedup state survives container restarts.** Previously the in-memory dedup maps were wiped on every restart, so the next poll/WebSocket reconnect would re-notify everything in the recently-added window. State is now persisted to `config/dedup-*.json` and reloaded on startup, with expired entries dropped automatically.
 
 ---
 

@@ -29,5 +29,5 @@ coverage/
 TODO.md
 SRP_ANALYSIS.md
 ToDo_v2.md
-docs/glossary.md
-docs/superpowers/
+docs/
+config/dedup-*.json
