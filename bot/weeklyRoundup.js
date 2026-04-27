@@ -80,55 +80,58 @@ function parseIntInRange(raw, fallback, min, max) {
 }
 
 async function runTick(client) {
-  try {
-    const enabled = process.env.WEEKLY_ROUNDUP_ENABLED === "true";
-    if (!enabled) return;
+  const enabled = process.env.WEEKLY_ROUNDUP_ENABLED === "true";
+  if (!enabled) return;
 
-    const channelId = process.env.WEEKLY_ROUNDUP_CHANNEL_ID;
-    if (!channelId) {
-      logger.warn(
-        "Weekly Roundup enabled but no channel configured. Skipping tick."
-      );
-      return;
-    }
-
-    const targetWeekday = parseIntInRange(
-      process.env.WEEKLY_ROUNDUP_WEEKDAY,
-      0,
-      0,
-      6
+  const channelId = process.env.WEEKLY_ROUNDUP_CHANNEL_ID;
+  if (!channelId) {
+    logger.warn(
+      "Weekly Roundup enabled but no channel configured. Skipping tick."
     );
-    const targetHour = parseIntInRange(
-      process.env.WEEKLY_ROUNDUP_HOUR,
-      18,
-      0,
-      23
-    );
-    const now = new Date();
-
-    if (now.getDay() !== targetWeekday) return;
-    if (now.getHours() !== targetHour) return;
-
-    const lastPostedAtStr = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT || "";
-    if (lastPostedAtStr) {
-      const lastPostedAt = new Date(lastPostedAtStr);
-      if (!isNaN(lastPostedAt.getTime())) {
-        const age = now.getTime() - lastPostedAt.getTime();
-        if (age < ALREADY_POSTED_MIN_AGE_MS) return; // already posted this week
-      }
-    }
-
-    if (currentFailures(now) >= 3) {
-      logger.warn(
-        "Weekly Roundup skipped: 3 consecutive failures this week. Will retry next week."
-      );
-      return;
-    }
-
-    await sendWeeklyRoundup(client, channelId, now);
-  } catch (err) {
-    logger.error(`Weekly Roundup tick error: ${err?.message || err}`);
+    return;
   }
+
+  const targetWeekday = parseIntInRange(
+    process.env.WEEKLY_ROUNDUP_WEEKDAY,
+    0,
+    0,
+    6
+  );
+  const targetHour = parseIntInRange(
+    process.env.WEEKLY_ROUNDUP_HOUR,
+    18,
+    0,
+    23
+  );
+  const now = new Date();
+
+  if (now.getDay() !== targetWeekday) return;
+  if (now.getHours() !== targetHour) return;
+
+  const lastPostedAtStr = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT || "";
+  if (lastPostedAtStr) {
+    const lastPostedAt = new Date(lastPostedAtStr);
+    if (isNaN(lastPostedAt.getTime())) {
+      // Fail safe: don't re-post if the persisted timestamp is corrupt — a
+      // duplicate digest is worse than skipping a week. Manual fix: clear the
+      // value via the dashboard.
+      logger.warn(
+        `Weekly Roundup: WEEKLY_ROUNDUP_LAST_POSTED_AT is not a valid date ("${lastPostedAtStr}"); skipping tick to avoid a duplicate post`
+      );
+      return;
+    }
+    const age = now.getTime() - lastPostedAt.getTime();
+    if (age < ALREADY_POSTED_MIN_AGE_MS) return; // already posted this week
+  }
+
+  if (currentFailures(now) >= 3) {
+    logger.warn(
+      "Weekly Roundup skipped: 3 consecutive failures this week. Will retry next week."
+    );
+    return;
+  }
+
+  await sendWeeklyRoundup(client, channelId, now);
 }
 
 async function fetchWindowItems() {
@@ -406,19 +409,25 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   }
 
   if (items.length === 0) {
-    logger.info(`${logPrefix}: no new items this week — skipping post`);
-    if (isTest) {
-      const rawCount = items.rawCount ?? 0;
-      const allowedCount = items.allowedLibraryCount ?? 0;
-      let msg;
-      if (allowedCount === 0) {
-        msg = "No notification libraries configured. Add libraries under Jellyfin notifications in the dashboard.";
-      } else if (rawCount > 0) {
-        msg = `Jellyfin returned ${rawCount} new items in the past week, but none are in your ${allowedCount} configured notification libraries. Check the library list in Jellyfin notifications.`;
-      } else {
-        msg = "Jellyfin returned no new items (Movie/Series/Season/Episode) in the past 7 days.";
-      }
-      throw new Error(msg);
+    const rawCount = items.rawCount ?? 0;
+    const allowedCount = items.allowedLibraryCount ?? 0;
+    let diag;
+    if (allowedCount === 0) {
+      diag = "No notification libraries configured. Add libraries under Jellyfin notifications in the dashboard.";
+    } else if (rawCount > 0) {
+      diag = `Jellyfin returned ${rawCount} new items in the past week, but none are in your ${allowedCount} configured notification libraries. Check the library list in Jellyfin notifications.`;
+    } else {
+      diag = "Jellyfin returned no new items (Movie/Series/Season/Episode) in the past 7 days.";
+    }
+    if (isTest) throw new Error(diag);
+    // warn (not info): "no items" with no configured libraries or a 0-of-N
+    // mismatch is the most common silent-fail symptom users mistake for a
+    // broken feature. Surfacing it loudly in the logs lets ops debug without
+    // turning on debug logging.
+    if (allowedCount === 0 || rawCount > 0) {
+      logger.warn(`${logPrefix}: skipping post — ${diag}`);
+    } else {
+      logger.info(`${logPrefix}: no new items this week — skipping post`);
     }
     resetFailures(now);
     await markPosted(now);
