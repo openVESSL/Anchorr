@@ -159,9 +159,8 @@ class JellyfinPoller {
           continue;
         }
 
-        // Deduplication
-        if (deduplicator.checkAndRecord(itemId)) {
-          logger.info(`⏭️ Skipping ${itemType} "${item.Name}" - already notified recently`);
+        if (deduplicator.checkAndRecord(item)) {
+          logger.info(`⏭️ Skipping ${itemType} "${item.Name}" - already notified recently (identity dedup)`);
           continue;
         }
 
