@@ -5,6 +5,7 @@ import { buildJellyfinUrl } from "../utils/jellyfinUrl.js";
 import { updateConfig } from "../utils/configFile.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
+import { recordOrGet } from "./roundupFirstSeen.js";
 
 // Hourly tick interval — do not change without updating the idempotency guard.
 const TICK_INTERVAL_MS = 60 * 60 * 1000;
@@ -437,12 +438,39 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     return;
   }
 
+  // Filter out items that we've already seen under their stable identity in
+  // a previous run. This is what catches Sonarr/Radarr quality upgrades:
+  // Jellyfin assigns the re-imported file a fresh ItemId AND a fresh
+  // DateCreated, so /Items?MinDateCreated returns it as if brand-new — but
+  // the stable key (TMDB for movies, SeriesId+S/E for episodes) matches a
+  // record from when it was originally added.
+  const cutoffMs = now.getTime() - WINDOW_MS;
+  const beforeFilter = items.length;
+  const fresh = items.filter((item) => {
+    const firstSeenAt = recordOrGet(item, now.getTime());
+    return firstSeenAt >= cutoffMs;
+  });
+  // Preserve the diagnostic counters from fetchWindowItems on the filtered
+  // array (filter() drops these expando properties).
+  fresh.rawCount = items.rawCount;
+  fresh.allowedLibraryCount = items.allowedLibraryCount;
+  fresh.alreadySeenCount = beforeFilter - fresh.length;
+  items = fresh;
+  if (items.alreadySeenCount > 0) {
+    logger.info(
+      `${logPrefix}: filtered ${items.alreadySeenCount} of ${beforeFilter} items as already-seen (Sonarr/Radarr upgrade or older import)`
+    );
+  }
+
   if (items.length === 0) {
     const rawCount = items.rawCount ?? 0;
     const allowedCount = items.allowedLibraryCount ?? 0;
+    const alreadySeen = items.alreadySeenCount ?? 0;
     let diag;
     if (allowedCount === 0) {
       diag = "No notification libraries configured. Add libraries under Jellyfin notifications in the dashboard.";
+    } else if (alreadySeen > 0) {
+      diag = `Jellyfin returned ${alreadySeen} item${alreadySeen === 1 ? "" : "s"} in the past week, but all of them have been seen before (Sonarr/Radarr upgrade or older import).`;
     } else if (rawCount > 0) {
       diag = `Jellyfin returned ${rawCount} new items in the past week, but none are in your ${allowedCount} configured notification libraries. Check the library list in Jellyfin notifications.`;
     } else {
@@ -453,7 +481,10 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     // mismatch is the most common silent-fail symptom users mistake for a
     // broken feature. Surfacing it loudly in the logs lets ops debug without
     // turning on debug logging.
-    if (allowedCount === 0 || rawCount > 0) {
+    // Misconfig (no libraries) or rawCount-but-not-in-config is a silent-fail
+    // symptom users mistake for a broken feature → warn. "Genuinely empty
+    // week" and "everything was an upgrade" are normal → info.
+    if (allowedCount === 0 || (rawCount > 0 && alreadySeen === 0)) {
       logger.warn(`${logPrefix}: skipping post — ${diag}`);
     } else {
       logger.info(`${logPrefix}: no new items this week — skipping post`);
