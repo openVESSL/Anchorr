@@ -414,15 +414,16 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   let baseUrlOk = false;
   try {
     if (baseUrl) {
-      // eslint-disable-next-line no-new
-      new URL(baseUrl);
-      baseUrlOk = true;
+      const parsed = new URL(baseUrl);
+      // Mirror the SSRF guard used by the config-test routes: only http(s)
+      // schemes are allowed, never file:/gopher:/etc.
+      baseUrlOk = parsed.protocol === "http:" || parsed.protocol === "https:";
     }
   } catch {
     /* fall through */
   }
   if (!baseUrlOk) {
-    const msg = `JELLYFIN_BASE_URL is missing or not a valid URL ("${baseUrl ?? ""}")`;
+    const msg = `JELLYFIN_BASE_URL is missing or not a valid http(s) URL ("${baseUrl ?? ""}")`;
     logger.error(`${logPrefix}: ${msg}`);
     if (isTest) throw new Error(msg);
     bumpFailure(now);

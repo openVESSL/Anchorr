@@ -1043,17 +1043,18 @@ function configureWebServer() {
       });
     } catch (error) {
       logger.error("Failed to send test weekly roundup:", error);
-      // Cap message length and coerce to string defensively — these strings
-      // come from upstream throws (Jellyfin axios errors, Discord client
-      // errors) whose shape we don't control. Keeps the dashboard response
-      // bounded even if a future upgrade changes error.message.
+      // Cap message length, coerce to string, and strip any URL-shaped
+      // substrings before returning to the dashboard. axios occasionally
+      // embeds the request URL (which may carry tokens or api_key query
+      // params) in error.message; we never want that to surface in an HTTP
+      // response.
       const raw =
         typeof error?.message === "string" ? error.message : String(error);
+      const sanitized = raw.replace(/https?:\/\/\S+/gi, "[url]").slice(0, 500);
       res.status(500).json({
         success: false,
         message:
-          raw.slice(0, 500) ||
-          "Failed to send weekly roundup. Check logs for details.",
+          sanitized || "Failed to send weekly roundup. Check logs for details.",
       });
     }
   });
