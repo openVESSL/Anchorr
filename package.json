@@ -1,6 +1,6 @@
 {
   "name": "anchorr",
-  "version": "1.5.3",
+  "version": "1.5.5",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

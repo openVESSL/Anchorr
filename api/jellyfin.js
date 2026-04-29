@@ -410,53 +410,53 @@ export async function findLibraryId(
 }
 
 /**
- * Fetch recently added items from Jellyfin
+ * Fetch recently added items from Jellyfin.
+ *
  * @param {string} apiKey - Jellyfin API key
  * @param {string} baseUrl - Jellyfin base URL
- * @param {number} limit - Maximum number of items to fetch
+ * @param {number} limit - Maximum number of items to fetch (default: 50)
+ * @param {string} [minDateCreated] - Optional ISO timestamp cutoff (inclusive).
+ *   When provided, only items created at or after this time are returned.
  * @returns {Promise<Array>} Array of recently added items
  */
-export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50) {
+export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50, minDateCreated, parentId) {
   try {
-    // Use /Items endpoint with SortBy=DateCreated for recently added items
-    // Note: /Items/Latest requires userId and has compatibility issues with API keys
     const safeBase = new URL(baseUrl);
     safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
     const url = safeBase.href;
+    const params = {
+      SortBy: "DateCreated",
+      SortOrder: "Descending",
+      Limit: limit,
+      Fields: "ProviderIds,Overview,Genres,RunTimeTicks,ParentId,DateCreated,SeriesName,SeasonName,IndexNumber,ParentIndexNumber,AncestorIds",
+      IncludeItemTypes: "Movie,Series,Season,Episode",
+      Recursive: true,
+    };
+    if (minDateCreated) {
+      params.MinDateCreated = minDateCreated;
+    }
+    if (parentId) {
+      params.ParentId = parentId;
+    }
     const response = await axios.get(url, {
       headers: { "X-MediaBrowser-Token": apiKey },
-      params: {
-        SortBy: "DateCreated",
-        SortOrder: "Descending",
-        Limit: limit,
-        Fields: "ProviderIds,Overview,Genres,RunTimeTicks,ParentId",
-        IncludeItemTypes: "Movie,Series,Season,Episode",
-        Recursive: true,
-      },
+      params,
       timeout: 10000,
     });
 
-    // Handle both direct array response and Items property
     const items = response.data?.Items || response.data || [];
-
-    logger.debug(`Fetched ${items.length} recently added items from Jellyfin`);
-
-    // Log first item's library info for debugging
-    if (items.length > 0) {
-      const firstItem = items[0];
-      logger.debug(
-        `First item: ${firstItem.Name} (Type: ${firstItem.Type}, ParentId: ${firstItem.ParentId})`
-      );
-    }
-
+    logger.debug(
+      `Fetched ${items.length} recently added items from Jellyfin${
+        minDateCreated ? ` (since ${minDateCreated})` : ""
+      }`
+    );
     return items;
   } catch (err) {
     logger.error(
       "Failed to fetch recently added items from Jellyfin:",
       err?.message || err
     );
-    // Return empty array instead of failing
-    return [];
+    throw err;
   }
 }
 

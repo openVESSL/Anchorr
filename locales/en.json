@@ -2,7 +2,9 @@
   "_meta": {
     "language_name": "English",
     "language_code": "en",
-    "contributors": ["nairdah"],
+    "contributors": [
+      "nairdah"
+    ],
     "completion": "100%",
     "last_updated": "2025-12-15",
     "notes": "Base English translations"
@@ -199,6 +201,23 @@
     "daily_pick_interval_label": "Interval (minutes)",
     "daily_pick_interval_help": "How often to send a random pick in minutes (default: 1440 = 24 hours)",
     "test_random_pick": "Test Random Pick",
+    "weekly_roundup_title": "Enable Weekly Roundup",
+    "weekly_roundup_help": "Post a weekly digest of new Jellyfin content to a Discord channel. Runs once per week on the configured weekday and hour.",
+    "weekly_roundup_channel_label": "Channel",
+    "weekly_roundup_channel_placeholder": "Select a channel...",
+    "weekly_roundup_channel_help": "Discord channel where the weekly roundup will be posted",
+    "weekly_roundup_weekday_label": "Weekday",
+    "weekly_roundup_hour_label": "Hour (0–23, server time)",
+    "weekly_roundup_color_label": "Embed Color (optional)",
+    "weekly_roundup_color_help": "Hex color for the roundup embed. Leave empty to use the default series color.",
+    "test_weekly_roundup": "Test Weekly Roundup",
+    "weekday_sunday": "Sunday",
+    "weekday_monday": "Monday",
+    "weekday_tuesday": "Tuesday",
+    "weekday_wednesday": "Wednesday",
+    "weekday_thursday": "Thursday",
+    "weekday_friday": "Friday",
+    "weekday_saturday": "Saturday",
     "embed_colors_title": "Discord Embed Colors",
     "embed_colors_help": "Customize the colors of Discord notification embeds for different content types.",
     "embed_color_movie_label": "🎬 Movies",
@@ -253,7 +272,7 @@
     },
     "actions": {
       "start": "Start Bot",
-      "stop": "Stop Bot", 
+      "stop": "Stop Bot",
       "restart": "Restart Bot"
     },
     "messages": {
@@ -360,5 +379,21 @@
     "copy_secret": "Copy Secret",
     "webhook_secret_desc": "Your webhook secret is used to secure incoming requests. Copy it below — you'll need to add it as a custom HTTP header in the Jellyfin webhook plugin:",
     "notification_testing_info": "These tests bypass the webhook endpoint and run internally — they work without the X-Webhook-Secret header. Make sure you've still copied the secret and added it to your Jellyfin webhook plugin so that real notifications from Jellyfin are accepted."
+  },
+  "roundup": {
+    "embed_title": "📦 New this week",
+    "footer_total": "{count} new items",
+    "footer_overflow": "{count} new items · … and {overflow} more",
+    "season_label_single": "Season {a}",
+    "season_label_pair": "Seasons {a} & {b}",
+    "season_label_multi": "Seasons {list}",
+    "episodes_label_one": "1 episode",
+    "episodes_label_many": "{count} episodes",
+    "unknown_series": "Unknown Series",
+    "season_fallback": "Season {n}",
+    "library_fallback": "Library",
+    "library_names_unavailable": "library names unavailable",
+    "field_more": "_… and {count} more_",
+    "unknown_title": "Unknown"
   }
 }

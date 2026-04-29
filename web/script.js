@@ -1351,6 +1351,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Test Weekly Roundup Button
+  const testWeeklyRoundupBtn = document.getElementById("test-weekly-roundup-btn");
+  if (testWeeklyRoundupBtn) {
+    testWeeklyRoundupBtn.addEventListener("click", async () => {
+      testWeeklyRoundupBtn.disabled = true;
+      const originalText = testWeeklyRoundupBtn.innerHTML;
+      testWeeklyRoundupBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending...';
+
+      try {
+        const response = await fetch("/api/test-weekly-roundup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          testWeeklyRoundupBtn.style.backgroundColor = "var(--green)";
+          testWeeklyRoundupBtn.innerHTML = '<i class="bi bi-check-circle"></i> Sent!';
+          setTimeout(() => {
+            testWeeklyRoundupBtn.innerHTML = originalText;
+            testWeeklyRoundupBtn.style.backgroundColor = "";
+            testWeeklyRoundupBtn.disabled = false;
+          }, 2000);
+        } else {
+          throw new Error(result.message || "Failed to send weekly roundup");
+        }
+      } catch (error) {
+        testWeeklyRoundupBtn.style.backgroundColor = "#f38ba8";
+        testWeeklyRoundupBtn.innerHTML = `<i class="bi bi-exclamation-circle"></i> ${escapeHtml(error.message)}`;
+        setTimeout(() => {
+          testWeeklyRoundupBtn.innerHTML = originalText;
+          testWeeklyRoundupBtn.style.backgroundColor = "";
+          testWeeklyRoundupBtn.disabled = false;
+        }, 3000);
+      }
+    });
+  }
+
   // Fetch and display Jellyfin libraries for notifications
   const fetchLibrariesBtn = document.getElementById("fetch-libraries-btn");
   const fetchLibrariesStatus = document.getElementById(
@@ -1801,6 +1840,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const episodeChannelSelect = document.getElementById("JELLYFIN_EPISODE_CHANNEL_ID");
     const seasonChannelSelect = document.getElementById("JELLYFIN_SEASON_CHANNEL_ID");
     const dailyRandomPickChannelSelect = document.getElementById("DAILY_RANDOM_PICK_CHANNEL_ID");
+    const weeklyRoundupChannelSelect = document.getElementById("WEEKLY_ROUNDUP_CHANNEL_ID");
 
     if (!guildId) {
       if (channelSelect) {
@@ -1819,6 +1859,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         dailyRandomPickChannelSelect.innerHTML =
           '<option value="">Select a channel...</option>';
       }
+      if (weeklyRoundupChannelSelect) {
+        weeklyRoundupChannelSelect.innerHTML =
+          '<option value="">Select a channel...</option>';
+      }
       return;
     }
 
@@ -1834,6 +1878,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     if (dailyRandomPickChannelSelect) {
       dailyRandomPickChannelSelect.innerHTML = '<option value="">Loading channels...</option>';
+    }
+    if (weeklyRoundupChannelSelect) {
+      weeklyRoundupChannelSelect.innerHTML = '<option value="">Loading channels...</option>';
     }
 
     try {
@@ -1924,6 +1971,26 @@ document.addEventListener("DOMContentLoaded", async () => {
             dailyRandomPickChannelSelect.value = currentValue;
           }
         }
+
+        // Populate weekly roundup channel select
+        if (weeklyRoundupChannelSelect) {
+          weeklyRoundupChannelSelect.innerHTML =
+            '<option value="">Select a channel...</option>';
+          data.channels.forEach((channel) => {
+            const option = document.createElement("option");
+            option.value = channel.id;
+            let icon = "";
+            if (channel.type === "announcement") icon = " 📢";
+            else if (channel.type === "forum-thread") icon = " 🧵";
+            option.textContent = `#${channel.name}${icon}`;
+            weeklyRoundupChannelSelect.appendChild(option);
+          });
+
+          const currentValue = weeklyRoundupChannelSelect.dataset.savedValue;
+          if (currentValue) {
+            weeklyRoundupChannelSelect.value = currentValue;
+          }
+        }
       } else {
         if (channelSelect) {
           channelSelect.innerHTML =
@@ -1939,6 +2006,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (dailyRandomPickChannelSelect) {
           dailyRandomPickChannelSelect.innerHTML =
+            '<option value="">Select a channel...</option>';
+        }
+        if (weeklyRoundupChannelSelect) {
+          weeklyRoundupChannelSelect.innerHTML =
             '<option value="">Select a channel...</option>';
         }
       }
@@ -1960,6 +2031,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         dailyRandomPickChannelSelect.innerHTML =
           '<option value="">Select a channel...</option>';
       }
+      if (weeklyRoundupChannelSelect) {
+        weeklyRoundupChannelSelect.innerHTML =
+          '<option value="">Select a channel...</option>';
+      }
     }
   }
 
@@ -1974,7 +2049,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const episodeChannelSelect = document.getElementById("JELLYFIN_EPISODE_CHANNEL_ID");
         const seasonChannelSelect = document.getElementById("JELLYFIN_SEASON_CHANNEL_ID");
         const dailyRandomPickChannelSelect = document.getElementById("DAILY_RANDOM_PICK_CHANNEL_ID");
-        
+        const weeklyRoundupChannelSelect = document.getElementById("WEEKLY_ROUNDUP_CHANNEL_ID");
+
         if (channelSelect) {
           channelSelect.innerHTML =
             '<option value="">Select a server first...</option>';
@@ -1989,6 +2065,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         if (dailyRandomPickChannelSelect) {
           dailyRandomPickChannelSelect.innerHTML =
+            '<option value="">Select a channel...</option>';
+        }
+        if (weeklyRoundupChannelSelect) {
+          weeklyRoundupChannelSelect.innerHTML =
             '<option value="">Select a channel...</option>';
         }
       }
