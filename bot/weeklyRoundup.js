@@ -6,6 +6,7 @@ import { updateConfig } from "../utils/configFile.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
 import { recordOrGet } from "./roundupFirstSeen.js";
+import { getInstalledAt } from "./roundupState.js";
 
 // Hourly tick interval — do not change without updating the idempotency guard.
 const TICK_INTERVAL_MS = 60 * 60 * 1000;
@@ -58,7 +59,27 @@ export function scheduleWeeklyRoundup(client) {
     clearInterval(roundupTimer);
   }
 
-  logger.info("📦 Weekly Roundup scheduler started (hourly tick)");
+  // Stamp the back-catalogue floor at scheduler start, not lazily on first
+  // tick — otherwise items added in the days between bot start and the
+  // first weekly tick can be misclassified later.
+  const installedAt = getInstalledAt();
+
+  // Validate WEEKLY_ROUNDUP_TZ once, loudly, at boot. The per-tick resolver
+  // logs at debug level so a misconfig doesn't spam the log every hour.
+  const tz = process.env.WEEKLY_ROUNDUP_TZ;
+  if (tz) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    } catch (err) {
+      logger.warn(
+        `Weekly Roundup: WEEKLY_ROUNDUP_TZ="${tz}" is not a valid IANA timezone (${err?.message || err}). The scheduler will fall back to host time until this is fixed.`
+      );
+    }
+  }
+
+  logger.info(
+    `📦 Weekly Roundup scheduler started (hourly tick, installedAt=${new Date(installedAt).toISOString()}${tz ? `, tz=${tz}` : ""})`
+  );
 
   // Initial tick after startup so startup logs settle first.
   setTimeout(() => {
@@ -78,6 +99,42 @@ function parseIntInRange(raw, fallback, min, max) {
   const n = parseInt(raw, 10);
   if (Number.isNaN(n) || n < min || n > max) return fallback;
   return n;
+}
+
+// Returns weekday (0=Sun..6=Sat) and hour (0..23). Defaults to host time
+// (respects host TZ env); WEEKLY_ROUNDUP_TZ overrides via Intl.
+function resolveLocalWeekdayHour(now) {
+  const tz = process.env.WEEKLY_ROUNDUP_TZ;
+  if (!tz) {
+    return { weekday: now.getDay(), hour: now.getHours() };
+  }
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      weekday: "short",
+      hour: "numeric",
+      hour12: false,
+    });
+    const parts = fmt.formatToParts(now);
+    const weekdayShort = parts.find((p) => p.type === "weekday")?.value;
+    const hourStr = parts.find((p) => p.type === "hour")?.value;
+    const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const weekday = map[weekdayShort];
+    // Intl returns "24" for midnight under hour12:false on some platforms.
+    const hourRaw = parseInt(hourStr, 10);
+    const hour = Number.isFinite(hourRaw) ? hourRaw % 24 : NaN;
+    if (weekday == null || !Number.isFinite(hour)) {
+      throw new Error(`unparseable Intl output for tz "${tz}"`);
+    }
+    return { weekday, hour };
+  } catch (err) {
+    // Boot-time validator already warned loudly; downgrade per-tick log
+    // to debug to avoid hourly spam while the misconfig persists.
+    logger.debug(
+      `Weekly Roundup: WEEKLY_ROUNDUP_TZ "${tz}" unparseable (${err?.message || err}); using host time`
+    );
+    return { weekday: now.getDay(), hour: now.getHours() };
+  }
 }
 
 async function runTick(client) {
@@ -105,13 +162,14 @@ async function runTick(client) {
     23
   );
   const now = new Date();
+  const { weekday, hour } = resolveLocalWeekdayHour(now);
 
-  if (now.getDay() !== targetWeekday) return;
+  if (weekday !== targetWeekday) return;
   // `>=` instead of strict equality: if the bot was down or the hourly tick
   // drifted past the boundary, post on the next tick within the same day
   // rather than skipping the entire week. The 6-day idempotency guard below
   // still prevents duplicates on re-tick.
-  if (now.getHours() < targetHour) return;
+  if (hour < targetHour) return;
 
   const lastPostedAtStr = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT || "";
   if (lastPostedAtStr) {
@@ -439,18 +497,45 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     return;
   }
 
-  // Filter out items that we've already seen under their stable identity in
-  // a previous run. This is what catches Sonarr/Radarr quality upgrades:
-  // Jellyfin assigns the re-imported file a fresh ItemId AND a fresh
-  // DateCreated, so /Items?MinDateCreated returns it as if brand-new — but
-  // the stable key (TMDB for movies, SeriesId+S/E for episodes) matches a
-  // record from when it was originally added.
+  // Filter stages: installedAt floor → DateCreated cutoff → first-seen map.
+  // The server-side filter is MinDateLastSaved (refresh-bumped), so we
+  // enforce DateCreated here. The first-seen map catches Sonarr/Radarr
+  // quality upgrades where ItemId + DateCreated reset but the stable
+  // identity (TMDB / SeriesId+S/E) matches a prior record.
   const cutoffMs = now.getTime() - WINDOW_MS;
+  const installedAt = getInstalledAt(now.getTime());
   const beforeFilter = items.length;
+  let droppedPreInstall = 0;
+  let droppedOldDateCreated = 0;
+  let droppedNoDateCreated = 0;
+  let droppedAlreadySeen = 0;
   const fresh = items.filter((item) => {
+    const created = item.DateCreated ? new Date(item.DateCreated).getTime() : NaN;
+    if (!Number.isFinite(created)) {
+      // Safer default for a "what's new this week" digest: an item without
+      // a usable DateCreated could just as easily be 5 years old as 5
+      // minutes old. Drop and count rather than letting it through.
+      droppedNoDateCreated++;
+      return false;
+    }
+    if (created < installedAt) {
+      droppedPreInstall++;
+      return false;
+    }
+    if (created < cutoffMs) {
+      droppedOldDateCreated++;
+      return false;
+    }
     const firstSeenAt = recordOrGet(item, now.getTime());
-    return firstSeenAt >= cutoffMs;
+    if (firstSeenAt < cutoffMs) {
+      droppedAlreadySeen++;
+      return false;
+    }
+    return true;
   });
+  logger.debug(
+    `${logPrefix}: filtered ${beforeFilter} → ${fresh.length} items (no DateCreated: ${droppedNoDateCreated}, pre-install: ${droppedPreInstall}, old DateCreated: ${droppedOldDateCreated}, already-seen: ${droppedAlreadySeen})`
+  );
   // Preserve the diagnostic counters from fetchWindowItems on the filtered
   // array (filter() drops these expando properties).
   fresh.rawCount = items.rawCount;
