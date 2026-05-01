@@ -461,15 +461,32 @@ export async function fetchRecentlyAdded(
     const cutoffMs = new Date(minDateCreated).getTime();
     const collected = [];
     let startIndex = 0;
+    let stopReason = "loop-exit";
     while (collected.length < maxTotal) {
       const params = { ...baseParams, StartIndex: startIndex };
-      const response = await axios.get(url, {
-        headers: { "X-MediaBrowser-Token": apiKey },
-        params,
-        timeout: 10000,
-      });
-      const page = response.data?.Items || [];
-      if (page.length === 0) break;
+      let page;
+      try {
+        const response = await axios.get(url, {
+          headers: { "X-MediaBrowser-Token": apiKey },
+          params,
+          timeout: 10000,
+        });
+        page = response.data?.Items || [];
+      } catch (err) {
+        // Per-page failure: keep what we have, surface a warning, stop.
+        // Returning the partial set is better than throwing the whole call
+        // away — the caller's downstream filters tolerate fewer items
+        // gracefully (it just means a thinner roundup that week).
+        logger.warn(
+          `fetchRecentlyAdded: page at StartIndex=${startIndex} failed (${err?.message || err}); returning ${collected.length} items collected so far`
+        );
+        stopReason = "page-error";
+        break;
+      }
+      if (page.length === 0) {
+        stopReason = "empty-page";
+        break;
+      }
 
       let stop = false;
       for (const item of page) {
@@ -478,21 +495,29 @@ export async function fetchRecentlyAdded(
           : NaN;
         if (Number.isFinite(created) && created < cutoffMs) {
           stop = true;
+          stopReason = "cutoff-hit";
           break;
         }
         collected.push(item);
         if (collected.length >= maxTotal) {
           stop = true;
+          stopReason = "max-total-hit";
+          logger.warn(
+            `fetchRecentlyAdded: hit maxTotal=${maxTotal} cap; older items in this window were truncated`
+          );
           break;
         }
       }
       if (stop) break;
-      if (page.length < limit) break;
+      if (page.length < limit) {
+        stopReason = "short-page";
+        break;
+      }
       startIndex += page.length;
     }
 
     logger.debug(
-      `Fetched ${collected.length} recently added items from Jellyfin (since ${minDateCreated}, paginated)`
+      `Fetched ${collected.length} recently added items from Jellyfin (since ${minDateCreated}, paginated, stop=${stopReason})`
     );
     return collected;
   } catch (err) {

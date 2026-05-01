@@ -1,4 +1,5 @@
 import { PersistentMap } from "../utils/persistentMap.js";
+import logger from "../utils/logger.js";
 
 const NEVER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 
@@ -13,6 +14,12 @@ export function getInstalledAt(now = Date.now()) {
   if (typeof existing === "number" && Number.isFinite(existing)) {
     return existing;
   }
+  // First time we've stamped this — or the persisted value was rejected
+  // by validateValue on load (PersistentMap logs the drop). Either way,
+  // surface it: an unexpected restamp resets the back-catalogue floor.
+  logger.info(
+    `roundup-state: stamping installedAt=${new Date(now).toISOString()} (no prior value found)`
+  );
   map.set(INSTALLED_AT_KEY, now);
   return now;
 }

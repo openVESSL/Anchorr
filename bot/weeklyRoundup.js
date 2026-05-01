@@ -59,12 +59,26 @@ export function scheduleWeeklyRoundup(client) {
     clearInterval(roundupTimer);
   }
 
-  // Idempotent — records on first ever call only. Doing it at scheduler
-  // start (not lazily) stamps the floor before any back-catalogue can leak
-  // into the first roundup after an upgrade.
+  // Stamp the back-catalogue floor at scheduler start, not lazily on first
+  // tick — otherwise items added in the days between bot start and the
+  // first weekly tick can be misclassified later.
   const installedAt = getInstalledAt();
+
+  // Validate WEEKLY_ROUNDUP_TZ once, loudly, at boot. The per-tick resolver
+  // logs at debug level so a misconfig doesn't spam the log every hour.
+  const tz = process.env.WEEKLY_ROUNDUP_TZ;
+  if (tz) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    } catch (err) {
+      logger.warn(
+        `Weekly Roundup: WEEKLY_ROUNDUP_TZ="${tz}" is not a valid IANA timezone (${err?.message || err}). The scheduler will fall back to host time until this is fixed.`
+      );
+    }
+  }
+
   logger.info(
-    `📦 Weekly Roundup scheduler started (hourly tick, installedAt=${new Date(installedAt).toISOString()})`
+    `📦 Weekly Roundup scheduler started (hourly tick, installedAt=${new Date(installedAt).toISOString()}${tz ? `, tz=${tz}` : ""})`
   );
 
   // Initial tick after startup so startup logs settle first.
@@ -114,8 +128,10 @@ function resolveLocalWeekdayHour(now) {
     }
     return { weekday, hour };
   } catch (err) {
-    logger.warn(
-      `Weekly Roundup: invalid WEEKLY_ROUNDUP_TZ "${tz}" (${err?.message || err}), falling back to host time`
+    // Boot-time validator already warned loudly; downgrade per-tick log
+    // to debug to avoid hourly spam while the misconfig persists.
+    logger.debug(
+      `Weekly Roundup: WEEKLY_ROUNDUP_TZ "${tz}" unparseable (${err?.message || err}); using host time`
     );
     return { weekday: now.getDay(), hour: now.getHours() };
   }
@@ -491,14 +507,22 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   const beforeFilter = items.length;
   let droppedPreInstall = 0;
   let droppedOldDateCreated = 0;
+  let droppedNoDateCreated = 0;
   let droppedAlreadySeen = 0;
   const fresh = items.filter((item) => {
     const created = item.DateCreated ? new Date(item.DateCreated).getTime() : NaN;
-    if (Number.isFinite(created) && created < installedAt) {
+    if (!Number.isFinite(created)) {
+      // Safer default for a "what's new this week" digest: an item without
+      // a usable DateCreated could just as easily be 5 years old as 5
+      // minutes old. Drop and count rather than letting it through.
+      droppedNoDateCreated++;
+      return false;
+    }
+    if (created < installedAt) {
       droppedPreInstall++;
       return false;
     }
-    if (Number.isFinite(created) && created < cutoffMs) {
+    if (created < cutoffMs) {
       droppedOldDateCreated++;
       return false;
     }
@@ -509,11 +533,9 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     }
     return true;
   });
-  if (beforeFilter !== fresh.length) {
-    logger.debug(
-      `${logPrefix}: filtered ${beforeFilter} → ${fresh.length} items (pre-install: ${droppedPreInstall}, old DateCreated: ${droppedOldDateCreated}, already-seen: ${droppedAlreadySeen})`
-    );
-  }
+  logger.debug(
+    `${logPrefix}: filtered ${beforeFilter} → ${fresh.length} items (no DateCreated: ${droppedNoDateCreated}, pre-install: ${droppedPreInstall}, old DateCreated: ${droppedOldDateCreated}, already-seen: ${droppedAlreadySeen})`
+  );
   // Preserve the diagnostic counters from fetchWindowItems on the filtered
   // array (filter() drops these expando properties).
   fresh.rawCount = items.rawCount;
