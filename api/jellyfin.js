@@ -409,22 +409,28 @@ export async function findLibraryId(
   }
 }
 
+const FETCH_RECENTLY_ADDED_MAX_TOTAL = 5000;
+
 /**
- * Fetch recently added items from Jellyfin.
- *
- * @param {string} apiKey - Jellyfin API key
- * @param {string} baseUrl - Jellyfin base URL
- * @param {number} limit - Maximum number of items to fetch (default: 50)
- * @param {string} [minDateCreated] - Optional ISO timestamp cutoff (inclusive).
- *   When provided, only items created at or after this time are returned.
- * @returns {Promise<Array>} Array of recently added items
+ * Fetch recently added items. With `minDateCreated`, paginates via
+ * StartIndex/Limit and breaks early once items fall below the cutoff
+ * (results are DateCreated desc). Server-side filter is `MinDateLastSaved`
+ * — Jellyfin silently ignores `MinDateCreated` — so callers must still
+ * filter by `DateCreated` client-side.
  */
-export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50, minDateCreated, parentId) {
+export async function fetchRecentlyAdded(
+  apiKey,
+  baseUrl,
+  limit = 50,
+  minDateCreated,
+  parentId,
+  maxTotal = FETCH_RECENTLY_ADDED_MAX_TOTAL
+) {
   try {
     const safeBase = new URL(baseUrl);
     safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
     const url = safeBase.href;
-    const params = {
+    const baseParams = {
       SortBy: "DateCreated",
       SortOrder: "Descending",
       Limit: limit,
@@ -433,24 +439,62 @@ export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50, minDateCre
       Recursive: true,
     };
     if (minDateCreated) {
-      params.MinDateCreated = minDateCreated;
+      baseParams.MinDateLastSaved = minDateCreated;
     }
     if (parentId) {
-      params.ParentId = parentId;
+      baseParams.ParentId = parentId;
     }
-    const response = await axios.get(url, {
-      headers: { "X-MediaBrowser-Token": apiKey },
-      params,
-      timeout: 10000,
-    });
 
-    const items = response.data?.Items || response.data || [];
+    if (!minDateCreated) {
+      const response = await axios.get(url, {
+        headers: { "X-MediaBrowser-Token": apiKey },
+        params: baseParams,
+        timeout: 10000,
+      });
+      const items = response.data?.Items || response.data || [];
+      logger.debug(
+        `Fetched ${items.length} recently added items from Jellyfin`
+      );
+      return items;
+    }
+
+    const cutoffMs = new Date(minDateCreated).getTime();
+    const collected = [];
+    let startIndex = 0;
+    while (collected.length < maxTotal) {
+      const params = { ...baseParams, StartIndex: startIndex };
+      const response = await axios.get(url, {
+        headers: { "X-MediaBrowser-Token": apiKey },
+        params,
+        timeout: 10000,
+      });
+      const page = response.data?.Items || [];
+      if (page.length === 0) break;
+
+      let stop = false;
+      for (const item of page) {
+        const created = item.DateCreated
+          ? new Date(item.DateCreated).getTime()
+          : NaN;
+        if (Number.isFinite(created) && created < cutoffMs) {
+          stop = true;
+          break;
+        }
+        collected.push(item);
+        if (collected.length >= maxTotal) {
+          stop = true;
+          break;
+        }
+      }
+      if (stop) break;
+      if (page.length < limit) break;
+      startIndex += page.length;
+    }
+
     logger.debug(
-      `Fetched ${items.length} recently added items from Jellyfin${
-        minDateCreated ? ` (since ${minDateCreated})` : ""
-      }`
+      `Fetched ${collected.length} recently added items from Jellyfin (since ${minDateCreated}, paginated)`
     );
-    return items;
+    return collected;
   } catch (err) {
     logger.error(
       "Failed to fetch recently added items from Jellyfin:",
