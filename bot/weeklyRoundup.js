@@ -2,18 +2,10 @@ import { EmbedBuilder } from "discord.js";
 import * as jellyfinApi from "../api/jellyfin.js";
 import { getLibraryChannels } from "../jellyfin/libraryResolver.js";
 import { buildJellyfinUrl } from "../utils/jellyfinUrl.js";
-import { updateConfig } from "../utils/configFile.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
 import { recordOrGet } from "./roundupFirstSeen.js";
 import { getInstalledAt } from "./roundupState.js";
-
-// Hourly tick interval — do not change without updating the idempotency guard.
-const TICK_INTERVAL_MS = 60 * 60 * 1000;
-
-// Cutoff for "this week already posted" — must be < 7 days to avoid edge cases
-// at the weekday/hour boundary (e.g., if the scheduler drifts by a few minutes).
-const ALREADY_POSTED_MIN_AGE_MS = 6 * 24 * 60 * 60 * 1000;
 
 // Rolling window of new items to include in the digest.
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -23,179 +15,6 @@ const MAX_ENTRIES = 25;
 
 // Fetch cap before grouping.
 const FETCH_LIMIT = 200;
-
-let roundupTimer = null;
-let failureState = { weekKey: null, count: 0 };
-
-function weekKeyFor(date) {
-  // ISO-like week marker: YYYY-MM-DD of the Sunday that started this week.
-  // Used to scope consecutive-failure counting to the current week only.
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - d.getDay());
-  return d.toISOString().slice(0, 10);
-}
-
-function bumpFailure(now) {
-  const key = weekKeyFor(now);
-  if (failureState.weekKey !== key) {
-    failureState = { weekKey: key, count: 0 };
-  }
-  failureState.count += 1;
-  return failureState.count;
-}
-
-function resetFailures(now) {
-  failureState = { weekKey: weekKeyFor(now), count: 0 };
-}
-
-function currentFailures(now) {
-  if (failureState.weekKey !== weekKeyFor(now)) return 0;
-  return failureState.count;
-}
-
-export function scheduleWeeklyRoundup(client) {
-  if (roundupTimer) {
-    clearInterval(roundupTimer);
-  }
-
-  // Stamp the back-catalogue floor at scheduler start, not lazily on first
-  // tick — otherwise items added in the days between bot start and the
-  // first weekly tick can be misclassified later.
-  const installedAt = getInstalledAt();
-
-  // Validate WEEKLY_ROUNDUP_TZ once, loudly, at boot. The per-tick resolver
-  // logs at debug level so a misconfig doesn't spam the log every hour.
-  const tz = process.env.WEEKLY_ROUNDUP_TZ;
-  if (tz) {
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    } catch (err) {
-      logger.warn(
-        `Weekly Roundup: WEEKLY_ROUNDUP_TZ="${tz}" is not a valid IANA timezone (${err?.message || err}). The scheduler will fall back to host time until this is fixed.`
-      );
-    }
-  }
-
-  logger.info(
-    `📦 Weekly Roundup scheduler started (hourly tick, installedAt=${new Date(installedAt).toISOString()}${tz ? `, tz=${tz}` : ""})`
-  );
-
-  // Initial tick after startup so startup logs settle first.
-  setTimeout(() => {
-    runTick(client).catch((err) =>
-      logger.error(`Weekly Roundup initial tick error: ${err?.message || err}`)
-    );
-  }, 10_000);
-
-  roundupTimer = setInterval(() => {
-    runTick(client).catch((err) =>
-      logger.error(`Weekly Roundup tick error: ${err?.message || err}`)
-    );
-  }, TICK_INTERVAL_MS);
-}
-
-function parseIntInRange(raw, fallback, min, max) {
-  const n = parseInt(raw, 10);
-  if (Number.isNaN(n) || n < min || n > max) return fallback;
-  return n;
-}
-
-// Returns weekday (0=Sun..6=Sat) and hour (0..23). Defaults to host time
-// (respects host TZ env); WEEKLY_ROUNDUP_TZ overrides via Intl.
-function resolveLocalWeekdayHour(now) {
-  const tz = process.env.WEEKLY_ROUNDUP_TZ;
-  if (!tz) {
-    return { weekday: now.getDay(), hour: now.getHours() };
-  }
-  try {
-    const fmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      weekday: "short",
-      hour: "numeric",
-      hour12: false,
-    });
-    const parts = fmt.formatToParts(now);
-    const weekdayShort = parts.find((p) => p.type === "weekday")?.value;
-    const hourStr = parts.find((p) => p.type === "hour")?.value;
-    const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    const weekday = map[weekdayShort];
-    // Intl returns "24" for midnight under hour12:false on some platforms.
-    const hourRaw = parseInt(hourStr, 10);
-    const hour = Number.isFinite(hourRaw) ? hourRaw % 24 : NaN;
-    if (weekday == null || !Number.isFinite(hour)) {
-      throw new Error(`unparseable Intl output for tz "${tz}"`);
-    }
-    return { weekday, hour };
-  } catch (err) {
-    // Boot-time validator already warned loudly; downgrade per-tick log
-    // to debug to avoid hourly spam while the misconfig persists.
-    logger.debug(
-      `Weekly Roundup: WEEKLY_ROUNDUP_TZ "${tz}" unparseable (${err?.message || err}); using host time`
-    );
-    return { weekday: now.getDay(), hour: now.getHours() };
-  }
-}
-
-async function runTick(client) {
-  const enabled = process.env.WEEKLY_ROUNDUP_ENABLED === "true";
-  if (!enabled) return;
-
-  const channelId = process.env.WEEKLY_ROUNDUP_CHANNEL_ID;
-  if (!channelId) {
-    logger.warn(
-      "Weekly Roundup enabled but no channel configured. Skipping tick."
-    );
-    return;
-  }
-
-  const targetWeekday = parseIntInRange(
-    process.env.WEEKLY_ROUNDUP_WEEKDAY,
-    0,
-    0,
-    6
-  );
-  const targetHour = parseIntInRange(
-    process.env.WEEKLY_ROUNDUP_HOUR,
-    18,
-    0,
-    23
-  );
-  const now = new Date();
-  const { weekday, hour } = resolveLocalWeekdayHour(now);
-
-  if (weekday !== targetWeekday) return;
-  // `>=` instead of strict equality: if the bot was down or the hourly tick
-  // drifted past the boundary, post on the next tick within the same day
-  // rather than skipping the entire week. The 6-day idempotency guard below
-  // still prevents duplicates on re-tick.
-  if (hour < targetHour) return;
-
-  const lastPostedAtStr = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT || "";
-  if (lastPostedAtStr) {
-    const lastPostedAt = new Date(lastPostedAtStr);
-    if (isNaN(lastPostedAt.getTime())) {
-      // Fail safe: don't re-post if the persisted timestamp is corrupt — a
-      // duplicate digest is worse than skipping a week. Manual fix: clear the
-      // value via the dashboard.
-      logger.warn(
-        `Weekly Roundup: WEEKLY_ROUNDUP_LAST_POSTED_AT is not a valid date ("${lastPostedAtStr}"); skipping tick to avoid a duplicate post`
-      );
-      return;
-    }
-    const age = now.getTime() - lastPostedAt.getTime();
-    if (age < ALREADY_POSTED_MIN_AGE_MS) return; // already posted this week
-  }
-
-  if (currentFailures(now) >= 3) {
-    logger.warn(
-      "Weekly Roundup skipped: 3 consecutive failures this week. Will retry next week."
-    );
-    return;
-  }
-
-  await sendWeeklyRoundup(client, channelId, now);
-}
 
 async function fetchWindowItems() {
   const apiKey = process.env.JELLYFIN_API_KEY;
@@ -450,24 +269,23 @@ function escapeMd(s) {
   return String(s).replace(/([\[\]\(\)\\*_~`])/g, "\\$1");
 }
 
-async function sendWeeklyRoundup(client, channelId, now, options = {}) {
+export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   const isTest = options.test === true;
   const logPrefix = isTest ? "Weekly Roundup (test)" : "Weekly Roundup";
 
   // In test mode we rethrow errors so the /api/test-weekly-roundup handler
-  // can surface them to the dashboard, and we skip all state side effects
-  // (failure counter, lastPostedAt) so a test run never masks or replaces a
-  // real scheduled post.
+  // can surface them to the dashboard. In production the scheduler records
+  // failures, so we throw to let it observe them.
   const onError = (err, msg) => {
     if (isTest) throw err instanceof Error ? err : new Error(msg);
-    bumpFailure(now);
+    throw err instanceof Error ? err : new Error(msg);
   };
 
   // Preflight: a malformed JELLYFIN_BASE_URL causes buildJellyfinUrl to emit
   // an http://invalid.local/... sentinel. Catching that here means the user
   // never sees a digest full of unclickable links — they get an ops log and
-  // the failure counter advances normally. Reaching this with no value at
-  // all (empty/undefined) is also misconfig: bail the same way.
+  // the scheduler records the failure normally. Reaching this with no value
+  // at all (empty/undefined) is also misconfig: bail the same way.
   const baseUrl = process.env.JELLYFIN_BASE_URL;
   let baseUrlOk = false;
   try {
@@ -483,9 +301,7 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   if (!baseUrlOk) {
     const msg = `JELLYFIN_BASE_URL is missing or not a valid http(s) URL ("${baseUrl ?? ""}")`;
     logger.error(`${logPrefix}: ${msg}`);
-    if (isTest) throw new Error(msg);
-    bumpFailure(now);
-    return;
+    throw new Error(msg);
   }
 
   let items;
@@ -493,8 +309,11 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     items = await fetchWindowItems();
   } catch (err) {
     logger.error(`${logPrefix}: failed to fetch items: ${err?.message}`);
-    onError(err, `Failed to fetch items: ${err?.message}`);
-    return;
+    if (isTest) {
+      onError(err, `Failed to fetch items: ${err?.message}`);
+      return;
+    }
+    throw err;
   }
 
   // Filter stages: installedAt floor → DateCreated cutoff → first-seen map.
@@ -575,8 +394,6 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     } else {
       logger.info(`${logPrefix}: no new items this week — skipping post`);
     }
-    resetFailures(now);
-    await markPosted(now);
     return;
   }
 
@@ -589,15 +406,16 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     logger.warn(
       `${logPrefix}: failed to fetch channel ${channelId}: ${err?.message}`
     );
-    onError(err, `Failed to fetch channel ${channelId}: ${err?.message}`);
-    return;
+    if (isTest) {
+      onError(err, `Failed to fetch channel ${channelId}: ${err?.message}`);
+      return;
+    }
+    throw err;
   }
   if (!channel) {
     const msg = `Channel ${channelId} not found or bot lacks access`;
     logger.warn(`${logPrefix}: ${msg}`);
-    if (isTest) throw new Error(msg);
-    bumpFailure(now);
-    return;
+    throw new Error(msg);
   }
 
   let embed;
@@ -605,8 +423,11 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     embed = await buildRoundupEmbed(grouped, items);
   } catch (err) {
     logger.error(`${logPrefix}: failed to build embed: ${err?.message}`);
-    onError(err, `Failed to build embed: ${err?.message}`);
-    return;
+    if (isTest) {
+      onError(err, `Failed to build embed: ${err?.message}`);
+      return;
+    }
+    throw err;
   }
 
   try {
@@ -614,33 +435,18 @@ async function sendWeeklyRoundup(client, channelId, now, options = {}) {
     logger.info(
       `${logPrefix} posted: ${grouped.totalCount} items across ${grouped.perLibrary.size} libraries`
     );
-    if (!isTest) {
-      resetFailures(now);
-      await markPosted(now);
-    }
   } catch (err) {
     logger.error(`${logPrefix}: failed to send embed: ${err?.message}`);
-    onError(err, `Failed to send embed: ${err?.message}`);
+    if (isTest) {
+      onError(err, `Failed to send embed: ${err?.message}`);
+      return;
+    }
+    throw err;
   }
 }
 
 export async function sendWeeklyRoundupTest(client, channelId) {
   await sendWeeklyRoundup(client, channelId, new Date(), { test: true });
-}
-
-async function markPosted(now) {
-  const nowIso = now.toISOString();
-  // Always set the in-memory env var so this process won't re-post within the
-  // same week, even if disk persistence fails. The roundup already went out —
-  // don't count persistence failure as a send failure.
-  process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT = nowIso;
-  try {
-    updateConfig({ WEEKLY_ROUNDUP_LAST_POSTED_AT: nowIso });
-  } catch (err) {
-    logger.error(
-      `Weekly Roundup: posted successfully but failed to persist lastPostedAt; a restart this week could trigger a duplicate post: ${err?.message}`
-    );
-  }
 }
 
 async function buildRoundupEmbed(grouped, rawItems) {
