@@ -266,7 +266,10 @@ function itemDeeplink(itemId) {
  * the bracketed label.
  */
 function escapeMd(s) {
-  return String(s).replace(/([\[\]\(\)\\*_~`])/g, "\\$1");
+  // Parens are not markdown control chars inside [label] — escaping them
+  // produces literal "\(2026\)" in the rendered link. Only escape the
+  // chars that Discord actually treats as markdown inside link labels.
+  return String(s).replace(/([\[\]\\*_~`])/g, "\\$1");
 }
 
 export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
