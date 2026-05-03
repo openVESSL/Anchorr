@@ -54,6 +54,22 @@ export const configSchema = Joi.object({
   USER_MAPPING_METADATA: Joi.object().optional(),
   ROLE_ALLOWLIST: Joi.array().items(Joi.string()).optional(),
   ROLE_BLOCKLIST: Joi.array().items(Joi.string()).optional(),
+  WEEKLY_ROUNDUP_ENABLED: Joi.string().valid("true", "false").optional(),
+  WEEKLY_ROUNDUP_CHANNEL_ID: Joi.string().allow("").optional(),
+  WEEKLY_ROUNDUP_WEEKDAY: Joi.alternatives(
+    Joi.string().pattern(/^[0-6]$/),
+    Joi.number().integer().min(0).max(6)
+  ).optional(),
+  WEEKLY_ROUNDUP_HOUR: Joi.alternatives(
+    Joi.string().pattern(/^([0-9]|1[0-9]|2[0-3])$/),
+    Joi.number().integer().min(0).max(23)
+  ).optional(),
+  WEEKLY_ROUNDUP_EMBED_COLOR: Joi.string().allow("").optional(),
+  WEEKLY_ROUNDUP_LAST_POSTED_AT: Joi.string().allow("").optional(),
+  WEEKLY_ROUNDUP_ROLE_ID: Joi.string()
+    .pattern(/^\d{17,20}$/)
+    .allow("")
+    .optional(),
 });
 
 // --- USER MAPPING VALIDATION ---

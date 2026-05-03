@@ -2,7 +2,9 @@
   "_meta": {
     "language_name": "Language Name",
     "language_code": "xx",
-    "contributors": ["Your Name"],
+    "contributors": [
+      "Your Name"
+    ],
     "completion": "0%",
     "last_updated": "YYYY-MM-DD",
     "notes": "Translation notes or specific considerations"
@@ -199,6 +201,26 @@
     "daily_pick_interval_label": "",
     "daily_pick_interval_help": "",
     "test_random_pick": "",
+    "weekly_roundup_title": "",
+    "weekly_roundup_help": "",
+    "weekly_roundup_channel_label": "",
+    "weekly_roundup_channel_placeholder": "",
+    "weekly_roundup_channel_help": "",
+    "weekly_roundup_weekday_label": "",
+    "weekly_roundup_hour_label": "",
+    "weekly_roundup_color_label": "",
+    "weekly_roundup_color_help": "",
+    "weekly_roundup_role_label": "",
+    "weekly_roundup_role_help": "",
+    "weekly_roundup_role_none": "",
+    "test_weekly_roundup": "",
+    "weekday_sunday": "",
+    "weekday_monday": "",
+    "weekday_tuesday": "",
+    "weekday_wednesday": "",
+    "weekday_thursday": "",
+    "weekday_friday": "",
+    "weekday_saturday": "",
     "embed_colors_title": "",
     "embed_colors_help": "",
     "embed_color_movie_label": "",
@@ -360,5 +382,21 @@
     "copy_secret": "",
     "webhook_secret_desc": "",
     "notification_testing_info": ""
+  },
+  "roundup": {
+    "embed_title": "📦 New this week",
+    "footer_total": "{count} new items",
+    "footer_overflow": "{count} new items · … and {overflow} more",
+    "season_label_single": "Season {a}",
+    "season_label_pair": "Seasons {a} & {b}",
+    "season_label_multi": "Seasons {list}",
+    "episodes_label_one": "1 episode",
+    "episodes_label_many": "{count} episodes",
+    "unknown_series": "Unknown Series",
+    "season_fallback": "Season {n}",
+    "library_fallback": "Library",
+    "library_names_unavailable": "library names unavailable",
+    "field_more": "_… and {count} more_",
+    "unknown_title": "Unknown"
   }
 }

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.5] - 2026-04-27
+
+### ✨ Added
+
+- **Weekly Roundup**: Optional scheduled Discord post that summarizes new Jellyfin content from the last 7 days. Disabled by default. Configurable via the dashboard (channel, weekday, hour, embed color). The roundup groups items by library and collapses episodes of the same series into one line (e.g. _"My Show — Seasons 1 & 2 (12 episodes)"_). Item titles link directly to Jellyfin. A hourly scheduler tick with a persisted `WEEKLY_ROUNDUP_LAST_POSTED_AT` timestamp makes the post idempotent across Docker restarts. Sonarr/Radarr quality upgrades are filtered out via a stable-identity first-seen map (`config/dedup-roundup-first-seen.json`) so a re-imported file does not show up as "new".
+
+---
+
 ## [1.5.4] - 2026-04-26
 
 ### 🐛 Fixed

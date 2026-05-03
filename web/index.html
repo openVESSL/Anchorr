@@ -959,6 +959,75 @@
                         </div>
                       </div>
 
+                      <!-- Weekly Roundup Section -->
+                      <div class="form-group" style="margin-top: 2rem; padding: 1rem; background-color: var(--surface0); border-radius: 8px; border-left: 4px solid var(--blue);">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 1rem;">
+                          <input type="checkbox" id="WEEKLY_ROUNDUP_ENABLED" name="WEEKLY_ROUNDUP_ENABLED" />
+                          <span data-i18n="config.weekly_roundup_title">Enable Weekly Roundup</span>
+                        </label>
+                        <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.weekly_roundup_help">
+                          Post a weekly digest of new Jellyfin content to a Discord channel. Runs once per week on the configured weekday and hour.
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1rem;">
+                          <label for="WEEKLY_ROUNDUP_CHANNEL_ID" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.weekly_roundup_channel_label">Channel</label>
+                          <select
+                            id="WEEKLY_ROUNDUP_CHANNEL_ID"
+                            name="WEEKLY_ROUNDUP_CHANNEL_ID"
+                            style="width: 100%; background-color: var(--background); border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
+                            <option value="" style="color: var(--subtext0);" data-i18n="config.weekly_roundup_channel_placeholder">Select a channel...</option>
+                          </select>
+                          <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.weekly_roundup_channel_help">
+                            Discord channel where the weekly roundup will be posted
+                          </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1rem;">
+                          <label for="WEEKLY_ROUNDUP_WEEKDAY" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.weekly_roundup_weekday_label">Weekday</label>
+                          <select
+                            id="WEEKLY_ROUNDUP_WEEKDAY"
+                            name="WEEKLY_ROUNDUP_WEEKDAY"
+                            style="width: 100%; max-width: 250px; background-color: var(--background); border: 1px solid var(--surface1); color: var(--text); padding: 0.75rem; border-radius: 8px; font-size: 1rem;">
+                            <option value="0" data-i18n="config.weekday_sunday">Sunday</option>
+                            <option value="1" data-i18n="config.weekday_monday">Monday</option>
+                            <option value="2" data-i18n="config.weekday_tuesday">Tuesday</option>
+                            <option value="3" data-i18n="config.weekday_wednesday">Wednesday</option>
+                            <option value="4" data-i18n="config.weekday_thursday">Thursday</option>
+                            <option value="5" data-i18n="config.weekday_friday">Friday</option>
+                            <option value="6" data-i18n="config.weekday_saturday">Saturday</option>
+                          </select>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1rem;">
+                          <label for="WEEKLY_ROUNDUP_HOUR" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.weekly_roundup_hour_label">Hour (0–23, server time)</label>
+                          <input type="number" id="WEEKLY_ROUNDUP_HOUR" name="WEEKLY_ROUNDUP_HOUR" placeholder="18" min="0" max="23" style="width: 100%; max-width: 150px; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface1); color: var(--text); font-size: 1rem;" />
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1rem;">
+                          <label for="WEEKLY_ROUNDUP_EMBED_COLOR" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.weekly_roundup_color_label">Embed Color (optional)</label>
+                          <input type="text" id="WEEKLY_ROUNDUP_EMBED_COLOR" name="WEEKLY_ROUNDUP_EMBED_COLOR" placeholder="#cba6f7" pattern="^#?[0-9a-fA-F]{6}$" style="width: 100%; max-width: 200px; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface1); color: var(--text); font-size: 1rem;" />
+                          <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.weekly_roundup_color_help">
+                            Hex color for the roundup embed. Leave empty to use the default series color.
+                          </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1rem;">
+                          <label for="WEEKLY_ROUNDUP_ROLE_ID" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.weekly_roundup_role_label">Role mention (optional)</label>
+                          <select id="WEEKLY_ROUNDUP_ROLE_ID" name="WEEKLY_ROUNDUP_ROLE_ID" style="width: 100%; max-width: 320px; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface1); color: var(--text); font-size: 1rem;">
+                            <option value="" data-i18n="config.weekly_roundup_role_none">No role mention</option>
+                          </select>
+                          <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.weekly_roundup_role_help">
+                            Optional. Pings the selected role when the roundup posts. Bot must be running to load the role list.
+                          </div>
+                        </div>
+
+                        <div style="margin-top: 1rem;">
+                          <button type="button" id="test-weekly-roundup-btn" class="btn btn-secondary" style="padding: 0.75rem 1rem; margin: 0; display: inline-flex; align-items: center; gap: 0.5rem;">
+                            <i class="bi bi-send"></i> <span data-i18n="config.test_weekly_roundup">Test Weekly Roundup</span>
+                          </button>
+                        </div>
+                      </div>
+
                       <!-- Discord Embed Colors Section -->
                       <div class="form-group" style="margin-top: 2rem;">
                         <label style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);">

@@ -2,7 +2,10 @@
   "_meta": {
     "language_name": "Svenska",
     "language_code": "sv",
-    "contributors": ["Simon Eklundh", "GitHub Copilot"],
+    "contributors": [
+      "Simon Eklundh",
+      "GitHub Copilot"
+    ],
     "completion": "100%",
     "last_updated": "2025-12-23",
     "notes": "Complete Swedish translation - all sections translated, merged PR improvements"
@@ -199,6 +202,26 @@
     "daily_pick_interval_label": "Intervall (minuter)",
     "daily_pick_interval_help": "Hur ofta ett slumpmässigt val skickas i minuter (standard: 1440 = 24 timmar)",
     "test_random_pick": "Testa slumpmässigt val",
+    "weekly_roundup_title": "Aktivera veckosammanfattning",
+    "weekly_roundup_help": "Skickar en gång per vecka en översikt över nytt Jellyfin-innehåll till en Discord-kanal. Körs på konfigurerad veckodag och timme.",
+    "weekly_roundup_channel_label": "Kanal",
+    "weekly_roundup_channel_placeholder": "Välj en kanal...",
+    "weekly_roundup_channel_help": "Discord-kanal där veckosammanfattningen publiceras",
+    "weekly_roundup_weekday_label": "Veckodag",
+    "weekly_roundup_hour_label": "Timme (0–23, servertid)",
+    "weekly_roundup_color_label": "Embed-färg (valfritt)",
+    "weekly_roundup_color_help": "Hex-färg för roundup-embed. Lämna tomt för att använda standardfärgen för serier.",
+    "weekly_roundup_role_label": "Rollomnämnande (valfritt)",
+    "weekly_roundup_role_help": "Valfritt. Pingar den valda rollen när sammanfattningen postas. Botten måste köras för att rollistan ska laddas.",
+    "weekly_roundup_role_none": "Inget rollomnämnande",
+    "test_weekly_roundup": "Testa veckosammanfattning",
+    "weekday_sunday": "Söndag",
+    "weekday_monday": "Måndag",
+    "weekday_tuesday": "Tisdag",
+    "weekday_wednesday": "Onsdag",
+    "weekday_thursday": "Torsdag",
+    "weekday_friday": "Fredag",
+    "weekday_saturday": "Lördag",
     "embed_colors_title": "Discord embed-färger",
     "embed_colors_help": "Anpassa färgerna på Discord-notifieringsembeds för olika innehållstyper.",
     "embed_color_movie_label": "🎬 Filmer",
@@ -360,5 +383,21 @@
     "copy_secret": "Kopiera Secret",
     "webhook_secret_desc": "Ditt webhook-secret används för att säkra inkommande förfrågningar. Kopiera det nedan — du behöver lägga till det som en anpassad HTTP-header i Jellyfin webhook-pluginet:",
     "notification_testing_info": "Dessa tester kringgår webhook-endpointen och körs internt — de fungerar utan X-Webhook-Secret-headern. Se till att du ändå har kopierat secret och lagt till det i ditt Jellyfin webhook-plugin så att riktiga notifieringar från Jellyfin accepteras."
+  },
+  "roundup": {
+    "embed_title": "📦 Nytt den här veckan",
+    "footer_total": "{count} nya objekt",
+    "footer_overflow": "{count} nya objekt · … och {overflow} till",
+    "season_label_single": "Säsong {a}",
+    "season_label_pair": "Säsong {a} & {b}",
+    "season_label_multi": "Säsonger {list}",
+    "episodes_label_one": "1 avsnitt",
+    "episodes_label_many": "{count} avsnitt",
+    "unknown_series": "Okänd serie",
+    "season_fallback": "Säsong {n}",
+    "library_fallback": "Bibliotek",
+    "library_names_unavailable": "biblioteksnamn är inte tillgängliga",
+    "field_more": "_… och {count} till_",
+    "unknown_title": "Okänd"
   }
 }

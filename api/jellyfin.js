@@ -409,54 +409,123 @@ export async function findLibraryId(
   }
 }
 
+const FETCH_RECENTLY_ADDED_MAX_TOTAL = 5000;
+
 /**
- * Fetch recently added items from Jellyfin
- * @param {string} apiKey - Jellyfin API key
- * @param {string} baseUrl - Jellyfin base URL
- * @param {number} limit - Maximum number of items to fetch
- * @returns {Promise<Array>} Array of recently added items
+ * Fetch recently added items. With `minDateCreated`, paginates via
+ * StartIndex/Limit and breaks early once items fall below the cutoff
+ * (results are DateCreated desc). Server-side filter is `MinDateLastSaved`
+ * — Jellyfin silently ignores `MinDateCreated` — so callers must still
+ * filter by `DateCreated` client-side.
  */
-export async function fetchRecentlyAdded(apiKey, baseUrl, limit = 50) {
+export async function fetchRecentlyAdded(
+  apiKey,
+  baseUrl,
+  limit = 50,
+  minDateCreated,
+  parentId,
+  maxTotal = FETCH_RECENTLY_ADDED_MAX_TOTAL
+) {
   try {
-    // Use /Items endpoint with SortBy=DateCreated for recently added items
-    // Note: /Items/Latest requires userId and has compatibility issues with API keys
     const safeBase = new URL(baseUrl);
     safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
     const url = safeBase.href;
-    const response = await axios.get(url, {
-      headers: { "X-MediaBrowser-Token": apiKey },
-      params: {
-        SortBy: "DateCreated",
-        SortOrder: "Descending",
-        Limit: limit,
-        Fields: "ProviderIds,Overview,Genres,RunTimeTicks,ParentId",
-        IncludeItemTypes: "Movie,Series,Season,Episode",
-        Recursive: true,
-      },
-      timeout: 10000,
-    });
-
-    // Handle both direct array response and Items property
-    const items = response.data?.Items || response.data || [];
-
-    logger.debug(`Fetched ${items.length} recently added items from Jellyfin`);
-
-    // Log first item's library info for debugging
-    if (items.length > 0) {
-      const firstItem = items[0];
-      logger.debug(
-        `First item: ${firstItem.Name} (Type: ${firstItem.Type}, ParentId: ${firstItem.ParentId})`
-      );
+    const baseParams = {
+      SortBy: "DateCreated",
+      SortOrder: "Descending",
+      Limit: limit,
+      Fields: "ProviderIds,Overview,Genres,RunTimeTicks,ParentId,DateCreated,SeriesName,SeasonName,IndexNumber,ParentIndexNumber,AncestorIds",
+      IncludeItemTypes: "Movie,Series,Season,Episode",
+      Recursive: true,
+    };
+    if (minDateCreated) {
+      baseParams.MinDateLastSaved = minDateCreated;
+    }
+    if (parentId) {
+      baseParams.ParentId = parentId;
     }
 
-    return items;
+    if (!minDateCreated) {
+      const response = await axios.get(url, {
+        headers: { "X-MediaBrowser-Token": apiKey },
+        params: baseParams,
+        timeout: 10000,
+      });
+      const items = response.data?.Items || response.data || [];
+      logger.debug(
+        `Fetched ${items.length} recently added items from Jellyfin`
+      );
+      return items;
+    }
+
+    const cutoffMs = new Date(minDateCreated).getTime();
+    const collected = [];
+    let startIndex = 0;
+    let stopReason = "loop-exit";
+    while (collected.length < maxTotal) {
+      const params = { ...baseParams, StartIndex: startIndex };
+      let page;
+      try {
+        const response = await axios.get(url, {
+          headers: { "X-MediaBrowser-Token": apiKey },
+          params,
+          timeout: 10000,
+        });
+        page = response.data?.Items || [];
+      } catch (err) {
+        // Per-page failure: keep what we have, surface a warning, stop.
+        // Returning the partial set is better than throwing the whole call
+        // away — the caller's downstream filters tolerate fewer items
+        // gracefully (it just means a thinner roundup that week).
+        logger.warn(
+          `fetchRecentlyAdded: page at StartIndex=${startIndex} failed (${err?.message || err}); returning ${collected.length} items collected so far`
+        );
+        stopReason = "page-error";
+        break;
+      }
+      if (page.length === 0) {
+        stopReason = "empty-page";
+        break;
+      }
+
+      let stop = false;
+      for (const item of page) {
+        const created = item.DateCreated
+          ? new Date(item.DateCreated).getTime()
+          : NaN;
+        if (Number.isFinite(created) && created < cutoffMs) {
+          stop = true;
+          stopReason = "cutoff-hit";
+          break;
+        }
+        collected.push(item);
+        if (collected.length >= maxTotal) {
+          stop = true;
+          stopReason = "max-total-hit";
+          logger.warn(
+            `fetchRecentlyAdded: hit maxTotal=${maxTotal} cap; older items in this window were truncated`
+          );
+          break;
+        }
+      }
+      if (stop) break;
+      if (page.length < limit) {
+        stopReason = "short-page";
+        break;
+      }
+      startIndex += page.length;
+    }
+
+    logger.debug(
+      `Fetched ${collected.length} recently added items from Jellyfin (since ${minDateCreated}, paginated, stop=${stopReason})`
+    );
+    return collected;
   } catch (err) {
     logger.error(
       "Failed to fetch recently added items from Jellyfin:",
       err?.message || err
     );
-    // Return empty array instead of failing
-    return [];
+    throw err;
   }
 }
 
