@@ -120,6 +120,23 @@ export function start(client) {
     `Roundup scheduler started: local now=${WEEKDAY_SHORT[now.getDay()]} ${now.toISOString()} hour=${now.getHours()}, target=${WEEKDAY_SHORT[targetWeekday]} ${targetHour}:00, installedAt=${new Date(installedAt).toISOString()}`
   );
 
+  // One-shot misconfig warnings so users don't have to wait an hour to find
+  // out their setup is wrong from the per-tick skip log.
+  if (
+    process.env.WEEKLY_ROUNDUP_ENABLED === "true" &&
+    !process.env.WEEKLY_ROUNDUP_CHANNEL_ID
+  ) {
+    logger.warn(
+      "Weekly Roundup is enabled but WEEKLY_ROUNDUP_CHANNEL_ID is empty; ticks will skip until a channel is configured"
+    );
+  }
+  const roleId = process.env.WEEKLY_ROUNDUP_ROLE_ID;
+  if (roleId && !/^\d{17,20}$/.test(roleId)) {
+    logger.warn(
+      `Weekly Roundup: WEEKLY_ROUNDUP_ROLE_ID="${roleId}" is not a valid Discord role ID (17–20 digits); posting without role mention`
+    );
+  }
+
   // Chained setTimeout (not setInterval) so each tick re-aligns to the top of
   // the next hour. setInterval(HOUR_MS) drifts off the boundary across DST
   // transitions and could push a post a full hour late.

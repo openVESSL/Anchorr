@@ -52,13 +52,27 @@ export function recordFailure(ms = Date.now()) {
 }
 
 (function migrateLegacyLastPostedAt() {
-  if (map.get(LAST_POSTED_AT_KEY) != null) return;
-  const legacy = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT;
-  if (!legacy) return;
-  const parsed = Date.parse(legacy);
-  if (!Number.isFinite(parsed)) return;
-  map.set(LAST_POSTED_AT_KEY, parsed);
-  logger.info(
-    `roundup-state: migrated legacy lastPostedAt=${new Date(parsed).toISOString()} from config`
-  );
+  // Wrapped: a corrupted PersistentMap or unreadable disk should not crash the
+  // bot at import time. Worst case the migration is skipped and the user gets
+  // one duplicate roundup, which is recoverable; a boot crash is not.
+  try {
+    if (map.get(LAST_POSTED_AT_KEY) != null) return;
+    const legacy = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT;
+    if (!legacy) return;
+    const parsed = Date.parse(legacy);
+    if (!Number.isFinite(parsed)) {
+      logger.warn(
+        `roundup-state: legacy WEEKLY_ROUNDUP_LAST_POSTED_AT="${legacy}" is not a parseable date; skipping migration (next run may produce a duplicate roundup)`
+      );
+      return;
+    }
+    map.set(LAST_POSTED_AT_KEY, parsed);
+    logger.info(
+      `roundup-state: migrated legacy lastPostedAt=${new Date(parsed).toISOString()} from config`
+    );
+  } catch (err) {
+    logger.error(
+      `roundup-state: legacy migration failed: ${err?.message || err}`
+    );
+  }
 })();
