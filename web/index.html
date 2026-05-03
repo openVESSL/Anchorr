@@ -1012,10 +1012,12 @@
                         </div>
 
                         <div class="form-group" style="margin-top: 1rem;">
-                          <label for="WEEKLY_ROUNDUP_ROLE_ID" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.weekly_roundup_role_label">Role ID (optional)</label>
-                          <input type="text" id="WEEKLY_ROUNDUP_ROLE_ID" name="WEEKLY_ROUNDUP_ROLE_ID" placeholder="123456789012345678" pattern="^\d{17,20}$" style="width: 100%; max-width: 250px; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface1); color: var(--text); font-size: 1rem;" />
+                          <label for="WEEKLY_ROUNDUP_ROLE_ID" style="display: block; margin-bottom: 0.5rem; font-weight: 600;" data-i18n="config.weekly_roundup_role_label">Role mention (optional)</label>
+                          <select id="WEEKLY_ROUNDUP_ROLE_ID" name="WEEKLY_ROUNDUP_ROLE_ID" style="width: 100%; max-width: 320px; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--surface1); background-color: var(--surface1); color: var(--text); font-size: 1rem;">
+                            <option value="" data-i18n="config.weekly_roundup_role_none">No role mention</option>
+                          </select>
                           <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.weekly_roundup_role_help">
-                            Optional. Role to ping when the roundup posts. Paste a Discord role ID.
+                            Optional. Pings the selected role when the roundup posts. Bot must be running to load the role list.
                           </div>
                         </div>
 
