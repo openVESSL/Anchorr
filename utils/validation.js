@@ -66,6 +66,10 @@ export const configSchema = Joi.object({
   ).optional(),
   WEEKLY_ROUNDUP_EMBED_COLOR: Joi.string().allow("").optional(),
   WEEKLY_ROUNDUP_LAST_POSTED_AT: Joi.string().allow("").optional(),
+  WEEKLY_ROUNDUP_ROLE_ID: Joi.string()
+    .pattern(/^\d{17,20}$/)
+    .allow("")
+    .optional(),
 });
 
 // --- USER MAPPING VALIDATION ---

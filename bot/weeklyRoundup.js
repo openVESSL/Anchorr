@@ -434,7 +434,14 @@ export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   }
 
   try {
-    await channel.send({ embeds: [embed] });
+    const roleId = process.env.WEEKLY_ROUNDUP_ROLE_ID;
+    const validRoleId = typeof roleId === "string" && /^\d{17,20}$/.test(roleId);
+    const sendOptions = { embeds: [embed] };
+    if (validRoleId && !isTest) {
+      sendOptions.content = `<@&${roleId}>`;
+      sendOptions.allowedMentions = { parse: ["roles"] };
+    }
+    await channel.send(sendOptions);
     logger.info(
       `${logPrefix} posted: ${grouped.totalCount} items across ${grouped.perLibrary.size} libraries`
     );
