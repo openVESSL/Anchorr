@@ -132,6 +132,7 @@ function groupItems(items) {
           createdAt,
           showKey: `movie|${item.Id}`,
           seasonNumber: 0,
+          kind: "movie",
           render: renderMovie(item),
         });
         break;
@@ -141,6 +142,7 @@ function groupItems(items) {
           createdAt,
           showKey: `series|${item.Id || item.Name || ""}`,
           seasonNumber: -1,
+          kind: "series-bare",
           render: renderSeries(item),
         });
         break;
@@ -150,6 +152,7 @@ function groupItems(items) {
           createdAt,
           showKey: `series|${item.SeriesId || item.SeriesName || ""}`,
           seasonNumber: item.IndexNumber ?? 0,
+          kind: "season",
           render: renderSeason(item),
         });
         break;
@@ -200,9 +203,28 @@ function groupItems(items) {
       createdAt: group.latestCreated,
       showKey: `series|${group.seriesId || group.seriesName || ""}`,
       seasonNumber: Number.isFinite(lowestSeason) ? lowestSeason : 0,
+      kind: "episode-group",
       render: renderEpisodeGroup(group),
     });
   }
+
+  // De-dupe per show: an episode-group already aggregates "Seasons 1–8 (177
+  // episodes)", so individual Season rows and the bare Series row would just
+  // repeat the same show. Without an episode-group, season rows are the real
+  // content — keep them and drop the bare Series row. Movies are unaffected.
+  const kindsByShow = new Map();
+  for (const e of entriesOut) {
+    if (!kindsByShow.has(e.showKey)) kindsByShow.set(e.showKey, new Set());
+    kindsByShow.get(e.showKey).add(e.kind);
+  }
+  const deduped = entriesOut.filter((e) => {
+    const kinds = kindsByShow.get(e.showKey);
+    if (kinds.has("episode-group")) return e.kind === "episode-group";
+    if (kinds.has("season")) return e.kind === "season";
+    return true;
+  });
+  entriesOut.length = 0;
+  entriesOut.push(...deduped);
 
   // Two-stage sort: place each show by its newest entry's createdAt (desc),
   // then within a show order rows by seasonNumber asc so Season 1, 2, 3 read
