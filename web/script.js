@@ -1991,6 +1991,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             weeklyRoundupChannelSelect.value = currentValue;
           }
         }
+
+        // Channels load only when the bot is running, which is the same
+        // precondition as the role list. Pull roles here too so the
+        // roundup role-mention picker is populated without requiring the
+        // user to visit the role-permissions tab.
+        loadRoles();
       } else {
         if (channelSelect) {
           channelSelect.innerHTML =
@@ -3427,6 +3433,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         populateRoleList("allowlist-roles", allowlist);
         populateRoleList("blocklist-roles", blocklist);
+        populateRoundupRoleSelect();
       } else {
         document.getElementById("allowlist-roles").innerHTML =
           `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
@@ -3439,6 +3446,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       const blocklistEl = document.getElementById("blocklist-roles");
       if (allowlistEl) allowlistEl.innerHTML = `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
       if (blocklistEl) blocklistEl.innerHTML = `<p class="form-text" style="opacity: 0.7; font-style: italic;">${t('errors.bot_must_be_running')}</p>`;
+    }
+  }
+
+  function populateRoundupRoleSelect() {
+    const select = document.getElementById("WEEKLY_ROUNDUP_ROLE_ID");
+    if (!select) return;
+    // Saved value was stamped by the generic config loader before options
+    // existed; preserve it so we can re-apply once the list is populated.
+    const saved = select.dataset.savedValue ?? select.value ?? "";
+    const noneLabel =
+      (typeof t === "function" && t("config.weekly_roundup_role_none")) ||
+      "No role mention";
+    select.innerHTML =
+      `<option value="">${escapeHtml(noneLabel)}</option>` +
+      guildRoles
+        .map(
+          (role) =>
+            `<option value="${escapeHtml(role.id)}">${escapeHtml(role.name)}</option>`
+        )
+        .join("");
+    if (saved && guildRoles.some((r) => r.id === saved)) {
+      select.value = saved;
+    } else {
+      select.value = "";
     }
   }
 
