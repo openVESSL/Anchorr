@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 - **Weekly Roundup**: Optional scheduled Discord post that summarizes new Jellyfin content from the last 7 days. Disabled by default. Configurable via the dashboard (channel, weekday, hour, embed color). The roundup groups items by library and collapses episodes of the same series into one line (e.g. _"My Show — Seasons 1 & 2 (12 episodes)"_). Item titles link directly to Jellyfin. A hourly scheduler tick with a persisted `WEEKLY_ROUNDUP_LAST_POSTED_AT` timestamp makes the post idempotent across Docker restarts. Sonarr/Radarr quality upgrades are filtered out via a stable-identity first-seen map (`config/dedup-roundup-first-seen.json`) so a re-imported file does not show up as "new".
+- **Optional role mention for the Weekly Roundup.** New config field `WEEKLY_ROUNDUP_ROLE_ID` (dashboard: "Role ID (optional)" under the Weekly Roundup section). When set to a Discord role snowflake, the bot pings that role in the post's content. Validated as a 17–20 digit snowflake; `allowedMentions` is restricted to roles so it cannot trigger `@everyone`.
+
+### 🐛 Fixed
+
+- **Weekly Roundup scheduler now respects the host timezone.** The previous build read `now.getHours()`, which on Docker defaults to UTC — so a configured hour like 13 fired at 13:00 UTC, not local. The scheduler now ticks at the top of every hour and posts when the host's local weekday/hour match the configured values. Set `TZ=Europe/Berlin` (or your zone) in `docker-compose.yml` so the container's local time matches your wall clock.
+- **Roundup observability**: every hourly tick logs its decision (`post` or `skip` with reason: `not-enabled`, `no-channel`, `wrong-weekday`, `before-target-hour`, `already-posted-this-week`, `circuit-open`). No more silent scheduler.
+- **Markdown escape no longer mangles years.** Titles like `Hoppers (2026)` rendered as `Hoppers \(2026\)` because parentheses were being escaped inside Discord masked-link labels, where they aren't markdown control characters. Only `[ ] \ * _ ~ \``  are escaped now.
+- **Same show no longer duplicated across rows.** When a show had both an episode-group aggregate ("Seasons 1–8 (177 episodes)") and individual Season rows plus a bare Series row, all three appeared. The roundup now picks one canonical representation per show: the episode-group aggregate when present, otherwise the season rows, otherwise the bare series row.
+- **Seasons within a show now sort numerically.** Previously `Season 1, Season 3, Season 2` could appear in any order driven by `DateCreated`. Rows belonging to the same show are now contiguous and ordered by season number, with the bare-title row sorting first.
+
+### 🔧 Changed
+
+- **Roundup scheduler internals split into single-responsibility modules.** `bot/roundupScheduler.js` owns the hourly tick loop and `evaluateTick(now)` decision; `bot/weeklyRoundup.js` owns post-rendering only; `bot/roundupState.js` owns persisted timestamps and the failure circuit breaker. Existing users do not need to migrate — the legacy `WEEKLY_ROUNDUP_LAST_POSTED_AT` is silently copied into the new state file on first boot.
 
 ---
 
