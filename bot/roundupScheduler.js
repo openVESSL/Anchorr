@@ -120,15 +120,17 @@ export function start(client) {
     `Roundup scheduler started: local now=${WEEKDAY_SHORT[now.getDay()]} ${now.toISOString()} hour=${now.getHours()}, target=${WEEKDAY_SHORT[targetWeekday]} ${targetHour}:00, installedAt=${new Date(installedAt).toISOString()}`
   );
 
-  const delay = msUntilNextHour(now);
-  setTimeout(() => {
-    runTick(client).catch((err) =>
-      logger.error(`Weekly Roundup tick crash: ${err?.message || err}`)
-    );
-    setInterval(() => {
-      runTick(client).catch((err) =>
-        logger.error(`Weekly Roundup tick crash: ${err?.message || err}`)
-      );
-    }, HOUR_MS);
-  }, delay);
+  // Chained setTimeout (not setInterval) so each tick re-aligns to the top of
+  // the next hour. setInterval(HOUR_MS) drifts off the boundary across DST
+  // transitions and could push a post a full hour late.
+  const scheduleNext = () => {
+    setTimeout(() => {
+      runTick(client)
+        .catch((err) =>
+          logger.error(`Weekly Roundup tick crash: ${err?.message || err}`)
+        )
+        .finally(scheduleNext);
+    }, msUntilNextHour(new Date()));
+  };
+  scheduleNext();
 }
