@@ -117,7 +117,7 @@ function groupItems(items) {
   const getLibraryIdFor = (item) => item._configLibraryId || null;
 
   const episodesBySeries = new Map(); // key: libraryId|seriesId
-  const entriesOut = []; // { libraryId, createdAt, render }
+  const entriesOut = []; // { libraryId, createdAt, showKey, seasonNumber, render }
 
   for (const item of items) {
     const libraryId = getLibraryIdFor(item);
@@ -127,13 +127,31 @@ function groupItems(items) {
 
     switch (item.Type) {
       case "Movie":
-        entriesOut.push({ libraryId, createdAt, render: renderMovie(item) });
+        entriesOut.push({
+          libraryId,
+          createdAt,
+          showKey: `movie|${item.Id}`,
+          seasonNumber: 0,
+          render: renderMovie(item),
+        });
         break;
       case "Series":
-        entriesOut.push({ libraryId, createdAt, render: renderSeries(item) });
+        entriesOut.push({
+          libraryId,
+          createdAt,
+          showKey: `series|${item.Id || item.Name || ""}`,
+          seasonNumber: -1,
+          render: renderSeries(item),
+        });
         break;
       case "Season":
-        entriesOut.push({ libraryId, createdAt, render: renderSeason(item) });
+        entriesOut.push({
+          libraryId,
+          createdAt,
+          showKey: `series|${item.SeriesId || item.SeriesName || ""}`,
+          seasonNumber: item.IndexNumber ?? 0,
+          render: renderSeason(item),
+        });
         break;
       case "Episode": {
         const seriesKey = item.SeriesId || item.SeriesName || "unknown";
@@ -176,14 +194,33 @@ function groupItems(items) {
   }
 
   for (const group of episodesBySeries.values()) {
+    const lowestSeason = Math.min(...group.seasons.keys());
     entriesOut.push({
       libraryId: group.libraryId,
       createdAt: group.latestCreated,
+      showKey: `series|${group.seriesId || group.seriesName || ""}`,
+      seasonNumber: Number.isFinite(lowestSeason) ? lowestSeason : 0,
       render: renderEpisodeGroup(group),
     });
   }
 
-  entriesOut.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  // Two-stage sort: place each show by its newest entry's createdAt (desc),
+  // then within a show order rows by seasonNumber asc so Season 1, 2, 3 read
+  // naturally and the bare-title row (-1) sorts first.
+  const showOrder = new Map();
+  for (const e of entriesOut) {
+    const t = e.createdAt.getTime();
+    if (!showOrder.has(e.showKey) || t > showOrder.get(e.showKey)) {
+      showOrder.set(e.showKey, t);
+    }
+  }
+  entriesOut.sort((a, b) => {
+    const sa = showOrder.get(a.showKey) ?? 0;
+    const sb = showOrder.get(b.showKey) ?? 0;
+    if (sb !== sa) return sb - sa;
+    if (a.showKey !== b.showKey) return a.showKey < b.showKey ? -1 : 1;
+    return a.seasonNumber - b.seasonNumber;
+  });
   const capped = entriesOut.slice(0, MAX_ENTRIES);
   const overflow = Math.max(0, entriesOut.length - MAX_ENTRIES);
 
