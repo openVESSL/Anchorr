@@ -8,7 +8,7 @@ import { registerCommands } from "../discord/commands.js";
 import { botState, loadPendingRequests } from "./botState.js";
 import { registerInteractions } from "./interactions.js";
 import { scheduleDailyRandomPick } from "./dailyPick.js";
-import { scheduleWeeklyRoundup } from "./weeklyRoundup.js";
+import { start as startRoundupScheduler } from "./roundupScheduler.js";
 import { loadConfigToEnv } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
 
@@ -72,7 +72,7 @@ export async function startBot() {
       logger.info("ℹ️ Jellyfin notifications will be received via webhooks.");
 
       scheduleDailyRandomPick(client);
-      scheduleWeeklyRoundup(client);
+      startRoundupScheduler(client);
 
       resolve({ success: true, message: `Logged in as ${client.user.tag}` });
     });
