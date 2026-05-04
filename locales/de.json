@@ -467,7 +467,9 @@
     "season_fallback": "Staffel {n}",
     "library_fallback": "Bibliothek",
     "library_names_unavailable": "Bibliotheksnamen nicht verfügbar",
-    "field_more": "_… und {count} weitere_",
+    "section_movies": "Filme",
+    "section_series": "Serien",
+    "field_continued": "(Forts.)",
     "unknown_title": "Unbekannt"
   }
 }

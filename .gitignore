@@ -31,3 +31,4 @@ SRP_ANALYSIS.md
 ToDo_v2.md
 docs/
 config/dedup-*.json
+.worktrees/
