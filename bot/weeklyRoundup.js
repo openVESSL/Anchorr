@@ -24,7 +24,10 @@ async function fetchWindowItems() {
   }
 
   const cutoff = new Date(Date.now() - WINDOW_MS).toISOString();
-  const libraryChannels = getLibraryChannels() || {};
+  const libraryChannels = getLibraryChannels();
+  if (!libraryChannels || typeof libraryChannels !== "object") {
+    throw new Error("getLibraryChannels() returned an unexpected value; cannot proceed");
+  }
 
   // Jellyfin item IDs are 32-char hex. Skip anything else (e.g. a stray "on"
   // value that leaked in from a checkbox).
@@ -266,13 +269,15 @@ function renderMovie(item) {
   const title = item.Name || t("roundup.unknown_title");
   const year = item.ProductionYear ? ` (${item.ProductionYear})` : "";
   const url = itemDeeplink(item.Id);
-  return `🎬 [**${escapeMd(title)}**${escapeMd(year)}](${url})`;
+  if (url) return `🎬 [**${escapeMd(title)}**${escapeMd(year)}](${url})`;
+  return `🎬 **${escapeMd(title)}**${escapeMd(year)}`;
 }
 
 function renderSeries(item) {
   const title = item.Name || t("roundup.unknown_title");
   const url = itemDeeplink(item.Id);
-  return `📺 [**${escapeMd(title)}**](${url})`;
+  if (url) return `📺 [**${escapeMd(title)}**](${url})`;
+  return `📺 **${escapeMd(title)}**`;
 }
 
 function renderSeason(item) {
@@ -280,7 +285,8 @@ function renderSeason(item) {
   const seasonLabel =
     item.Name || t("roundup.season_fallback", { n: item.IndexNumber ?? "?" });
   const url = itemDeeplink(item.Id);
-  return `📺 [**${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}](${url})`;
+  if (url) return `📺 [**${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}](${url})`;
+  return `📺 **${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}`;
 }
 
 function renderEpisodeGroup(group) {
@@ -333,7 +339,7 @@ function escapeMd(s) {
   // Parens are not markdown control chars inside [label] — escaping them
   // produces literal "\(2026\)" in the rendered link. Only escape the
   // chars that Discord actually treats as markdown inside link labels.
-  return String(s).replace(/([\[\]\\*_~`])/g, "\\$1");
+  return String(s).replace(/[\r\n]/g, " ").replace(/([\[\]\\*_~`])/g, "\\$1");
 }
 
 export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
@@ -344,7 +350,6 @@ export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   // can surface them to the dashboard. In production the scheduler records
   // failures, so we throw to let it observe them.
   const onError = (err, msg) => {
-    if (isTest) throw err instanceof Error ? err : new Error(msg);
     throw err instanceof Error ? err : new Error(msg);
   };
 
@@ -575,7 +580,7 @@ async function buildRoundupEmbed(grouped, rawItems) {
   // If we couldn't resolve real library names AND there are multiple
   // sections, every section header reads the same generic fallback — note
   // that in the footer so Discord viewers understand why headers look alike.
-  if (libraryNamesFailed && grouped.perLibrary.size > 1) {
+  if (libraryNamesFailed) {
     footerText += " · " + t("roundup.library_names_unavailable");
   }
   embed.setFooter({ text: footerText });

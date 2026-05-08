@@ -158,7 +158,9 @@ export function readConfig() {
     logger.debug(`Config loaded successfully from ${configPath}`);
     return config;
   } catch (error) {
-    logger.error(`Error reading config from ${configPath}:`, error);
+    logger.error(
+      `Config file at ${configPath} exists but could not be read or parsed (it may be corrupt): ${error.message}. Restore from a backup or delete the file and reconfigure via the dashboard.`
+    );
     return null;
   }
 }
