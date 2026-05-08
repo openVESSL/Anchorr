@@ -214,8 +214,10 @@
     "embed_customization_help": "Passe an, welche Elemente in deinen Discord-Benachrichtigungs-Embeds erscheinen.",
     "embed_backdrop": "Hintergrundbild",
     "embed_backdrop_help": "Großes Hintergrundbild",
-    "embed_overview": "Übersicht/Beschreibung",
-    "embed_overview_help": "Handlungszusammenfassung",
+    "embed_overview_movies": "Übersicht/Beschreibung (Filme & Serien)",
+    "embed_overview_movies_help": "Handlungszusammenfassung für Film- und Serienbenachrichtigungen",
+    "embed_overview_episodes": "Übersicht/Beschreibung (Episoden)",
+    "embed_overview_episodes_help": "Episodenzusammenfassung — deaktivieren, um Spoiler zu vermeiden",
     "embed_genre": "Genre",
     "embed_genre_help": "Genre-Feld",
     "embed_runtime": "Laufzeit",
@@ -467,7 +469,9 @@
     "season_fallback": "Staffel {n}",
     "library_fallback": "Bibliothek",
     "library_names_unavailable": "Bibliotheksnamen nicht verfügbar",
-    "field_more": "_… und {count} weitere_",
+    "section_movies": "Filme",
+    "section_series": "Serien",
+    "field_continued": "(Forts.)",
     "unknown_title": "Unbekannt"
   }
 }

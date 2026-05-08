@@ -150,8 +150,10 @@
     "embed_customization_help": "Anpassa vilka element som visas i dina Discord-notifieringsembeds.",
     "embed_backdrop": "Bakgrundsbild",
     "embed_backdrop_help": "Stor bakgrundsbild",
-    "embed_overview": "Översikt/Beskrivning",
-    "embed_overview_help": "Handlingssammanfattning",
+    "embed_overview_movies": "Översikt/Beskrivning (Filmer & Serier)",
+    "embed_overview_movies_help": "Handlingssammanfattning för film- och serienotiser",
+    "embed_overview_episodes": "Översikt/Beskrivning (Avsnitt)",
+    "embed_overview_episodes_help": "Avsnittssammanfattning — inaktivera för att undvika spoilers",
     "embed_genre": "Genre",
     "embed_genre_help": "Genrefält",
     "embed_runtime": "Speltid",
@@ -397,7 +399,9 @@
     "season_fallback": "Säsong {n}",
     "library_fallback": "Bibliotek",
     "library_names_unavailable": "biblioteksnamn är inte tillgängliga",
-    "field_more": "_… och {count} till_",
+    "section_movies": "Filmer",
+    "section_series": "Serier",
+    "field_continued": "(forts.)",
     "unknown_title": "Okänd"
   }
 }

@@ -249,7 +249,9 @@ export async function findLibraryByAncestors(
             return library.ItemId;
           }
         } catch (err) {
-          // Silent fail for recursive search
+          logger.warn(
+            `findLibraryByAncestors: ancestor check failed for item ${itemId} in library ${library.Name}: ${err?.message || err}`
+          );
         }
       }
     }

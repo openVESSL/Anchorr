@@ -149,8 +149,10 @@
     "embed_customization_help": "Customize which elements appear in your Discord notification embeds.",
     "embed_backdrop": "Backdrop Image",
     "embed_backdrop_help": "Large background image",
-    "embed_overview": "Overview/Description",
-    "embed_overview_help": "Plot summary text",
+    "embed_overview_movies": "Overview/Description (Movies & Series)",
+    "embed_overview_movies_help": "Plot summary for movies and series notifications",
+    "embed_overview_episodes": "Overview/Description (Episodes)",
+    "embed_overview_episodes_help": "Episode summary — disable to avoid spoilers",
     "embed_genre": "Genre",
     "embed_genre_help": "Genre field",
     "embed_runtime": "Runtime",
@@ -396,7 +398,9 @@
     "season_fallback": "Season {n}",
     "library_fallback": "Library",
     "library_names_unavailable": "library names unavailable",
-    "field_more": "_… and {count} more_",
+    "section_movies": "Movies",
+    "section_series": "Series",
+    "field_continued": "(cont.)",
     "unknown_title": "Unknown"
   }
 }

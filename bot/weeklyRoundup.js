@@ -24,7 +24,10 @@ async function fetchWindowItems() {
   }
 
   const cutoff = new Date(Date.now() - WINDOW_MS).toISOString();
-  const libraryChannels = getLibraryChannels() || {};
+  const libraryChannels = getLibraryChannels();
+  if (!libraryChannels || typeof libraryChannels !== "object") {
+    throw new Error("getLibraryChannels() returned an unexpected value; cannot proceed");
+  }
 
   // Jellyfin item IDs are 32-char hex. Skip anything else (e.g. a stray "on"
   // value that leaked in from a checkbox).
@@ -109,7 +112,7 @@ async function fetchWindowItems() {
  * - Movies / Series / Season items produce one entry each.
  * - Episodes are collapsed per series into a single "Series X — Season N (M episodes)" entry.
  *
- * Returns { perLibrary: Map<libraryId, { entries: string[] }>, totalCount, overflow }.
+ * Returns { perLibrary: Map<libraryId, { movies: string[], series: string[] }>, totalCount, overflow }.
  */
 function groupItems(items) {
   // Items have already been tagged with _configLibraryId by fetchWindowItems,
@@ -249,9 +252,14 @@ function groupItems(items) {
   const perLibrary = new Map();
   for (const entry of capped) {
     if (!perLibrary.has(entry.libraryId)) {
-      perLibrary.set(entry.libraryId, { entries: [] });
+      perLibrary.set(entry.libraryId, { movies: [], series: [] });
     }
-    perLibrary.get(entry.libraryId).entries.push(entry.render);
+    const bucket = perLibrary.get(entry.libraryId);
+    if (entry.kind === "movie") {
+      bucket.movies.push(entry.render);
+    } else {
+      bucket.series.push(entry.render);
+    }
   }
 
   return { perLibrary, totalCount: entriesOut.length, overflow };
@@ -261,13 +269,15 @@ function renderMovie(item) {
   const title = item.Name || t("roundup.unknown_title");
   const year = item.ProductionYear ? ` (${item.ProductionYear})` : "";
   const url = itemDeeplink(item.Id);
-  return `🎬 [**${escapeMd(title)}**${escapeMd(year)}](${url})`;
+  if (url) return `🎬 [**${escapeMd(title)}**${escapeMd(year)}](${url})`;
+  return `🎬 **${escapeMd(title)}**${escapeMd(year)}`;
 }
 
 function renderSeries(item) {
   const title = item.Name || t("roundup.unknown_title");
   const url = itemDeeplink(item.Id);
-  return `📺 [**${escapeMd(title)}**](${url})`;
+  if (url) return `📺 [**${escapeMd(title)}**](${url})`;
+  return `📺 **${escapeMd(title)}**`;
 }
 
 function renderSeason(item) {
@@ -275,7 +285,8 @@ function renderSeason(item) {
   const seasonLabel =
     item.Name || t("roundup.season_fallback", { n: item.IndexNumber ?? "?" });
   const url = itemDeeplink(item.Id);
-  return `📺 [**${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}](${url})`;
+  if (url) return `📺 [**${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}](${url})`;
+  return `📺 **${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}`;
 }
 
 function renderEpisodeGroup(group) {
@@ -328,7 +339,7 @@ function escapeMd(s) {
   // Parens are not markdown control chars inside [label] — escaping them
   // produces literal "\(2026\)" in the rendered link. Only escape the
   // chars that Discord actually treats as markdown inside link labels.
-  return String(s).replace(/([\[\]\\*_~`])/g, "\\$1");
+  return String(s).replace(/[\r\n]/g, " ").replace(/([\[\]\\*_~`])/g, "\\$1");
 }
 
 export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
@@ -339,7 +350,6 @@ export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   // can surface them to the dashboard. In production the scheduler records
   // failures, so we throw to let it observe them.
   const onError = (err, msg) => {
-    if (isTest) throw err instanceof Error ? err : new Error(msg);
     throw err instanceof Error ? err : new Error(msg);
   };
 
@@ -541,10 +551,24 @@ async function buildRoundupEmbed(grouped, rawItems) {
   const { map: libraryNames, failed: libraryNamesFailed } =
     await resolveLibraryNames(Array.from(grouped.perLibrary.keys()));
 
+  const allFields = [];
   for (const [libraryId, bucket] of grouped.perLibrary.entries()) {
-    const name = libraryNames[libraryId] || t("roundup.library_fallback");
-    embed.addFields({ name, value: renderFieldValue(bucket.entries) });
+    const libraryName = libraryNames[libraryId] || t("roundup.library_fallback");
+    // Separator field — library name as section header
+    allFields.push({ name: libraryName, value: "​" });
+    if (bucket.movies.length > 0) {
+      allFields.push(...renderFieldGroup(t("roundup.section_movies"), bucket.movies));
+    }
+    if (bucket.series.length > 0) {
+      allFields.push(...renderFieldGroup(t("roundup.section_series"), bucket.series));
+    }
   }
+  // Discord hard limit: 25 fields per embed
+  if (allFields.length > 25) {
+    logger.warn(`[weeklyRoundup] embed field count (${allFields.length}) exceeds Discord limit of 25; trimming`);
+    allFields.length = 25;
+  }
+  embed.addFields(allFields);
 
   let footerText =
     grouped.overflow > 0
@@ -556,7 +580,7 @@ async function buildRoundupEmbed(grouped, rawItems) {
   // If we couldn't resolve real library names AND there are multiple
   // sections, every section header reads the same generic fallback — note
   // that in the footer so Discord viewers understand why headers look alike.
-  if (libraryNamesFailed && grouped.perLibrary.size > 1) {
+  if (libraryNamesFailed) {
     footerText += " · " + t("roundup.library_names_unavailable");
   }
   embed.setFooter({ text: footerText });
@@ -564,27 +588,28 @@ async function buildRoundupEmbed(grouped, rawItems) {
   return embed;
 }
 
-// Discord embed field values are capped at 1024 chars. Joining everything and
-// byte-slicing can cut a markdown link in half (e.g. `[**Title**](http://…`),
-// producing a broken field. Build entry-by-entry until the next entry would
-// overflow, then append a translated overflow hint if anything was dropped.
+// Discord embed field values are capped at 1024 chars. Build entry-by-entry;
+// when entries overflow spill into continuation fields instead of dropping them.
+// Returns an array of { name, value } objects ready for embed.addFields().
 const FIELD_VALUE_BUDGET = 1024;
-function renderFieldValue(entries) {
+function renderFieldGroup(name, entries) {
+  const fields = [];
+  let currentName = name;
   let value = "";
-  let dropped = 0;
-  for (let i = 0; i < entries.length; i++) {
-    const next = (value ? "\n" : "") + entries[i];
+
+  for (const entry of entries) {
+    const next = (value ? "\n" : "") + entry;
     if (value.length + next.length > FIELD_VALUE_BUDGET) {
-      dropped = entries.length - i;
-      break;
+      fields.push({ name: currentName, value });
+      currentName = name + " " + t("roundup.field_continued");
+      value = entry;
+    } else {
+      value += next;
     }
-    value += next;
   }
-  if (dropped > 0) {
-    const moreLine = "\n" + t("roundup.field_more", { count: dropped });
-    if (value.length + moreLine.length <= FIELD_VALUE_BUDGET) value += moreLine;
-  }
-  return value;
+  if (value) fields.push({ name: currentName, value });
+
+  return fields;
 }
 
 async function resolveLibraryNames(libraryIds) {

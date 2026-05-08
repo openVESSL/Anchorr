@@ -56,7 +56,8 @@ export function recordFailure(ms = Date.now()) {
   // bot at import time. Worst case the migration is skipped and the user gets
   // one duplicate roundup, which is recoverable; a boot crash is not.
   try {
-    if (map.get(LAST_POSTED_AT_KEY) != null) return;
+    const existing = map.get(LAST_POSTED_AT_KEY);
+    if (typeof existing === "number" && Number.isFinite(existing)) return;
     const legacy = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT;
     if (!legacy) return;
     const parsed = Date.parse(legacy);

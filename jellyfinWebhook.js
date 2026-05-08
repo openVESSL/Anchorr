@@ -184,7 +184,8 @@ async function processAndSendNotification(
 
   // Get embed customization settings from environment
   const showBackdrop = process.env.EMBED_SHOW_BACKDROP !== "false";
-  const showOverview = process.env.EMBED_SHOW_OVERVIEW !== "false";
+  const showOverviewMovies = process.env.EMBED_SHOW_OVERVIEW_MOVIES !== "false";
+  const showOverviewEpisodes = process.env.EMBED_SHOW_OVERVIEW_EPISODES !== "false";
   const showGenre = process.env.EMBED_SHOW_GENRE !== "false";
   const showRuntime = process.env.EMBED_SHOW_RUNTIME !== "false";
   const showRating = process.env.EMBED_SHOW_RATING !== "false";
@@ -428,7 +429,7 @@ async function processAndSendNotification(
   // Add fields based on ItemType
   if (ItemType === "Episode" && episodeCount <= 1) {
     // Single episode: show overview
-    if (showOverview && overviewText) {
+    if (showOverviewEpisodes && overviewText) {
       embed.addFields({ name: "Episode Summary", value: overviewText });
     }
   } else if (ItemType === "Season") {
@@ -436,8 +437,8 @@ async function processAndSendNotification(
   } else {
     // Movies and Series: Summary, Genre, Runtime, Rating
     const fields = [];
-    
-    if (showOverview) {
+
+    if (showOverviewMovies) {
       fields.push({ name: headerLine, value: overviewText || "No description available." });
     }
     
