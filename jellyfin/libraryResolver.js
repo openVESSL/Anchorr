@@ -60,7 +60,7 @@ export function getLibraryChannels() {
     }
     return parsed;
   } catch (e) {
-    logger.warn("Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES:", e);
+    logger.warn(`Failed to parse JELLYFIN_NOTIFICATION_LIBRARIES: ${e?.message || e}`);
     return {};
   }
 }

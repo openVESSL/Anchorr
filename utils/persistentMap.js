@@ -137,7 +137,6 @@ export class PersistentMap {
       this.flushTimer = null;
     }
     if (!this.dirty) return;
-    this.dirty = false;
     const now = Date.now();
     const data = [];
     for (const [key, entry] of this.entries) {
@@ -151,6 +150,7 @@ export class PersistentMap {
       const tmpPath = `${this.filePath}.tmp`;
       fs.writeFileSync(tmpPath, JSON.stringify(data), { mode: 0o600 });
       fs.renameSync(tmpPath, this.filePath);
+      this.dirty = false;
       if (this.consecutiveFlushFailures > 0) {
         logger.info(
           `PersistentMap[${this.name}]: flush recovered after ${this.consecutiveFlushFailures} failure(s)`
@@ -237,6 +237,8 @@ export class PersistentMap {
     this.entries.delete(oldKey);
     if (!this.entries.has(newKey)) {
       this.entries.set(newKey, entry);
+    } else {
+      logger.debug(`PersistentMap[${this.name}]: rekey collision — ${oldKey} → ${newKey} already exists, old entry discarded`);
     }
     this._scheduleFlush();
     return true;
