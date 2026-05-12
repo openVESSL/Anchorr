@@ -25,7 +25,7 @@ const debouncedSenders = new Map();
 // re-notifies anything in the recently-added window via the next poll/WS reconnect).
 const sentNotifications = new PersistentMap(
   "sent-notifications",
-  7 * 24 * 60 * 60 * 1000, // 7 days — survive Sonarr/Radarr upgrade cycles
+  5 * 365 * 24 * 60 * 60 * 1000, // ~5 years — items already in the library never re-notify
   { validateValue: (v) => v && typeof v.level === "number" }
 );
 
@@ -1003,7 +1003,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           `[DUPLICATE CHECK] ${data.ItemType} "${
             data.Name
           }" - SeriesId: ${SeriesId}, sentLevel: ${sentLevel}, currentLevel: ${currentLevel}, has debouncer: ${debouncedSenders.has(
-            SeriesId
+            seriesKey
           )}`
         );
 
