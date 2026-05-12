@@ -1,9 +1,8 @@
 import { PersistentMap } from "../utils/persistentMap.js";
 
-// Wider than the 7-day roundup window so an item filtered out one week is
-// still remembered the following week (avoids it re-appearing as "new" if
-// Sonarr does a second upgrade just past the 7-day mark).
-const TTL_MS = 14 * 24 * 60 * 60 * 1000;
+// Items already seen should never re-appear as "new" regardless of how many
+// Sonarr/Radarr quality upgrades happen. ~5 years is effectively permanent.
+const TTL_MS = 5 * 365 * 24 * 60 * 60 * 1000;
 
 const map = new PersistentMap("roundup-first-seen", TTL_MS, {
   validateValue: (v) => v && typeof v.firstSeenAt === "number",
