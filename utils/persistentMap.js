@@ -226,6 +226,26 @@ export class PersistentMap {
     return removed;
   }
 
+  /** Rename a key without changing its value or expiresAt. Returns true if the key existed. */
+  rekey(oldKey, newKey) {
+    const entry = this.entries.get(oldKey);
+    if (!entry) return false;
+    this.entries.set(newKey, entry);
+    this.entries.delete(oldKey);
+    this._scheduleFlush();
+    return true;
+  }
+
+  /** Iterate over all non-expired keys. */
+  keys() {
+    const now = Date.now();
+    const result = [];
+    for (const [key, entry] of this.entries) {
+      if (entry.expiresAt > now) result.push(key);
+    }
+    return result;
+  }
+
   size() {
     return this.entries.size;
   }

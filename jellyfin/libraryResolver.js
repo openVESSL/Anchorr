@@ -166,7 +166,12 @@ export function buildIdentityKey(item) {
         ? `name:${item.SeriesName}`
         : null;
       if (seriesKey && seasonNum != null && episodeNum != null) {
-        return `series:${seriesKey}:s${seasonNum}e${episodeNum}`;
+        const epEnd = item.IndexNumberEnd ?? item.EpisodeNumberEnd;
+        const epSuffix =
+          epEnd != null && epEnd !== episodeNum
+            ? `e${episodeNum}-${epEnd}`
+            : `e${episodeNum}`;
+        return `series:${seriesKey}:s${seasonNum}${epSuffix}`;
       }
       return itemId ? `id:${itemId}` : null;
     }

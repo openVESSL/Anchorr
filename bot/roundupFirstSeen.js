@@ -1,4 +1,6 @@
 import { PersistentMap } from "../utils/persistentMap.js";
+import { buildIdentityKey } from "../jellyfin/libraryResolver.js";
+import logger from "../utils/logger.js";
 
 // Items already seen should never re-appear as "new" regardless of how many
 // Sonarr/Radarr quality upgrades happen. ~5 years is effectively permanent.
@@ -8,51 +10,52 @@ const map = new PersistentMap("roundup-first-seen", TTL_MS, {
   validateValue: (v) => v && typeof v.firstSeenAt === "number",
 });
 
-/**
- * Build a stable per-item identity key that survives Sonarr/Radarr quality
- * upgrades (which change the Jellyfin ItemId).
- *
- * - Movies prefer TMDB; fall back to ItemId (re-imports without TMDB will
- *   slip through — known limitation, very rare in practice).
- * - Episodes/Seasons use SeriesId, which is the Jellyfin series *container*
- *   ItemId. The container persists across episode-file re-imports, so it's
- *   stable for our purposes.
- */
-export function stableKeyFor(item) {
-  if (!item || !item.Type) return null;
-  const tmdb = item.ProviderIds?.Tmdb;
-  switch (item.Type) {
-    case "Movie":
-      if (tmdb) return `m:tmdb:${tmdb}`;
-      return item.Id ? `m:jf:${item.Id}` : null;
-    case "Series":
-      if (tmdb) return `S:tmdb:${tmdb}`;
-      return item.Id ? `S:jf:${item.Id}` : null;
-    case "Season": {
-      const sid = item.SeriesId;
-      const n = item.IndexNumber;
-      if (sid && n != null) return `s:${sid}-S${n}`;
-      return item.Id ? `s:jf:${item.Id}` : null;
+// One-time migration from the v1 key format (used by stableKeyFor) to the v2
+// format (used by buildIdentityKey). Runs once on startup; a no-op after that
+// since v2 keys don't start with the old single-letter prefixes.
+(function migrateV1Keys() {
+  const oldPrefixes = ["m:", "S:", "s:", "e:"];
+  const toMigrate = map.keys().filter((k) => oldPrefixes.some((p) => k.startsWith(p)));
+  if (toMigrate.length === 0) return;
+
+  let migrated = 0;
+  let dropped = 0;
+  for (const oldKey of toMigrate) {
+    const newKey = migrateKey(oldKey);
+    if (newKey !== null) {
+      map.rekey(oldKey, newKey);
+      migrated++;
+    } else {
+      map.delete(oldKey);
+      dropped++;
     }
-    case "Episode": {
-      const sid = item.SeriesId;
-      const season = item.ParentIndexNumber;
-      const ep = item.IndexNumber;
-      const epEnd = item.IndexNumberEnd;
-      if (sid && season != null && ep != null) {
-        return epEnd != null && epEnd !== ep
-          ? `e:${sid}-S${season}E${ep}-${epEnd}`
-          : `e:${sid}-S${season}E${ep}`;
-      }
-      // No usable index — best we can do is series + episode title.
-      if (sid && item.Name) {
-        return `e:${sid}-n:${item.Name.toLowerCase().trim()}`;
-      }
-      return item.Id ? `e:jf:${item.Id}` : null;
-    }
-    default:
-      return null;
   }
+  logger.info(
+    `roundup-first-seen: migrated ${migrated} key(s) from v1 to v2 format (dropped ${dropped} unrecognised)`
+  );
+})();
+
+function migrateKey(oldKey) {
+  // m:tmdb:X → movie:tmdb:X
+  if (oldKey.startsWith("m:tmdb:")) return "movie:tmdb:" + oldKey.slice(7);
+  // m:jf:X → id:X
+  if (oldKey.startsWith("m:jf:")) return "id:" + oldKey.slice(5);
+  // S:tmdb:X → series:tmdb:X
+  if (oldKey.startsWith("S:tmdb:")) return "series:tmdb:" + oldKey.slice(7);
+  // S:jf:X → series:id:X
+  if (oldKey.startsWith("S:jf:")) return "series:id:" + oldKey.slice(5);
+  // s:SeriesId-SN → series:id:SeriesId:sN
+  const seasonMatch = oldKey.match(/^s:([^-]+)-S(\d+)$/);
+  if (seasonMatch) return `series:id:${seasonMatch[1]}:s${seasonMatch[2]}`;
+  // s:jf:X → id:X
+  if (oldKey.startsWith("s:jf:")) return "id:" + oldKey.slice(5);
+  // e:SeriesId-SNEm(-m2)? → series:id:SeriesId:sNem
+  const epMatch = oldKey.match(/^e:([^-]+)-S(\d+)E(\d+)(?:-\d+)?$/);
+  if (epMatch) return `series:id:${epMatch[1]}:s${epMatch[2]}e${epMatch[3]}`;
+  // e:SeriesId-n:name → no stable equivalent, drop
+  // e:jf:X → id:X
+  if (oldKey.startsWith("e:jf:")) return "id:" + oldKey.slice(5);
+  return null;
 }
 
 /**
@@ -63,7 +66,7 @@ export function stableKeyFor(item) {
  * rather over-include than drop a genuinely new item.
  */
 export function recordOrGet(item, now = Date.now()) {
-  const key = stableKeyFor(item);
+  const key = buildIdentityKey(item);
   if (!key) return now;
   const existing = map.get(key);
   if (existing && typeof existing.firstSeenAt === "number") {
