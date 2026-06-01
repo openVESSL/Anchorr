@@ -1,4 +1,6 @@
 import { PersistentMap } from "../utils/persistentMap.js";
+import { buildIdentityKey } from "../jellyfin/libraryResolver.js";
+import logger from "../utils/logger.js";
 
 // Items already seen should never re-appear as "new" regardless of how many
 // Sonarr/Radarr quality upgrades happen. ~5 years is effectively permanent.
@@ -8,52 +10,71 @@ const map = new PersistentMap("roundup-first-seen", TTL_MS, {
   validateValue: (v) => v && typeof v.firstSeenAt === "number",
 });
 
-/**
- * Build a stable per-item identity key that survives Sonarr/Radarr quality
- * upgrades (which change the Jellyfin ItemId).
- *
- * - Movies prefer TMDB; fall back to ItemId (re-imports without TMDB will
- *   slip through — known limitation, very rare in practice).
- * - Episodes/Seasons use SeriesId, which is the Jellyfin series *container*
- *   ItemId. The container persists across episode-file re-imports, so it's
- *   stable for our purposes.
- */
-export function stableKeyFor(item) {
-  if (!item || !item.Type) return null;
-  const tmdb = item.ProviderIds?.Tmdb;
-  switch (item.Type) {
-    case "Movie":
-      if (tmdb) return `m:tmdb:${tmdb}`;
-      return item.Id ? `m:jf:${item.Id}` : null;
-    case "Series":
-      if (tmdb) return `S:tmdb:${tmdb}`;
-      return item.Id ? `S:jf:${item.Id}` : null;
-    case "Season": {
-      const sid = item.SeriesId;
-      const n = item.IndexNumber;
-      if (sid && n != null) return `s:${sid}-S${n}`;
-      return item.Id ? `s:jf:${item.Id}` : null;
-    }
-    case "Episode": {
-      const sid = item.SeriesId;
-      const season = item.ParentIndexNumber;
-      const ep = item.IndexNumber;
-      const epEnd = item.IndexNumberEnd;
-      if (sid && season != null && ep != null) {
-        return epEnd != null && epEnd !== ep
-          ? `e:${sid}-S${season}E${ep}-${epEnd}`
-          : `e:${sid}-S${season}E${ep}`;
-      }
-      // No usable index — best we can do is series + episode title.
-      if (sid && item.Name) {
-        return `e:${sid}-n:${item.Name.toLowerCase().trim()}`;
-      }
-      return item.Id ? `e:jf:${item.Id}` : null;
-    }
-    default:
-      return null;
+// Declared before the migration IIFE that calls it (avoids a latent boot-crash
+// if this function is ever converted to a const arrow, which is not hoisted).
+function migrateKey(oldKey) {
+  // m:tmdb:X → movie:tmdb:X
+  if (oldKey.startsWith("m:tmdb:")) return "movie:tmdb:" + oldKey.slice(7);
+  // m:jf:X → id:X
+  if (oldKey.startsWith("m:jf:")) return "id:" + oldKey.slice(5);
+  // S:tmdb:X → series:tmdb:X
+  if (oldKey.startsWith("S:tmdb:")) return "series:tmdb:" + oldKey.slice(7);
+  // S:jf:X → series:id:X
+  if (oldKey.startsWith("S:jf:")) return "series:id:" + oldKey.slice(5);
+  // s:SeriesId-SN → series:id:SeriesId:sN
+  // Use .+? so dashed GUIDs in SeriesId are captured correctly.
+  const seasonMatch = oldKey.match(/^s:(.+?)-S(\d+)$/);
+  if (seasonMatch) return `series:id:${seasonMatch[1]}:s${seasonMatch[2]}`;
+  // s:jf:X → id:X
+  if (oldKey.startsWith("s:jf:")) return "id:" + oldKey.slice(5);
+  // e:SeriesId-SNEm(-eEnd)? → series:id:SeriesId:sNem(-eEnd)?
+  const epMatch = oldKey.match(/^e:(.+?)-S(\d+)E(\d+)(?:-(\d+))?$/);
+  if (epMatch) {
+    const [, sid, s, e, eEnd] = epMatch;
+    const suffix = eEnd != null ? `e${e}-${eEnd}` : `e${e}`;
+    return `series:id:${sid}:s${s}${suffix}`;
   }
+  // e:SeriesId-n:name → no stable equivalent, drop
+  // e:jf:X → id:X
+  if (oldKey.startsWith("e:jf:")) return "id:" + oldKey.slice(5);
+  return null;
 }
+
+// One-time migration from the v1 key format (used by stableKeyFor) to the v2
+// format (used by buildIdentityKey). Runs once on startup; a no-op after that
+// since v2 keys don't start with the old single-letter prefixes.
+(function migrateV1Keys() {
+  let migrated = 0;
+  let dropped = 0;
+  try {
+    const oldPrefixes = ["m:", "S:", "s:", "e:"];
+    const toMigrate = map.keys().filter((k) => oldPrefixes.some((p) => k.startsWith(p)));
+    if (toMigrate.length === 0) return;
+
+    for (const oldKey of toMigrate) {
+      const newKey = migrateKey(oldKey);
+      if (newKey !== null) {
+        map.rekey(oldKey, newKey);
+        migrated++;
+      } else {
+        map.delete(oldKey);
+        dropped++;
+      }
+    }
+    if (dropped > 0) {
+      logger.warn(
+        `roundup-first-seen: dropped ${dropped} v1 key(s) with no v2 equivalent — those items may re-appear once in the next Weekly Roundup`
+      );
+    }
+    if (migrated > 0) {
+      logger.info(`roundup-first-seen: migrated ${migrated} key(s) from v1 to v2 format`);
+    }
+  } catch (err) {
+    logger.warn(
+      `roundup-first-seen: v1→v2 key migration failed after ${migrated} migrated / ${dropped} dropped (${err?.message || err}). Remaining v1 keys were not migrated — affected items may re-appear once in the next Weekly Roundup.`
+    );
+  }
+})();
 
 /**
  * Returns the recorded `firstSeenAt` timestamp for this item's stable
@@ -63,7 +84,7 @@ export function stableKeyFor(item) {
  * rather over-include than drop a genuinely new item.
  */
 export function recordOrGet(item, now = Date.now()) {
-  const key = stableKeyFor(item);
+  const key = buildIdentityKey(item);
   if (!key) return now;
   const existing = map.get(key);
   if (existing && typeof existing.firstSeenAt === "number") {

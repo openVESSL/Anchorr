@@ -511,80 +511,19 @@ export function registerInteractions(client) {
               })
               .slice(0, 10);
 
-            const trendingChoices = await Promise.all(
-              filtered.map(async (item) => {
-                try {
-                  const details = await tmdbApi.tmdbGetDetails(
-                    item.id,
-                    item.media_type,
-                    getTmdbApiKey()
-                  );
-
-                  const emoji = item.media_type === "movie" ? "🎬" : "📺";
-                  const date =
-                    item.release_date || item.first_air_date || "";
-                  const year = date ? ` (${date.slice(0, 4)})` : "";
-
-                  let extraInfo = "";
-                  if (item.media_type === "movie") {
-                    const director = details.credits?.crew?.find(
-                      (c) => c.job === "Director"
-                    );
-                    const directorName = director ? director.name : null;
-                    const runtime = details.runtime;
-                    const hours = runtime ? Math.floor(runtime / 60) : 0;
-                    const minutes = runtime ? runtime % 60 : 0;
-                    const runtimeStr = runtime
-                      ? `${hours}h ${minutes}m`
-                      : null;
-
-                    if (directorName && runtimeStr) {
-                      extraInfo = ` — directed by ${directorName} — runtime: ${runtimeStr}`;
-                    } else if (directorName) {
-                      extraInfo = ` — directed by ${directorName}`;
-                    } else if (runtimeStr) {
-                      extraInfo = ` — runtime: ${runtimeStr}`;
-                    }
-                  } else {
-                    const creator = details.created_by?.[0]?.name;
-                    const seasonCount = details.number_of_seasons;
-                    const seasonStr = seasonCount
-                      ? `${seasonCount} season${seasonCount > 1 ? "s" : ""}`
-                      : null;
-
-                    if (creator && seasonStr) {
-                      extraInfo = ` — created by ${creator} — ${seasonStr}`;
-                    } else if (creator) {
-                      extraInfo = ` — created by ${creator}`;
-                    } else if (seasonStr) {
-                      extraInfo = ` — ${seasonStr}`;
-                    }
-                  }
-
-                  let fullName = `${emoji} ${item.title || item.name}${year}${extraInfo}`;
-                  if (fullName.length > 98) {
-                    fullName = fullName.substring(0, 95) + "...";
-                  }
-
-                  return { name: fullName, value: `${item.id}|${item.media_type}` };
-                } catch (err) {
-                  const emoji = item.media_type === "movie" ? "🎬" : "📺";
-                  const date =
-                    item.release_date || item.first_air_date || "";
-                  const year = date ? ` (${date.slice(0, 4)})` : "";
-                  let basicName = `${emoji} ${item.title || item.name}${year}`;
-                  if (basicName.length > 98) {
-                    basicName = basicName.substring(0, 95) + "...";
-                  }
-                  return { name: basicName, value: `${item.id}|${item.media_type}` };
-                }
-              })
-            );
+            const trendingChoices = filtered.map((item) => {
+              const emoji = item.media_type === "movie" ? "🎬" : "📺";
+              const date = item.release_date || item.first_air_date || "";
+              const year = date ? ` (${date.slice(0, 4)})` : "";
+              let label = `${emoji} ${item.title || item.name}${year}`;
+              if (label.length > 98) label = label.substring(0, 95) + "...";
+              return { name: label, value: `${item.id}|${item.media_type}` };
+            });
 
             await interaction.respond(trendingChoices);
             return;
           } catch (e) {
-            logger.error("Trending autocomplete error:", e);
+            logger.error(`Trending autocomplete error (${e?.status ?? e?.code ?? "unknown"}):`, e);
             return interaction.respond([]);
           }
         }
@@ -603,83 +542,18 @@ export function registerInteractions(client) {
             )
             .slice(0, 10);
 
-          const detailedChoices = await Promise.all(
-            filtered.map(async (item) => {
-              try {
-                const details = await tmdbApi.tmdbGetDetails(
-                  item.id,
-                  item.media_type,
-                  getTmdbApiKey()
-                );
+          const choices = filtered.map((item) => {
+            const emoji = item.media_type === "movie" ? "🎬" : "📺";
+            const date = item.release_date || item.first_air_date || "";
+            const year = date ? ` (${date.slice(0, 4)})` : "";
+            let label = `${emoji} ${item.title || item.name}${year}`;
+            if (label.length > 98) label = label.substring(0, 95) + "...";
+            return { name: label, value: `${item.id}|${item.media_type}` };
+          });
 
-                const emoji = item.media_type === "movie" ? "🎬" : "📺";
-                const date =
-                  item.release_date || item.first_air_date || "";
-                const year = date ? ` (${date.slice(0, 4)})` : "";
-
-                let extraInfo = "";
-                if (item.media_type === "movie") {
-                  const director = details.credits?.crew?.find(
-                    (c) => c.job === "Director"
-                  );
-                  const directorName = director ? director.name : null;
-                  const runtime = details.runtime;
-                  const hours = runtime ? Math.floor(runtime / 60) : 0;
-                  const minutes = runtime ? runtime % 60 : 0;
-                  const runtimeStr = runtime
-                    ? `${hours}h ${minutes}m`
-                    : null;
-
-                  if (directorName && runtimeStr) {
-                    extraInfo = ` — directed by ${directorName} — runtime: ${runtimeStr}`;
-                  } else if (directorName) {
-                    extraInfo = ` — directed by ${directorName}`;
-                  } else if (runtimeStr) {
-                    extraInfo = ` — runtime: ${runtimeStr}`;
-                  }
-                } else {
-                  const creator = details.created_by?.[0]?.name;
-                  const seasonCount = details.number_of_seasons;
-                  const seasonStr = seasonCount
-                    ? `${seasonCount} season${seasonCount > 1 ? "s" : ""}`
-                    : null;
-
-                  if (creator && seasonStr) {
-                    extraInfo = ` — created by ${creator} — ${seasonStr}`;
-                  } else if (creator) {
-                    extraInfo = ` — created by ${creator}`;
-                  } else if (seasonStr) {
-                    extraInfo = ` — ${seasonStr}`;
-                  }
-                }
-
-                let fullName = `${emoji} ${item.title || item.name}${year}${extraInfo}`;
-                if (fullName.length > 98) {
-                  fullName = fullName.substring(0, 95) + "...";
-                }
-
-                return { name: fullName, value: `${item.id}|${item.media_type}` };
-              } catch (err) {
-                logger.debug(
-                  `Failed to fetch details for ${item.id}:`,
-                  err?.message
-                );
-                const emoji = item.media_type === "movie" ? "🎬" : "📺";
-                const date =
-                  item.release_date || item.first_air_date || "";
-                const year = date ? ` (${date.slice(0, 4)})` : "";
-                let basicName = `${emoji} ${item.title || item.name}${year}`;
-                if (basicName.length > 98) {
-                  basicName = basicName.substring(0, 95) + "...";
-                }
-                return { name: basicName, value: `${item.id}|${item.media_type}` };
-              }
-            })
-          );
-
-          await interaction.respond(detailedChoices);
+          await interaction.respond(choices);
         } catch (e) {
-          logger.error("Autocomplete error:", e);
+          logger.error(`Autocomplete error (${e?.status ?? e?.code ?? "unknown"}):`, e);
           return await interaction.respond([]);
         }
       }

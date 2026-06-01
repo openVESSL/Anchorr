@@ -137,7 +137,6 @@ export class PersistentMap {
       this.flushTimer = null;
     }
     if (!this.dirty) return;
-    this.dirty = false;
     const now = Date.now();
     const data = [];
     for (const [key, entry] of this.entries) {
@@ -151,6 +150,7 @@ export class PersistentMap {
       const tmpPath = `${this.filePath}.tmp`;
       fs.writeFileSync(tmpPath, JSON.stringify(data), { mode: 0o600 });
       fs.renameSync(tmpPath, this.filePath);
+      this.dirty = false;
       if (this.consecutiveFlushFailures > 0) {
         logger.info(
           `PersistentMap[${this.name}]: flush recovered after ${this.consecutiveFlushFailures} failure(s)`
@@ -163,7 +163,7 @@ export class PersistentMap {
       // First failure visible at warn; subsequent ones at debug to avoid
       // log floods (e.g. disk full + bursty writes every 2s).
       const msg = `PersistentMap[${this.name}]: flush failed #${this.consecutiveFlushFailures} (${err?.message || err})`;
-      if (this.consecutiveFlushFailures === 1) logger.warn(msg);
+      if (this.consecutiveFlushFailures === 1 || this.consecutiveFlushFailures % 20 === 0) logger.warn(msg);
       else logger.debug(msg);
     }
   }
@@ -224,6 +224,43 @@ export class PersistentMap {
     }
     if (removed > 0) this._scheduleFlush();
     return removed;
+  }
+
+  /**
+   * Rename a key without changing its value or expiresAt. If newKey already
+   * exists the old entry is discarded (existing entry wins) and the old key is
+   * removed. Returns true if oldKey existed.
+   */
+  rekey(oldKey, newKey) {
+    const entry = this.entries.get(oldKey);
+    if (!entry) return false;
+    this.entries.delete(oldKey);
+    if (!this.entries.has(newKey)) {
+      this.entries.set(newKey, entry);
+    } else {
+      logger.info(`PersistentMap[${this.name}]: rekey collision — ${oldKey} → ${newKey} already exists, old entry discarded`);
+    }
+    this._scheduleFlush();
+    return true;
+  }
+
+  /** Return all non-expired keys, evicting expired entries as a side effect (consistent with get/has). */
+  keys() {
+    const now = Date.now();
+    const result = [];
+    const expired = [];
+    for (const [key, entry] of this.entries) {
+      if (entry.expiresAt > now) {
+        result.push(key);
+      } else {
+        expired.push(key);
+      }
+    }
+    if (expired.length > 0) {
+      for (const key of expired) this.entries.delete(key);
+      this._scheduleFlush();
+    }
+    return result;
   }
 
   size() {
