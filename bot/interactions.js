@@ -523,7 +523,7 @@ export function registerInteractions(client) {
             await interaction.respond(trendingChoices);
             return;
           } catch (e) {
-            logger.error("Trending autocomplete error:", e);
+            logger.error(`Trending autocomplete error (${e?.status ?? e?.code ?? "unknown"}):`, e);
             return interaction.respond([]);
           }
         }
@@ -553,7 +553,7 @@ export function registerInteractions(client) {
 
           await interaction.respond(choices);
         } catch (e) {
-          logger.error("Autocomplete error:", e);
+          logger.error(`Autocomplete error (${e?.status ?? e?.code ?? "unknown"}):`, e);
           return await interaction.respond([]);
         }
       }

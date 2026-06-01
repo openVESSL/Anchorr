@@ -163,7 +163,7 @@ export class PersistentMap {
       // First failure visible at warn; subsequent ones at debug to avoid
       // log floods (e.g. disk full + bursty writes every 2s).
       const msg = `PersistentMap[${this.name}]: flush failed #${this.consecutiveFlushFailures} (${err?.message || err})`;
-      if (this.consecutiveFlushFailures === 1) logger.warn(msg);
+      if (this.consecutiveFlushFailures === 1 || this.consecutiveFlushFailures % 20 === 0) logger.warn(msg);
       else logger.debug(msg);
     }
   }
