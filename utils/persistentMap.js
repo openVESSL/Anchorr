@@ -238,7 +238,7 @@ export class PersistentMap {
     if (!this.entries.has(newKey)) {
       this.entries.set(newKey, entry);
     } else {
-      logger.debug(`PersistentMap[${this.name}]: rekey collision — ${oldKey} → ${newKey} already exists, old entry discarded`);
+      logger.info(`PersistentMap[${this.name}]: rekey collision — ${oldKey} → ${newKey} already exists, old entry discarded`);
     }
     this._scheduleFlush();
     return true;

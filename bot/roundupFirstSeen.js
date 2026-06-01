@@ -44,13 +44,13 @@ function migrateKey(oldKey) {
 // format (used by buildIdentityKey). Runs once on startup; a no-op after that
 // since v2 keys don't start with the old single-letter prefixes.
 (function migrateV1Keys() {
+  let migrated = 0;
+  let dropped = 0;
   try {
     const oldPrefixes = ["m:", "S:", "s:", "e:"];
     const toMigrate = map.keys().filter((k) => oldPrefixes.some((p) => k.startsWith(p)));
     if (toMigrate.length === 0) return;
 
-    let migrated = 0;
-    let dropped = 0;
     for (const oldKey of toMigrate) {
       const newKey = migrateKey(oldKey);
       if (newKey !== null) {
@@ -71,7 +71,7 @@ function migrateKey(oldKey) {
     }
   } catch (err) {
     logger.warn(
-      `roundup-first-seen: v1→v2 key migration failed and was skipped (${err?.message || err}). Dedup state from before this update was not carried over — items may re-appear once in the next Weekly Roundup.`
+      `roundup-first-seen: v1→v2 key migration failed after ${migrated} migrated / ${dropped} dropped (${err?.message || err}). Remaining v1 keys were not migrated — affected items may re-appear once in the next Weekly Roundup.`
     );
   }
 })();
