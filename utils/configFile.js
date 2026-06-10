@@ -158,7 +158,9 @@ export function readConfig() {
     logger.debug(`Config loaded successfully from ${configPath}`);
     return config;
   } catch (error) {
-    logger.error(`Error reading config from ${configPath}:`, error);
+    logger.error(
+      `Config file at ${configPath} exists but could not be read or parsed (it may be corrupt): ${error.message}. Restore from a backup or delete the file and reconfigure via the dashboard.`
+    );
     return null;
   }
 }
@@ -177,11 +179,14 @@ export function writeConfig(config) {
       fs.mkdirSync(configDir, { recursive: true, mode: 0o777 });
     }
 
-    // Write with explicit permissions (sensitive fields are base64-encoded)
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(encodeConfig(config), null, 2), {
+    // Atomic write: write to a temp file then rename so a mid-write kill never
+    // leaves a corrupted config.json behind.
+    const tmpPath = CONFIG_PATH + ".tmp";
+    fs.writeFileSync(tmpPath, JSON.stringify(encodeConfig(config), null, 2), {
       mode: 0o600,
       encoding: "utf-8",
     });
+    fs.renameSync(tmpPath, CONFIG_PATH);
 
     logger.debug(`Config saved successfully to ${CONFIG_PATH}`);
     return true;
@@ -220,7 +225,13 @@ export function writeConfig(config) {
  * @returns {boolean} True if update succeeded
  */
 export function updateConfig(updates) {
-  const config = readConfig() || {};
+  const config = readConfig();
+  if (!config) {
+    // Refuse to write a partial config if the existing config is unreadable --
+    // that would silently wipe every setting the user configured.
+    logger.error("updateConfig: readConfig() returned null — refusing partial write to avoid config wipe");
+    return false;
+  }
   const updatedConfig = { ...config, ...updates };
   return writeConfig(updatedConfig);
 }

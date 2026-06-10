@@ -11,6 +11,7 @@ import logger from "./utils/logger.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import { findBestBackdrop } from "./api/tmdb.js";
 import { isValidUrl } from "./utils/url.js";
+import { buildJellyfinUrl } from "./utils/jellyfinUrl.js";
 import {
   getLibraryChannels,
   resolveTargetChannel,
@@ -24,7 +25,7 @@ const debouncedSenders = new Map();
 // re-notifies anything in the recently-added window via the next poll/WS reconnect).
 const sentNotifications = new PersistentMap(
   "sent-notifications",
-  7 * 24 * 60 * 60 * 1000, // 7 days — survive Sonarr/Radarr upgrade cycles
+  5 * 365 * 24 * 60 * 60 * 1000, // ~5 years — items already in the library never re-notify
   { validateValue: (v) => v && typeof v.level === "number" }
 );
 
@@ -117,36 +118,6 @@ function getItemLevel(itemType) {
   }
 }
 
-// Build a Jellyfin URL that preserves a potential subpath (e.g., /jellyfin)
-// and appends the provided path and optional hash fragment safely.
-// Always uses the configured JELLYFIN_BASE_URL — the webhook-provided ServerUrl
-// is not trusted as it could be poisoned via Jellyfin metadata.
-function buildJellyfinUrl(_baseUrl, appendPath, hash) {
-  const effectiveBaseUrl = process.env.JELLYFIN_BASE_URL;
-
-  try {
-    const u = new URL(effectiveBaseUrl);
-    let p = u.pathname || "/";
-    if (!p.endsWith("/")) p += "/";
-    const pathClean = String(appendPath || "").replace(/^\/+/, "");
-    u.pathname = p + pathClean;
-    if (hash != null) {
-      const h = String(hash);
-      u.hash = h.startsWith("#") ? h.slice(1) : h;
-    }
-    return u.toString();
-  } catch (_e) {
-    logger.warn(`buildJellyfinUrl: Invalid JELLYFIN_BASE_URL "${effectiveBaseUrl}": ${_e?.message}. Falling back to string concatenation.`);
-    const baseNoSlash = String(effectiveBaseUrl || "").replace(/\/+$/, "");
-    const pathNoLead = String(appendPath || "").replace(/^\/+/, "");
-    const h = hash
-      ? String(hash).startsWith("#")
-        ? String(hash)
-        : `#${hash}`
-      : "";
-    return `${baseNoSlash}/${pathNoLead}${h}`;
-  }
-}
 
 /**
  * Clean title by removing Jellyfin/TMDB metadata like [tvdbid-123], [imdbid-123], (?), etc.
@@ -213,7 +184,8 @@ async function processAndSendNotification(
 
   // Get embed customization settings from environment
   const showBackdrop = process.env.EMBED_SHOW_BACKDROP !== "false";
-  const showOverview = process.env.EMBED_SHOW_OVERVIEW !== "false";
+  const showOverviewMovies = process.env.EMBED_SHOW_OVERVIEW_MOVIES !== "false";
+  const showOverviewEpisodes = process.env.EMBED_SHOW_OVERVIEW_EPISODES !== "false";
   const showGenre = process.env.EMBED_SHOW_GENRE !== "false";
   const showRuntime = process.env.EMBED_SHOW_RUNTIME !== "false";
   const showRating = process.env.EMBED_SHOW_RATING !== "false";
@@ -445,7 +417,6 @@ async function processAndSendNotification(
 
   // Only set URL if ServerUrl is valid
   const jellyfinUrl = buildJellyfinUrl(
-    ServerUrl,
     "web/index.html",
     `!/details?id=${ItemId}&serverId=${ServerId}`
   );
@@ -458,7 +429,7 @@ async function processAndSendNotification(
   // Add fields based on ItemType
   if (ItemType === "Episode" && episodeCount <= 1) {
     // Single episode: show overview
-    if (showOverview && overviewText) {
+    if (showOverviewEpisodes && overviewText) {
       embed.addFields({ name: "Episode Summary", value: overviewText });
     }
   } else if (ItemType === "Season") {
@@ -466,8 +437,8 @@ async function processAndSendNotification(
   } else {
     // Movies and Series: Summary, Genre, Runtime, Rating
     const fields = [];
-    
-    if (showOverview) {
+
+    if (showOverviewMovies) {
       fields.push({ name: headerLine, value: overviewText || "No description available." });
     }
     
@@ -556,7 +527,7 @@ async function processAndSendNotification(
     ItemType === "Episode" && SeriesId ? SeriesId : ItemId;
   const backdrop = backdropPath
     ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
-    : buildJellyfinUrl(ServerUrl, `Items/${fallbackBackdropItemId}/Images/Backdrop`);
+    : buildJellyfinUrl(`Items/${fallbackBackdropItemId}/Images/Backdrop`);
   
   if (showBackdrop && isValidUrl(backdrop)) {
     embed.setImage(backdrop);
@@ -598,7 +569,6 @@ async function processAndSendNotification(
 
   if (showButtonWatch) {
     const watchUrl = buildJellyfinUrl(
-      ServerUrl,
       "web/index.html",
       `!/details?id=${ItemId}&serverId=${ServerId}`
     );
@@ -749,7 +719,6 @@ async function processAndSendNotification(
           .setTitle(embedTitle);
 
         const dmJellyfinUrl = buildJellyfinUrl(
-          ServerUrl,
           "web/index.html",
           `!/details?id=${ItemId}&serverId=${ServerId}`
         );
@@ -1034,7 +1003,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           `[DUPLICATE CHECK] ${data.ItemType} "${
             data.Name
           }" - SeriesId: ${SeriesId}, sentLevel: ${sentLevel}, currentLevel: ${currentLevel}, has debouncer: ${debouncedSenders.has(
-            SeriesId
+            seriesKey
           )}`
         );
 

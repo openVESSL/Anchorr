@@ -46,6 +46,7 @@ Anchorr supports multiple languages! Help make it accessible to more users by co
 - English (en) - Base language
 - German (de) - Fully translated
 - Swedish (sv) - Available
+- French (fr) - Fully translated
 
 #### How to Add a New Language
 
