@@ -61,11 +61,16 @@ export async function seedLibrary() {
     let totalKeys = 0;
 
     for (const lib of libraries) {
-      const items = await jellyfinApi.fetchAllLibraryItems(
+      const { items, complete } = await jellyfinApi.fetchAllLibraryItems(
         apiKey,
         baseUrl,
         lib.ItemId
       );
+      if (!complete) {
+        throw new Error(
+          `incomplete fetch for library "${lib.Name}" — aborting seed`
+        );
+      }
       for (const item of items) {
         for (const key of deriveSeedKeys(item)) {
           deduplicator.store.set(key, true);

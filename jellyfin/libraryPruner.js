@@ -25,11 +25,17 @@ export async function pruneLibrary() {
     const currentKeys = new Set();
 
     for (const lib of libraries) {
-      const items = await jellyfinApi.fetchAllLibraryItems(
+      const { items, complete } = await jellyfinApi.fetchAllLibraryItems(
         apiKey,
         baseUrl,
         lib.ItemId
       );
+      if (!complete) {
+        logger.error(
+          `libraryPruner: incomplete fetch for library "${lib.Name}" — aborting prune run, no keys removed (will retry next cycle)`
+        );
+        return;
+      }
       for (const item of items) {
         for (const key of deriveSeedKeys(item)) currentKeys.add(key);
       }

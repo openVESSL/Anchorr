@@ -539,6 +539,9 @@ const FETCH_ALL_ITEMS_PAGE_SIZE = 200;
  * Used for the one-time library seed scan and the daily prune scan —
  * unlike fetchRecentlyAdded, this must see the *entire* library, not
  * just recently added items.
+ *
+ * Returns { items: object[], complete: boolean }; complete is false if a
+ * page fetch failed partway through.
  */
 export async function fetchAllLibraryItems(apiKey, baseUrl, parentId) {
   const safeBase = new URL(baseUrl);
@@ -556,6 +559,7 @@ export async function fetchAllLibraryItems(apiKey, baseUrl, parentId) {
 
   const collected = [];
   let startIndex = 0;
+  let complete = true;
   while (true) {
     const params = { ...baseParams, StartIndex: startIndex };
     let page;
@@ -568,8 +572,9 @@ export async function fetchAllLibraryItems(apiKey, baseUrl, parentId) {
       page = response.data?.Items || [];
     } catch (err) {
       logger.warn(
-        `fetchAllLibraryItems: page at StartIndex=${startIndex} (parent ${parentId}) failed (${err?.message || err}); returning ${collected.length} items collected so far`
+        `fetchAllLibraryItems: page at StartIndex=${startIndex} (parent ${parentId}) failed (${err?.message || err}); returning ${collected.length} items collected so far (incomplete)`
       );
+      complete = false;
       break;
     }
     if (page.length === 0) break;
@@ -579,9 +584,9 @@ export async function fetchAllLibraryItems(apiKey, baseUrl, parentId) {
   }
 
   logger.debug(
-    `fetchAllLibraryItems: fetched ${collected.length} items for parent ${parentId}`
+    `fetchAllLibraryItems: fetched ${collected.length} items for parent ${parentId} (complete: ${complete})`
   );
-  return collected;
+  return { items: collected, complete };
 }
 
 /**
