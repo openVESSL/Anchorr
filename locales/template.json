@@ -127,6 +127,8 @@
     "jellyfin_api_key_help": "",
     "test_endpoint": "",
     "test_endpoint_help": "",
+    "reseed_library": "",
+    "reseed_library_help": "",
     "jellyfin_server_id": "",
     "jellyfin_server_id_help": "",
     "notification_testing_title": "",

@@ -10,6 +10,8 @@ import { handleJellyfinWebhook } from "./jellyfinWebhook.js";
 import { configTemplate } from "./lib/config.js";
 import { sendDailyRandomPick } from "./bot/dailyPick.js";
 import { sendWeeklyRoundupTest } from "./bot/weeklyRoundup.js";
+import { seedLibrary } from "./jellyfin/librarySeeder.js";
+import { pruneLibrary } from "./jellyfin/libraryPruner.js";
 
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -1070,6 +1072,7 @@ logger.info("Web server configured successfully");
 // --- START THE SERVER ---
 // This single `app.listen` call handles both modes.
 let server;
+let libraryPruneTimer;
 
 function startServer() {
   // Check volume configuration early
@@ -1143,7 +1146,21 @@ function startServer() {
     } catch (e) {
       logger.error("Error during auto-start check:", e?.message || e);
     }
+
+    // One-time library seed: pre-populate the dedup store with everything
+    // that already exists in Jellyfin so pre-existing content never
+    // triggers a "new item" Discord notification. Runs async — webhook/
+    // poller/websocket are already listening and handle items normally
+    // while this is in progress.
+    if (process.env.LIBRARY_SEEDED !== "true") {
+      seedLibrary();
+    }
   });
+
+  const LIBRARY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+  libraryPruneTimer = setInterval(() => {
+    pruneLibrary();
+  }, LIBRARY_PRUNE_INTERVAL_MS);
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
@@ -1163,6 +1180,7 @@ function startServer() {
 
 // Keep the process alive
 process.on("SIGTERM", () => {
+  clearInterval(libraryPruneTimer);
   logger.info("SIGTERM signal received: closing HTTP server");
   server.close(() => {
     logger.info("HTTP server closed");
@@ -1171,6 +1189,7 @@ process.on("SIGTERM", () => {
 });
 
 process.on("SIGINT", () => {
+  clearInterval(libraryPruneTimer);
   logger.info("SIGINT signal received: closing HTTP server");
   server.close(() => {
     logger.info("HTTP server closed");

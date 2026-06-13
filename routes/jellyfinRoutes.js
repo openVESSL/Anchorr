@@ -5,8 +5,30 @@ import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
 import { libraryCache } from "../jellyfinWebhook.js";
 import logger from "../utils/logger.js";
+import { seedLibrary } from "../jellyfin/librarySeeder.js";
+import { updateConfig } from "../utils/configFile.js";
 
 const router = Router();
+
+// Resets the LIBRARY_SEEDED flag and re-runs the full library seed scan.
+// Fire-and-forget: the scan can take a while for large libraries, so this
+// responds immediately and the scan continues in the background.
+router.post("/seed/reset", authenticateToken, async (_req, res) => {
+  if (!updateConfig({ LIBRARY_SEEDED: "false" })) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update config.json.",
+    });
+  }
+  process.env.LIBRARY_SEEDED = "false";
+
+  seedLibrary(); // fire and forget — logs its own progress/result
+
+  res.json({
+    success: true,
+    message: "Library re-seed started in the background. Check the logs for progress.",
+  });
+});
 
 function isAllowedUrl(url) {
   try {

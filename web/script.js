@@ -1390,6 +1390,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Re-Seed Library Button
+  const reseedLibraryBtn = document.getElementById("reseed-library-btn");
+  const reseedLibraryStatus = document.getElementById("reseed-library-status");
+  if (reseedLibraryBtn) {
+    reseedLibraryBtn.addEventListener("click", async () => {
+      reseedLibraryBtn.disabled = true;
+      const originalText = reseedLibraryBtn.innerHTML;
+      reseedLibraryBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Starting...';
+      reseedLibraryStatus.textContent = "";
+
+      try {
+        const response = await fetch("/api/seed/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          reseedLibraryStatus.textContent = result.message;
+          reseedLibraryStatus.style.color = "var(--green)";
+        } else {
+          throw new Error(result.message || "Failed to start re-seed");
+        }
+      } catch (error) {
+        reseedLibraryStatus.textContent = error.message;
+        reseedLibraryStatus.style.color = "#f38ba8";
+      } finally {
+        reseedLibraryBtn.innerHTML = originalText;
+        reseedLibraryBtn.disabled = false;
+      }
+    });
+  }
+
   // Fetch and display Jellyfin libraries for notifications
   const fetchLibrariesBtn = document.getElementById("fetch-libraries-btn");
   const fetchLibrariesStatus = document.getElementById(

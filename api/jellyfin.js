@@ -531,6 +531,64 @@ export async function fetchRecentlyAdded(
   }
 }
 
+const FETCH_ALL_ITEMS_PAGE_SIZE = 200;
+
+/**
+ * Fetch every Movie/Series/Season/Episode under a library (ParentId),
+ * paginated via StartIndex/Limit with no upper cap on total items.
+ * Used for the one-time library seed scan and the daily prune scan —
+ * unlike fetchRecentlyAdded, this must see the *entire* library, not
+ * just recently added items.
+ *
+ * Returns { items: object[], complete: boolean }; complete is false if a
+ * page fetch failed partway through.
+ */
+export async function fetchAllLibraryItems(apiKey, baseUrl, parentId) {
+  const safeBase = new URL(baseUrl);
+  safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
+  const url = safeBase.href;
+  const baseParams = {
+    Fields: "ProviderIds,SeriesName,SeasonName,IndexNumber,ParentIndexNumber,AncestorIds",
+    IncludeItemTypes: "Movie,Series,Season,Episode",
+    Recursive: true,
+    SortBy: "SortName",
+    SortOrder: "Ascending",
+    Limit: FETCH_ALL_ITEMS_PAGE_SIZE,
+    ParentId: parentId,
+  };
+
+  const collected = [];
+  let startIndex = 0;
+  let complete = true;
+  while (true) {
+    const params = { ...baseParams, StartIndex: startIndex };
+    let page;
+    try {
+      const response = await axios.get(url, {
+        headers: { "X-MediaBrowser-Token": apiKey },
+        params,
+        timeout: 15000,
+      });
+      page = response.data?.Items || [];
+    } catch (err) {
+      logger.warn(
+        `fetchAllLibraryItems: page at StartIndex=${startIndex} (parent ${parentId}) failed (${err?.message || err}); returning ${collected.length} items collected so far (incomplete)`
+      );
+      complete = false;
+      break;
+    }
+    if (page.length === 0) break;
+    collected.push(...page);
+    if (page.length < FETCH_ALL_ITEMS_PAGE_SIZE) break;
+    startIndex += FETCH_ALL_ITEMS_PAGE_SIZE;
+  }
+
+  logger.debug(
+    `fetchAllLibraryItems: fetched ${collected.length} items for parent ${parentId} (complete: ${complete})`
+  );
+  return { items: collected, complete };
+}
+
 /**
  * Fetch detailed information about a specific item
  * @param {string} itemId - Jellyfin item ID
