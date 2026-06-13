@@ -524,6 +524,16 @@
                         </div>
                       </div>
                       <div class="form-group">
+                        <button type="button" id="reseed-library-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem;" data-i18n="config.reseed_library">Re-Seed Library</button>
+                        <span
+                          id="reseed-library-status"
+                          style="margin-left: 1rem;"
+                        ></span>
+                        <div class="form-text" style="margin-top: 0.5rem;" data-i18n="config.reseed_library_help">
+                          Re-scans your entire Jellyfin library and marks all current items as "already known", so they won't trigger Discord notifications. Use this if you've reorganized your library or if old items are incorrectly being announced as new.
+                        </div>
+                      </div>
+                      <div class="form-group">
                         <label for="JELLYFIN_SERVER_ID" data-i18n="config.jellyfin_server_id"
                           >Jellyfin Server ID</label
                         >

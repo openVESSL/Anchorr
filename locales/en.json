@@ -127,6 +127,8 @@
     "jellyfin_api_key_help": "API key for your Jellyfin server. You can generate one in Jellyfin Dashboard → Administration → API Keys. This is required for loading libraries and enhanced features.",
     "test_endpoint": "Test Endpoint",
     "test_endpoint_help": "Testing the endpoint successfully will automatically populate the Jellyfin Server ID field.",
+    "reseed_library": "Re-Seed Library",
+    "reseed_library_help": "Re-scans your entire Jellyfin library and marks all current items as \"already known\", so they won't trigger Discord notifications. Use this if you've reorganized your library or if old items are incorrectly being announced as new.",
     "jellyfin_server_id": "Jellyfin Server ID",
     "jellyfin_server_id_help": "Used for redirecting to the correct path of your Jellyfin server media page when using the \"Watch Now\" button. You can find this in your Jellyfin URL when viewing the page of any movie or show from your library.",
     "notification_testing_title": "Notification Testing",
