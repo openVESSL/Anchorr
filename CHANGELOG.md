@@ -7,21 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.5.6] - 2026-06-13
+## [1.5.5] - 2026-04-27
+
+### 🌍 Added
+
+- **French translation (`fr`)**: Anchorr is now fully translated into French, covering all bot messages and UI text.
 
 ### ✨ Added
 
 - **Library seed scan**: On first boot, Anchorr now scans your entire Jellyfin library and records everything that already exists, so pre-existing content never triggers a "new item" Discord notification.
 - **Daily prune scan**: A background job runs once per day to remove records for items that have been deleted from Jellyfin, keeping internal state from growing unbounded.
 - **"Re-Seed Library" button**: A new button in the Jellyfin settings section lets you manually re-run the library seed scan, e.g. after reorganizing your library.
-
----
-
-## [1.5.5] - 2026-04-27
-
-### 🌍 Added
-
-- **French translation (`fr`)**: Anchorr is now fully translated into French, covering all bot messages and UI text.
 
 ### ✨ Added
 
