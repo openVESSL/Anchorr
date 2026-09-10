@@ -4,6 +4,7 @@ import { authenticateToken } from "../utils/auth.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
 import { libraryCache } from "../jellyfinWebhook.js";
+import { jellyfinAuthHeaders } from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
 import { seedLibrary, checkSeedPreconditions } from "../jellyfin/librarySeeder.js";
 import { updateConfig } from "../utils/configFile.js";
@@ -87,7 +88,7 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
     const response = await axios.get(
       safeUrl.href,
       {
-        headers: { "X-MediaBrowser-Token": apiKey },
+        headers: jellyfinAuthHeaders(apiKey),
         timeout: TIMEOUTS.JELLYFIN_API,
       }
     );
@@ -106,7 +107,7 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
 
     res.json({ success: true, libraries });
   } catch (err) {
-    logger.error("[JELLYFIN LIBRARIES API] Error:", err);
+    logger.error(`[JELLYFIN LIBRARIES API] Error: ${err?.message || err}`);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -166,7 +167,7 @@ router.get("/jellyfin/libraries", authenticateToken, async (req, res) => {
       })),
     });
   } catch (error) {
-    logger.error("Failed to fetch Jellyfin libraries:", error);
+    logger.error(`Failed to fetch Jellyfin libraries: ${error?.message || error}`);
     res.status(500).json({
       success: false,
       message: "Failed to fetch libraries. Check Jellyfin configuration.",
