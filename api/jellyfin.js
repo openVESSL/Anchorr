@@ -1,5 +1,30 @@
 import axios from "axios";
+import { createRequire } from "module";
 import logger from "../utils/logger.js";
+
+const require = createRequire(import.meta.url);
+const APP_VERSION = require("../package.json").version || "0.0.0";
+
+// Jellyfin 12 disables legacy authorization by default, which kills the old
+// X-MediaBrowser-Token header. The standard Authorization header with the
+// MediaBrowser scheme works on 10.10.x and 12.x alike.
+export function jellyfinAuthHeaders(apiKey) {
+  const key = String(apiKey ?? "").trim();
+  if (!key) {
+    throw new Error("Jellyfin API key is missing - cannot build an Authorization header");
+  }
+  // Quotes, commas and control chars would break the header's own syntax.
+  // Stripping them silently would send a wrong token and surface as a generic
+  // 401, so reject instead and name the real problem.
+  if (/["'\\,\x00-\x1f\x7f]/.test(key)) {
+    throw new Error(
+      "Jellyfin API key contains characters that are invalid in an Authorization header (quotes, comma, backslash or control characters)"
+    );
+  }
+  return {
+    Authorization: `MediaBrowser Client="Anchorr", Device="Anchorr", DeviceId="anchorr-bot", Version="${APP_VERSION}", Token="${key}"`,
+  };
+}
 
 /**
  * Fetch all libraries from Jellyfin
@@ -14,7 +39,7 @@ export async function fetchLibraries(apiKey, baseUrl) {
     safeBase.pathname = basePathNoSlash + "/Library/VirtualFolders";
     const url = safeBase.href;
     const response = await axios.get(url, {
-      headers: { "X-MediaBrowser-Token": apiKey },
+      headers: jellyfinAuthHeaders(apiKey),
       timeout: 5000,
     });
 
@@ -32,7 +57,7 @@ export async function fetchLibraries(apiKey, baseUrl) {
         itemsUrlObj.pathname = basePathNoSlash + "/Items";
         const itemsUrl = itemsUrlObj.href;
         const itemsResponse = await axios.get(itemsUrl, {
-          headers: { "X-MediaBrowser-Token": apiKey },
+          headers: jellyfinAuthHeaders(apiKey),
           params: {
             Ids: vf.ItemId,
             Fields: "Path,LibraryOptions",
@@ -107,7 +132,7 @@ export async function findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl) {
     safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
     const url = safeBase.href;
     const response = await axios.get(url, {
-      headers: { "X-MediaBrowser-Token": apiKey },
+      headers: jellyfinAuthHeaders(apiKey),
       params: {
         Recursive: true,
         AnyProviderIdEquals: `Tmdb.${tmdbId}`,
@@ -156,7 +181,7 @@ export async function findLibraryByAncestors(
     )}/Items/${itemId}/Ancestors`;
 
     const response = await axios.get(ancestorsUrl, {
-      headers: { "X-MediaBrowser-Token": apiKey },
+      headers: jellyfinAuthHeaders(apiKey),
       timeout: 5000,
     });
 
@@ -235,7 +260,7 @@ export async function findLibraryByAncestors(
         try {
           const libItemsUrl = `${baseUrl.replace(/\/$/, "")}/Items`;
           const libResponse = await axios.get(libItemsUrl, {
-            headers: { "X-MediaBrowser-Token": apiKey },
+            headers: jellyfinAuthHeaders(apiKey),
             params: {
               ParentId: library.ItemId,
               Recursive: true,
@@ -294,7 +319,7 @@ export async function findLibraryId(
     // Use the /Items endpoint without userId to avoid 400 errors
     const url = `${baseUrl.replace(/\/$/, "")}/Items`;
     const response = await axios.get(url, {
-      headers: { "X-MediaBrowser-Token": apiKey },
+      headers: jellyfinAuthHeaders(apiKey),
       params: {
         Ids: itemId,
         Fields: "ParentId,Path", // Request Path to help identify library
@@ -367,7 +392,7 @@ export async function findLibraryId(
       for (const [collectionId, library] of libraryMap.entries()) {
         try {
           const libResponse = await axios.get(url, {
-            headers: { "X-MediaBrowser-Token": apiKey },
+            headers: jellyfinAuthHeaders(apiKey),
             params: { Ids: library.ItemId, Fields: "ParentId" },
             timeout: 5000,
           });
@@ -455,7 +480,7 @@ export async function fetchRecentlyAdded(
 
     if (!minDateCreated) {
       const response = await axios.get(url, {
-        headers: { "X-MediaBrowser-Token": apiKey },
+        headers: jellyfinAuthHeaders(apiKey),
         params: baseParams,
         timeout: 10000,
       });
@@ -477,7 +502,7 @@ export async function fetchRecentlyAdded(
       let page;
       try {
         const response = await axios.get(url, {
-          headers: { "X-MediaBrowser-Token": apiKey },
+          headers: jellyfinAuthHeaders(apiKey),
           params,
           timeout: 10000,
         });
@@ -583,7 +608,7 @@ export async function fetchAllLibraryItems(apiKey, baseUrl, parentId) {
     let page;
     try {
       const response = await axios.get(url, {
-        headers: { "X-MediaBrowser-Token": apiKey },
+        headers: jellyfinAuthHeaders(apiKey),
         params,
         timeout: 15000,
       });
@@ -627,7 +652,7 @@ export async function fetchItemDetails(itemId, apiKey, baseUrl) {
   try {
     const url = `${baseUrl.replace(/\/$/, "")}/Items/${itemId}`;
     const response = await axios.get(url, {
-      headers: { "X-MediaBrowser-Token": apiKey },
+      headers: jellyfinAuthHeaders(apiKey),
       timeout: 5000,
     });
 

@@ -68,7 +68,7 @@ export class JellyfinWebSocketClient {
         .replace(/\/$/, "");
 
       const deviceId = "anchorr-bot";
-      const fullUrl = `${wsUrl}/socket?api_key=${apiKey}&deviceId=${deviceId}`;
+      const fullUrl = `${wsUrl}/socket?ApiKey=${encodeURIComponent(apiKey)}&deviceId=${deviceId}`;
 
       logger.info(`🔌 Connecting to Jellyfin WebSocket: ${wsUrl}/socket`);
       logger.debug(`   Base URL: ${baseUrl}`);
@@ -105,6 +105,11 @@ export class JellyfinWebSocketClient {
       this.ws.on("error", (err) => {
         logger.error("Jellyfin WebSocket error:", err?.message || err);
         if (err?.code) logger.error("Error code:", err.code);
+        if (/Unexpected server response: (401|403)/.test(err?.message || "")) {
+          logger.error(
+            "Jellyfin rejected the WebSocket API key. On Jellyfin 12 the legacy 'api_key' parameter is disabled - check JELLYFIN_API_KEY in the dashboard."
+          );
+        }
       });
 
       this.ws.on("close", (code, reason) => {
@@ -128,6 +133,12 @@ export class JellyfinWebSocketClient {
         };
         const codeDescription = closeCodeMap[code] || "Unknown code";
         logger.warn(`   Code: ${code} (${codeDescription})`);
+
+        if (code === 1008) {
+          logger.error(
+            "Jellyfin closed the WebSocket with a policy violation - this is usually a rejected API key. Check JELLYFIN_API_KEY in the dashboard."
+          );
+        }
 
         this.isConnected = false;
 

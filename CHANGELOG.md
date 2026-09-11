@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.1] - 2026-09-11
+
+### 🐛 Fixed
+
+- **Jellyfin 12 compatibility**: Jellyfin 12.0 disables legacy authorization by default, and its migration turns it off on existing installs as well. Anchorr authenticated exclusively via the now-disabled `X-MediaBrowser-Token` header and `api_key` query parameter, so every Jellyfin request failed with `401` after upgrading: no notifications, no library list in the dashboard, no WebSocket connection. All Jellyfin calls now use the standard `Authorization: MediaBrowser` header, and the WebSocket handshake uses the `ApiKey` query parameter. Both are accepted by Jellyfin 10.10.x and 12.x, so older servers keep working and no configuration change is needed.
+- **Invalid Jellyfin API key now reported directly**: A missing or malformed API key previously produced a valid-looking request that Jellyfin answered with a generic `401`, making a config mistake indistinguishable from a server problem. The key is now validated before the request and the actual reason is logged.
+- **Jellyfin WebSocket auth failures are no longer silent**: A rejected API key surfaced only as a generic transport error inside an endless reconnect loop. Authorization rejections now log the real cause.
+
+### 🔒 Security
+
+- **Jellyfin auth header no longer written to log files**: Passing a raw axios error to the logger serialized the request configuration, including the `Authorization` header, into `logs/combined-*.log` and `logs/error-*.log` in cleartext. The affected Jellyfin code paths now log only the error message. Existing log files are not rewritten. If you have been running Anchorr with debug logs retained, rotate or delete `logs/` and regenerate your Jellyfin API key.
+
+---
+
 ## [1.6.0] - 2026-09-02
 
 ### ✨ Added

@@ -219,7 +219,7 @@ class JellyfinPoller {
       // Cleanup old deduplicator entries
       deduplicator.cleanup();
     } catch (err) {
-      logger.error("Error during Jellyfin polling:", err);
+      logger.error(`Error during Jellyfin polling: ${err?.message || err}`);
     }
   }
 }
