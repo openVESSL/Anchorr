@@ -11,6 +11,12 @@ import logger from "./utils/logger.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import { findBestBackdrop } from "./api/tmdb.js";
 import { isValidUrl } from "./utils/url.js";
+import {
+  getBackdropItemId,
+  getNotificationTmdbId,
+  isSeriesChild,
+  resolveSeriesProviderIds,
+} from "./jellyfin/notificationMetadata.js";
 import { buildJellyfinUrl } from "./utils/jellyfinUrl.js";
 import {
   getLibraryChannels,
@@ -173,8 +179,9 @@ async function processAndSendNotification(
     Audio_0_Language,
   } = data;
 
-  // We need to fetch details from TMDB to get the backdrop
-  const tmdbId = data.Provider_tmdb;
+  // A season's Provider_tmdb is a TMDB season ID, not a TV-series ID.
+  // Child notifications use the separately resolved parent series ID.
+  const tmdbId = getNotificationTmdbId(data);
 
   const testPrefix = isTestNotif ? "[TEST NOTIFICATION] " : "";
 
@@ -236,7 +243,7 @@ async function processAndSendNotification(
   let details = null;
   if (tmdbId) {
     // Check cache first
-    const cacheKey = `tmdb-${ItemType}-${tmdbId}`;
+    const cacheKey = `tmdb-${ItemType === "Movie" ? "movie" : "tv"}-${tmdbId}`;
     const cached = apiCache.get(cacheKey);
     const now = Date.now();
 
@@ -517,14 +524,13 @@ async function processAndSendNotification(
   }
 
   const backdropPath = details ? findBestBackdrop(details) : null;
-  // Episodes don't have their own backdrop in Jellyfin — fall back to the series.
-  if (ItemType === "Episode" && !SeriesId) {
+  // Seasons and episodes generally do not have their own backdrop in Jellyfin.
+  if (isSeriesChild(ItemType) && !SeriesId) {
     logger.warn(
-      `Episode webhook missing SeriesId; backdrop fallback will use ItemId and likely 404. ItemId=${ItemId}, Name=${Name}`
+      `${ItemType} webhook missing SeriesId; backdrop fallback will use ItemId and may 404. ItemId=${ItemId}, Name=${Name}`
     );
   }
-  const fallbackBackdropItemId =
-    ItemType === "Episode" && SeriesId ? SeriesId : ItemId;
+  const fallbackBackdropItemId = getBackdropItemId(data);
   const backdrop = backdropPath
     ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
     : buildJellyfinUrl(`Items/${fallbackBackdropItemId}/Images/Backdrop`);
@@ -924,6 +930,14 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       }
     }
 
+    // Webhook Provider_tmdb is item-level. Resolve parent provider IDs before
+    // artwork, request matching, and series-level deduplication are handled.
+    if (!isTestNotification && isSeriesChild(data.ItemType)) {
+      const seriesProviderIds = await resolveSeriesProviderIds(data);
+      data.SeriesProvider_tmdb = seriesProviderIds?.Tmdb || null;
+      data.SeriesProvider_imdb = seriesProviderIds?.Imdb || null;
+    }
+
     if (data.ItemType === "Movie") {
       const { ItemId } = data;
       const isTestMovie = ItemId && ItemId.startsWith("test-");
@@ -973,12 +987,30 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
       // Episodes/Seasons fold into a series-level entry by reusing the Series identity.
       const seriesIdentityInput = {
         ItemType: "Series",
-        Provider_tmdb: data.Provider_tmdb,
+        Provider_tmdb:
+          data.ItemType === "Series"
+            ? data.Provider_tmdb
+            : data.SeriesProvider_tmdb,
         SeriesId: SeriesId,
         Name: data.SeriesName || (data.ItemType === "Series" ? data.Name : null),
         ItemId: SeriesId,
       };
       const seriesKey = buildIdentityKey(seriesIdentityInput) || `id:${SeriesId}`;
+      const legacySeriesKey =
+        data.ItemType !== "Series" && data.Provider_tmdb
+          ? `series:tmdb:${data.Provider_tmdb}`
+          : null;
+      if (
+        legacySeriesKey &&
+        legacySeriesKey !== seriesKey &&
+        !sentNotifications.has(seriesKey) &&
+        sentNotifications.has(legacySeriesKey)
+      ) {
+        sentNotifications.rekey(legacySeriesKey, seriesKey);
+        logger.info(
+          `[DEDUP] Migrated legacy series notification key ${legacySeriesKey} -> ${seriesKey}`
+        );
+      }
       logger.debug(`[DEDUP] Series identity key for "${data.Name}": ${seriesKey} (raw SeriesId: ${SeriesId})`);
       
       // Initialize variables outside the if block so they're accessible later
