@@ -9,7 +9,7 @@ import * as tmdbApi from "../api/tmdb.js";
 import { minutesToHhMm } from "../utils/time.js";
 import { COLORS } from "../lib/constants.js";
 import { getSeerrApiUrl, normalizeSeerrUrl } from "../utils/seerrUrl.js";
-import { isValidUrl } from "../utils/url.js";
+import { isDiscordLinkableUrl, isValidUrl } from "../utils/url.js";
 import logger from "../utils/logger.js";
 
 export function buildNotificationEmbed(
@@ -83,7 +83,7 @@ export function buildNotificationEmbed(
   const embed = new EmbedBuilder()
     .setAuthor({
       name: authorName,
-      url: isValidUrl(seerrMediaUrl) ? seerrMediaUrl : undefined,
+      url: isDiscordLinkableUrl(seerrMediaUrl) ? seerrMediaUrl : undefined,
     })
     .setTitle(titleWithYear)
     .setURL(imdbId ? `https://www.imdb.com/title/${imdbId}/` : undefined)
