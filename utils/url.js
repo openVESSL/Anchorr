@@ -8,13 +8,7 @@ export function isValidUrl(string) {
   }
 }
 
-/**
- * Heuristic: is this URL likely to pass Discord's embed link validator?
- * Discord is stricter than `new URL()` and rejects dotless hosts like
- * Docker service names. Not exhaustive — a rejection past this should throw.
- * @param {string} string
- * @returns {boolean}
- */
+// Discord's embed validator rejects dotless hosts like "seerr". Heuristic, not exhaustive.
 export function isDiscordLinkableUrl(string) {
   if (!isValidUrl(string)) return false;
   const url = new URL(string);

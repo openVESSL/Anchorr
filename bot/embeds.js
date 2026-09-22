@@ -12,7 +12,7 @@ import { getSeerrApiUrl, normalizeSeerrUrl } from "../utils/seerrUrl.js";
 import { isDiscordLinkableUrl, isValidUrl } from "../utils/url.js";
 import logger from "../utils/logger.js";
 
-// Tracks the last SEERR_URL we warned about, so a config change warns again.
+// Holds the URL rather than a flag, so a config change warns again.
 let warnedUnlinkableSeerrUrl = null;
 
 function resolveAuthorUrl(seerrMediaUrl, seerrBaseUrl) {
@@ -21,8 +21,7 @@ function resolveAuthorUrl(seerrMediaUrl, seerrBaseUrl) {
   if (warnedUnlinkableSeerrUrl !== seerrBaseUrl) {
     warnedUnlinkableSeerrUrl = seerrBaseUrl;
     logger.warn(
-      `SEERR_URL (${seerrBaseUrl}) cannot be used as a Discord link, so embeds will have no Jellyseerr link. ` +
-        `Discord requires a public http(s) URL with a dotted hostname; internal names like "seerr" or "localhost" are rejected.`
+      `SEERR_URL (${seerrBaseUrl}) cannot be used as a Discord link. Embeds will have no Jellyseerr link until it points to a public hostname with a dot.`
     );
   }
   return undefined;
