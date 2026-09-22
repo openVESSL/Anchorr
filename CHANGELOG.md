@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.2] - 2026-09-22
+
+### 🐛 Fixed
+
+- **`/search` and `/request` no longer fail when Seerr runs behind a reverse proxy**: If `SEERR_URL` pointed at an internal address that is not publicly resolvable, such as a Docker Compose service name (`http://seerr:5055`) or `localhost`, every `/search` and `/request` reply was rejected by Discord with `Invalid Form Body` / `URL_TYPE_INVALID_URL`. The bot builds a clickable Jellyseerr link into the embed from `SEERR_URL`, and Discord validates that link more strictly than the bot did. `/search` was unusable in this setup, and `/request` sent the request to Jellyseerr but then failed on the confirmation message, so users saw an error for a request that had actually gone through. The link is now omitted when Discord would reject it, and the embed is sent without it. A warning naming the cause is logged once per configured value.
+- **Jellyfin notifications with an internal server URL**: The same rejection applied to the Jellyfin item link and the "Watch Now" button, which are built from `JELLYFIN_BASE_URL`. For a container-internal value like `http://jellyfin:8096`, Discord rejected the link button and the entire notification failed to send, both in channels and in direct messages. These links are now dropped the same way instead of failing the message.
+
+No configuration change is needed. If your Jellyseerr or Jellyfin URL is only reachable inside your network, the affected embeds will simply have no clickable link.
+
+---
+
 ## [1.6.1] - 2026-09-11
 
 ### 🐛 Fixed
