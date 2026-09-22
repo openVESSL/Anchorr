@@ -12,6 +12,22 @@ import { getSeerrApiUrl, normalizeSeerrUrl } from "../utils/seerrUrl.js";
 import { isDiscordLinkableUrl, isValidUrl } from "../utils/url.js";
 import logger from "../utils/logger.js";
 
+// Tracks the last SEERR_URL we warned about, so a config change warns again.
+let warnedUnlinkableSeerrUrl = null;
+
+function resolveAuthorUrl(seerrMediaUrl, seerrBaseUrl) {
+  if (!seerrMediaUrl) return undefined;
+  if (isDiscordLinkableUrl(seerrMediaUrl)) return seerrMediaUrl;
+  if (warnedUnlinkableSeerrUrl !== seerrBaseUrl) {
+    warnedUnlinkableSeerrUrl = seerrBaseUrl;
+    logger.warn(
+      `SEERR_URL (${seerrBaseUrl}) cannot be used as a Discord link, so embeds will have no Jellyseerr link. ` +
+        `Discord requires a public http(s) URL with a dotted hostname; internal names like "seerr" or "localhost" are rejected.`
+    );
+  }
+  return undefined;
+}
+
 export function buildNotificationEmbed(
   details,
   mediaType,
@@ -83,7 +99,7 @@ export function buildNotificationEmbed(
   const embed = new EmbedBuilder()
     .setAuthor({
       name: authorName,
-      url: isDiscordLinkableUrl(seerrMediaUrl) ? seerrMediaUrl : undefined,
+      url: resolveAuthorUrl(seerrMediaUrl, currentSeerrUrl),
     })
     .setTitle(titleWithYear)
     .setURL(imdbId ? `https://www.imdb.com/title/${imdbId}/` : undefined)

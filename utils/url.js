@@ -9,9 +9,9 @@ export function isValidUrl(string) {
 }
 
 /**
- * Checks whether a URL is acceptable as a clickable link in a Discord embed.
- * Discord's embed validator is stricter than `new URL()` and rejects hosts
- * without a dot (e.g. Docker service names) and localhost.
+ * Heuristic: is this URL likely to pass Discord's embed link validator?
+ * Discord is stricter than `new URL()` and rejects dotless hosts like
+ * Docker service names. Not exhaustive — a rejection past this should throw.
  * @param {string} string
  * @returns {boolean}
  */
