@@ -9,8 +9,23 @@ import * as tmdbApi from "../api/tmdb.js";
 import { minutesToHhMm } from "../utils/time.js";
 import { COLORS } from "../lib/constants.js";
 import { getSeerrApiUrl, normalizeSeerrUrl } from "../utils/seerrUrl.js";
-import { isValidUrl } from "../utils/url.js";
+import { isDiscordLinkableUrl, isValidUrl } from "../utils/url.js";
 import logger from "../utils/logger.js";
+
+// Holds the URL rather than a flag, so a config change warns again.
+let warnedUnlinkableSeerrUrl = null;
+
+function resolveAuthorUrl(seerrMediaUrl, seerrBaseUrl) {
+  if (!seerrMediaUrl) return undefined;
+  if (isDiscordLinkableUrl(seerrMediaUrl)) return seerrMediaUrl;
+  if (warnedUnlinkableSeerrUrl !== seerrBaseUrl) {
+    warnedUnlinkableSeerrUrl = seerrBaseUrl;
+    logger.warn(
+      `SEERR_URL (${seerrBaseUrl}) cannot be used as a Discord link. Embeds will have no Jellyseerr link until it points to a public hostname with a dot.`
+    );
+  }
+  return undefined;
+}
 
 export function buildNotificationEmbed(
   details,
@@ -83,7 +98,7 @@ export function buildNotificationEmbed(
   const embed = new EmbedBuilder()
     .setAuthor({
       name: authorName,
-      url: isValidUrl(seerrMediaUrl) ? seerrMediaUrl : undefined,
+      url: resolveAuthorUrl(seerrMediaUrl, currentSeerrUrl),
     })
     .setTitle(titleWithYear)
     .setURL(imdbId ? `https://www.imdb.com/title/${imdbId}/` : undefined)
