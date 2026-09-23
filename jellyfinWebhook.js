@@ -10,7 +10,7 @@ import { minutesToHhMm } from "./utils/time.js";
 import logger from "./utils/logger.js";
 import { fetchOMDbData } from "./api/omdb.js";
 import { findBestBackdrop } from "./api/tmdb.js";
-import { isValidUrl } from "./utils/url.js";
+import { isDiscordLinkableUrl, isValidUrl } from "./utils/url.js";
 import {
   getBackdropItemId,
   getNotificationTmdbId,
@@ -427,7 +427,7 @@ async function processAndSendNotification(
     "web/index.html",
     `!/details?id=${ItemId}&serverId=${ServerId}`
   );
-  if (isValidUrl(jellyfinUrl)) {
+  if (isDiscordLinkableUrl(jellyfinUrl)) {
     embed.setURL(jellyfinUrl);
   }
 
@@ -578,7 +578,7 @@ async function processAndSendNotification(
       "web/index.html",
       `!/details?id=${ItemId}&serverId=${ServerId}`
     );
-    if (isValidUrl(watchUrl)) {
+    if (isDiscordLinkableUrl(watchUrl)) {
       buttonComponents.push(
         new ButtonBuilder()
           .setStyle(ButtonStyle.Link)
@@ -728,7 +728,7 @@ async function processAndSendNotification(
           "web/index.html",
           `!/details?id=${ItemId}&serverId=${ServerId}`
         );
-        if (isValidUrl(dmJellyfinUrl)) {
+        if (isDiscordLinkableUrl(dmJellyfinUrl)) {
           dmEmbed.setURL(dmJellyfinUrl);
         }
         dmEmbed
@@ -751,7 +751,7 @@ async function processAndSendNotification(
           }
         }
 
-        const dmButtons = isValidUrl(dmJellyfinUrl) ? new ActionRowBuilder().addComponents(
+        const dmButtons = isDiscordLinkableUrl(dmJellyfinUrl) ? new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
             .setLabel("▶ Watch Now!")

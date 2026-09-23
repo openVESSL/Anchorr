@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.2] - 2026-09-23
+
+### 🐛 Fixed
+
+- **`/search` and `/request` failed when `SEERR_URL` was not publicly resolvable** ([#130](https://github.com/openVESSL/Anchorr/issues/130)): Discord rejects embed links whose hostname has no dot, such as a Docker Compose service name (`http://seerr:5055`) or `localhost`. The link is now omitted instead of failing the reply, and the cause is logged once.
+- **Jellyfin notifications failed with a container-internal `JELLYFIN_BASE_URL`**: The item link and the "Watch Now" button hit the same rejection, which made the whole notification fail. Those links are now dropped the same way.
+
+No configuration change is needed. Affected embeds simply have no clickable link.
+
+---
+
 ## [1.6.1] - 2026-09-11
 
 ### 🐛 Fixed
