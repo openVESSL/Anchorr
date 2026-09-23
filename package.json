@@ -6,7 +6,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "create-translation": "node scripts/create-translation.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "type": "module",
   "keywords": [],
