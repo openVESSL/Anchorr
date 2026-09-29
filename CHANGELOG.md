@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.3] - 2026-09-29
+
+### 🐛 Fixed
+
+- **"Send PM when request is available" and channel announcements couldn't be toggled independently** ([#134](https://github.com/openVESSL/Anchorr/issues/134)): Both were computed in one function, and disabling a channel announcement (e.g. for episodes/seasons) used an early return that also silently skipped the DM. Movies and series had no channel-level toggle in the real-time webhook path at all. The DM now always runs independent of the channel-announcement outcome, and new "Announce new movies/series in channel" checkboxes let you turn channel posts off without affecting DMs.
+
+---
+
 ## [1.6.2] - 2026-09-23
 
 ### 🐛 Fixed
