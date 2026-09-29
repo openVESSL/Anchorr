@@ -591,125 +591,146 @@ async function processAndSendNotification(
   // 2. Library-specific channel (targetChannelId)
   // 3. Default Jellyfin channel
   let channelId;
-  
+  let shouldAnnounceInChannel = true;
+
   if (ItemType === "Episode") {
     const episodeNotifyEnabled = process.env.JELLYFIN_NOTIFY_EPISODES === "true";
     const episodeChannelId = process.env.JELLYFIN_EPISODE_CHANNEL_ID;
-    
-    if (episodeNotifyEnabled && episodeChannelId) {
+
+    if (!episodeNotifyEnabled) {
+      // Episode notifications disabled - skip channel announcement only
+      logger.info(`Episode notifications disabled. Skipping channel announcement for: ${data.Name}`);
+      shouldAnnounceInChannel = false;
+    } else if (episodeChannelId) {
       // Episode notifications enabled with specific channel - use it
       channelId = episodeChannelId;
       logger.debug(`Using episode-specific channel: ${channelId}`);
-    } else if (episodeNotifyEnabled && !episodeChannelId) {
+    } else {
       // Episode notifications enabled but no specific channel - fallback to library or default
       channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
       logger.debug(`Episode notifications enabled, using fallback channel: ${channelId}`);
-    } else if (!episodeNotifyEnabled) {
-      // Episode notifications disabled - skip
-      logger.info(`Episode notifications disabled. Skipping notification for: ${data.Name}`);
-      return;
     }
   } else if (ItemType === "Season") {
     const seasonNotifyEnabled = process.env.JELLYFIN_NOTIFY_SEASONS === "true";
     const seasonChannelId = process.env.JELLYFIN_SEASON_CHANNEL_ID;
-    
-    if (seasonNotifyEnabled && seasonChannelId) {
+
+    if (!seasonNotifyEnabled) {
+      // Season notifications disabled - skip channel announcement only
+      logger.info(`Season notifications disabled. Skipping channel announcement for: ${data.Name}`);
+      shouldAnnounceInChannel = false;
+    } else if (seasonChannelId) {
       // Season notifications enabled with specific channel - use it
       channelId = seasonChannelId;
       logger.debug(`Using season-specific channel: ${channelId}`);
-    } else if (seasonNotifyEnabled && !seasonChannelId) {
+    } else {
       // Season notifications enabled but no specific channel - fallback to library or default
       channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
       logger.debug(`Season notifications enabled, using fallback channel: ${channelId}`);
-    } else if (!seasonNotifyEnabled) {
-      // Season notifications disabled - skip
-      logger.info(`Season notifications disabled. Skipping notification for: ${data.Name}`);
-      return;
+    }
+  } else if (ItemType === "Movie") {
+    if (process.env.JELLYFIN_NOTIFY_MOVIES === "false") {
+      logger.info(`Movie notifications disabled. Skipping channel announcement for: ${data.Name}`);
+      shouldAnnounceInChannel = false;
+    } else {
+      channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
+    }
+  } else if (ItemType === "Series") {
+    if (process.env.JELLYFIN_NOTIFY_SERIES === "false") {
+      logger.info(`Series notifications disabled. Skipping channel announcement for: ${data.Name}`);
+      shouldAnnounceInChannel = false;
+    } else {
+      channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
     }
   } else {
-    // For movies, series, etc. - use library channel or default
+    // Other item types - use library channel or default
     channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
   }
 
-  if (!channelId) {
+  if (shouldAnnounceInChannel && !channelId) {
     logger.error(`❌ No Discord channel configured for ${ItemType} "${data.Name}" — set JELLYFIN_CHANNEL_ID or configure a library channel in the dashboard`);
-    return;
+    shouldAnnounceInChannel = false;
   }
 
-  let channel;
-  try {
-    channel = await client.channels.fetch(channelId);
-  } catch (error) {
-    logger.error(`❌ Failed to fetch Discord channel ${channelId} for "${data.Name}" (${ItemType}): ${error.message}`);
-    throw new Error(`Discord channel ${channelId} not accessible`);
-  }
+  if (shouldAnnounceInChannel) {
+    let channel;
+    try {
+      channel = await client.channels.fetch(channelId);
+    } catch (error) {
+      logger.error(`❌ Failed to fetch Discord channel ${channelId} for "${data.Name}" (${ItemType}): ${error.message}`);
+      throw new Error(`Discord channel ${channelId} not accessible`);
+    }
 
-  // Check if this is a batched episode notification and we have an existing message to edit
-  if (
-    ItemType === "Episode" &&
-    episodeCount > 1 &&
-    episodeDetails &&
-    SeriesId
-  ) {
-    const existingMessage = episodeMessages.get(SeriesId);
+    // Check if this is a batched episode notification and we have an existing message to edit
+    let editedExisting = false;
+    if (
+      ItemType === "Episode" &&
+      episodeCount > 1 &&
+      episodeDetails &&
+      SeriesId
+    ) {
+      const existingMessage = episodeMessages.get(SeriesId);
 
-    if (existingMessage) {
-      try {
-        const channel = await client.channels.fetch(existingMessage.channelId);
-        const message = await channel.messages.fetch(existingMessage.messageId);
-        await message.edit({ embeds: [embed], components: [buttons] });
-        logger.info(
-          `Updated existing message for: ${embedTitle} (${episodeCount} episodes total)`
-        );
-        return; // Early return, don't send a new message
-      } catch (err) {
-        logger.warn(
-          `Failed to edit existing message for ${SeriesId}, sending new one:`,
-          err
-        );
-        // Continue to send new message
+      if (existingMessage) {
+        try {
+          const existingChannel = await client.channels.fetch(existingMessage.channelId);
+          const message = await existingChannel.messages.fetch(existingMessage.messageId);
+          await message.edit({ embeds: [embed], components: [buttons] });
+          logger.info(
+            `Updated existing message for: ${embedTitle} (${episodeCount} episodes total)`
+          );
+          editedExisting = true;
+        } catch (err) {
+          logger.warn(
+            `Failed to edit existing message for ${SeriesId}, sending new one:`,
+            err
+          );
+          // Continue to send new message
+        }
       }
     }
-  }
 
-  let sentMessage;
-  try {
-    const messageOptions = {
-      embeds: [embed],
-    };
-    
-    if (buttons) {
-      messageOptions.components = [buttons];
+    if (!editedExisting) {
+      let sentMessage;
+      try {
+        const messageOptions = {
+          embeds: [embed],
+        };
+
+        if (buttons) {
+          messageOptions.components = [buttons];
+        }
+
+        sentMessage = await channel.send(messageOptions);
+      } catch (error) {
+        logger.error(`Failed to send Discord message:`, error);
+        throw new Error(`Failed to send Discord notification: ${error.message}`);
+      }
+
+      // Store message reference for future edits (batched episodes only)
+      if (
+        ItemType === "Episode" &&
+        episodeCount > 1 &&
+        episodeDetails &&
+        SeriesId
+      ) {
+        episodeMessages.set(SeriesId, {
+          messageId: sentMessage.id,
+          channelId: channel.id,
+        });
+
+        // Clean up message reference after some time (prevent memory leaks)
+        setTimeout(() => {
+          episodeMessages.delete(SeriesId);
+          logger.debug(`Cleaned up message reference for SeriesId: ${SeriesId}`);
+        }, 6 * 60 * 60 * 1000); // 6 hours
+      }
     }
-    
-    sentMessage = await channel.send(messageOptions);
-  } catch (error) {
-    logger.error(`Failed to send Discord message:`, error);
-    throw new Error(`Failed to send Discord notification: ${error.message}`);
+
+    logger.info(`${testPrefix}Sent notification for: ${embedTitle}`);
   }
 
-  // Store message reference for future edits (batched episodes only)
-  if (
-    ItemType === "Episode" &&
-    episodeCount > 1 &&
-    episodeDetails &&
-    SeriesId
-  ) {
-    episodeMessages.set(SeriesId, {
-      messageId: sentMessage.id,
-      channelId: channel.id,
-    });
-
-    // Clean up message reference after some time (prevent memory leaks)
-    setTimeout(() => {
-      episodeMessages.delete(SeriesId);
-      logger.debug(`Cleaned up message reference for SeriesId: ${SeriesId}`);
-    }, 6 * 60 * 60 * 1000); // 6 hours
-  }
-  
-  logger.info(`${testPrefix}Sent notification for: ${embedTitle}`);
-
-  // Send DMs to users who requested this content
+  // Send DMs to users who requested this content — independent of the
+  // channel-announcement toggles above, so disabling one never disables the other.
   if (usersToNotify.length > 0) {
     for (const userId of usersToNotify) {
       try {
