@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **"Send PM when request is available" and channel announcements couldn't be toggled independently** ([#134](https://github.com/openVESSL/Anchorr/issues/134)): Both were computed in one function, and disabling a channel announcement (e.g. for episodes/seasons) used an early return that also silently skipped the DM. Movies and series had no channel-level toggle in the real-time webhook path at all. The DM now always runs independent of the channel-announcement outcome, and new "Announce new movies/series in channel" checkboxes let you turn channel posts off without affecting DMs.
 
+### 🔒 Security
+
+- **Coloris (color picker) is now pinned to a fixed version with Subresource Integrity**: The dashboard loaded Coloris from jsDelivr via `@latest`, an unpinned, mutable reference with no integrity check. It's now pinned to `v0.25.0` with SRI hashes on both the script and stylesheet, so the CDN can't silently serve different content than what was reviewed.
+
 ---
 
 ## [1.6.2] - 2026-09-23
