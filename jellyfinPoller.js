@@ -142,12 +142,6 @@ class JellyfinPoller {
         const itemId = item.Id;
         const itemType = item.Type;
 
-        // Note: per-type channel-announcement toggles (JELLYFIN_NOTIFY_MOVIES/
-        // SERIES/SEASONS/EPISODES) are intentionally NOT checked here. They only
-        // gate the channel announcement, not DM eligibility for pending requests,
-        // so processAndSendNotification() decides that itself — skipping it here
-        // would also skip DM delivery for a disabled type.
-
         if (deduplicator.checkAndRecord(item)) {
           logger.info(`⏭️ Skipping ${itemType} "${item.Name}" - already notified recently (identity dedup)`);
           continue;

@@ -729,8 +729,7 @@ async function processAndSendNotification(
     logger.info(`${testPrefix}Sent notification for: ${embedTitle}`);
   }
 
-  // Send DMs to users who requested this content — independent of the
-  // channel-announcement toggles above, so disabling one never disables the other.
+  // DMs are independent of the channel-announcement toggles above.
   if (usersToNotify.length > 0) {
     for (const userId of usersToNotify) {
       try {
