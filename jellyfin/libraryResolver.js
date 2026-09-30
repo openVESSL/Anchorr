@@ -117,8 +117,9 @@ export function getLibraryAnimeFlag(configLibraryId, libraryChannels) {
  * instead of file identity.
  *
  * Accepts both:
- *   - Webhook payload shape: { ItemType, Provider_tmdb, SeriesId, Name, Year,
- *     SeasonNumber, EpisodeNumber, IndexNumber, ParentIndexNumber, ItemId }
+ *   - Webhook payload shape: { ItemType, Provider_tmdb,
+ *     SeriesProvider_tmdb, SeriesId, Name, Year, SeasonNumber, EpisodeNumber,
+ *     IndexNumber, ParentIndexNumber, ItemId }
  *   - Jellyfin API shape:    { Type, ProviderIds: { Tmdb }, SeriesId, Name,
  *     ProductionYear, IndexNumber, ParentIndexNumber, Id }
  *
@@ -131,6 +132,7 @@ export function buildIdentityKey(item) {
 
   const type = item.ItemType || item.Type;
   const tmdb = item.Provider_tmdb || item.ProviderIds?.Tmdb;
+  const seriesTmdb = item.SeriesProvider_tmdb;
   const seriesId = item.SeriesId;
   const seasonNum = item.SeasonNumber ?? item.ParentIndexNumber;
   const episodeNum = item.EpisodeNumber ?? item.IndexNumber;
@@ -151,8 +153,8 @@ export function buildIdentityKey(item) {
       return itemId ? `id:${itemId}` : null;
 
     case "Season": {
-      const seriesKey = tmdb
-        ? `tmdb:${tmdb}`
+      const seriesKey = seriesTmdb
+        ? `tmdb:${seriesTmdb}`
         : seriesId
         ? `id:${seriesId}`
         : name
@@ -163,8 +165,8 @@ export function buildIdentityKey(item) {
     }
 
     case "Episode": {
-      const seriesKey = tmdb
-        ? `tmdb:${tmdb}`
+      const seriesKey = seriesTmdb
+        ? `tmdb:${seriesTmdb}`
         : seriesId
         ? `id:${seriesId}`
         : item.SeriesName
@@ -184,6 +186,31 @@ export function buildIdentityKey(item) {
     default:
       return itemId ? `id:${itemId}` : null;
   }
+}
+
+/**
+ * Reproduce the pre-SeriesProvider identity for an existing persisted entry.
+ * This is used only to migrate old keys on first access after an upgrade.
+ */
+export function buildLegacyChildIdentityKey(item) {
+  if (!item) return null;
+  const type = item.ItemType || item.Type;
+  if (type !== "Season" && type !== "Episode") return null;
+
+  const tmdb = item.Provider_tmdb || item.ProviderIds?.Tmdb;
+  const seasonNum = item.SeasonNumber ?? item.ParentIndexNumber;
+  if (!tmdb || seasonNum == null) return null;
+
+  if (type === "Season") return `series:tmdb:${tmdb}:s${seasonNum}`;
+
+  const episodeNum = item.EpisodeNumber ?? item.IndexNumber;
+  if (episodeNum == null) return null;
+  const epEnd = item.IndexNumberEnd ?? item.EpisodeNumberEnd;
+  const epSuffix =
+    epEnd != null && epEnd !== episodeNum
+      ? `e${episodeNum}-${epEnd}`
+      : `e${episodeNum}`;
+  return `series:tmdb:${tmdb}:s${seasonNum}${epSuffix}`;
 }
 
 /**
@@ -226,6 +253,20 @@ export class ItemDeduplicator {
       }
     }
     if (this.store.has(key)) return true;
+
+    // v1.6.1 and earlier used the child's own TMDB ID in season/episode keys.
+    // Move a matching persisted entry to the corrected key on first access so
+    // an upgrade does not re-announce recently seen content.
+    if (typeof itemOrKey !== "string") {
+      const legacyKey = buildLegacyChildIdentityKey(itemOrKey);
+      if (legacyKey && legacyKey !== key && this.store.has(legacyKey)) {
+        this.store.rekey(legacyKey, key);
+        logger.info(
+          `[DEDUP] Migrated legacy child identity ${legacyKey} -> ${key}`
+        );
+        return true;
+      }
+    }
     this.store.set(key, true);
     return false;
   }
