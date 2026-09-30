@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.3] - 2026-09-29
+
+### 🐛 Fixed
+
+- **"Send PM when request is available" and channel announcements couldn't be toggled independently** ([#134](https://github.com/openVESSL/Anchorr/issues/134)): Both were computed in one function, and disabling a channel announcement (e.g. for episodes/seasons) used an early return that also silently skipped the DM. Movies and series had no channel-level toggle in the real-time webhook path at all. The DM now always runs independent of the channel-announcement outcome, and new "Announce new movies/series in channel" checkboxes let you turn channel posts off without affecting DMs.
+
+### 🔒 Security
+
+- **Coloris (color picker) is now pinned to a fixed version with Subresource Integrity**: The dashboard loaded Coloris from jsDelivr via `@latest`, an unpinned, mutable reference with no integrity check. It's now pinned to `v0.25.0` with SRI hashes on both the script and stylesheet, so the CDN can't silently serve different content than what was reviewed.
+- **Dependencies updated to clear all known advisories**: `npm audit` reported 8 vulnerabilities (2 high, 6 moderate), including prototype pollution in `joi` and request smuggling and CRLF injection in `undici` (pulled in by discord.js). All of them were already fixed in versions the existing version ranges allow, so only the lockfile was stale. Notable bumps: discord.js 14.26.2 to 14.27.0, undici 6.27.0 to 6.29.0, joi 18.2.1 to 18.2.9, express 4.22.2 to 4.22.3. No configuration change is needed.
+
+---
+
 ## [1.6.2] - 2026-09-23
 
 ### 🐛 Fixed
