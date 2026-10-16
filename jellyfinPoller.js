@@ -132,12 +132,6 @@ class JellyfinPoller {
         );
       }
 
-      // Get notification type filters
-      const notifyMovies = process.env.JELLYFIN_NOTIFY_MOVIES !== "false";
-      const notifySeries = process.env.JELLYFIN_NOTIFY_SERIES !== "false";
-      const notifySeasons = process.env.JELLYFIN_NOTIFY_SEASONS !== "false";
-      const notifyEpisodes = process.env.JELLYFIN_NOTIFY_EPISODES !== "false";
-
       const libraryChannels = getLibraryChannels();
       const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID;
 
@@ -147,17 +141,6 @@ class JellyfinPoller {
       for (const item of items) {
         const itemId = item.Id;
         const itemType = item.Type;
-
-        // Check if we should notify for this type
-        if (
-          (itemType === "Movie" && !notifyMovies) ||
-          (itemType === "Series" && !notifySeries) ||
-          (itemType === "Season" && !notifySeasons) ||
-          (itemType === "Episode" && !notifyEpisodes)
-        ) {
-          logger.debug(`Skipping ${itemType} notification (disabled in config)`);
-          continue;
-        }
 
         if (deduplicator.checkAndRecord(item)) {
           logger.info(`⏭️ Skipping ${itemType} "${item.Name}" - already notified recently (identity dedup)`);

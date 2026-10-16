@@ -9,7 +9,7 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css"
     />
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mdbassit/Coloris@latest/dist/coloris.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mdbassit/Coloris@0.25.0/dist/coloris.min.css" integrity="sha384-DY3umZptOgjUNshBFbvu1+3RVFPoD1/CgGcc1yyJ77/aFOJ7jtN4BORnz/D/xF0n" crossorigin="anonymous" />
     <link rel="icon" href="assets/logo.png" type="image/png" />
   </head>
   <body class="auth-mode">
@@ -593,6 +593,27 @@
                         <div class="form-text" style="margin-bottom: 1rem;" data-i18n="config.library_channel_mapping_help">
                           Map specific Jellyfin libraries to different Discord channels. Click "Fetch Libraries" to load your libraries, then select a channel for each one. Unchecked libraries will not send any notifications.
                         </div>
+
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="JELLYFIN_NOTIFY_MOVIES" name="JELLYFIN_NOTIFY_MOVIES" checked />
+                            <span data-i18n="config.jellyfin_notify_movies_label">Announce new movies in channel</span>
+                          </label>
+                          <div class="form-text" data-i18n="config.jellyfin_notify_movies_help">
+                            When enabled, new movies are announced in the configured Discord channel. Independent of the "Send PM when request is available" setting.
+                          </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="JELLYFIN_NOTIFY_SERIES" name="JELLYFIN_NOTIFY_SERIES" checked />
+                            <span data-i18n="config.jellyfin_notify_series_label">Announce new series in channel</span>
+                          </label>
+                          <div class="form-text" data-i18n="config.jellyfin_notify_series_help">
+                            When enabled, new series are announced in the configured Discord channel. Independent of the "Send PM when request is available" setting.
+                          </div>
+                        </div>
+
                         <button type="button" id="fetch-libraries-btn" class="btn btn-secondary" style="padding: 0.5rem 1rem; margin: 0 0 1rem 0; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;">
                           <i class="bi bi-arrow-clockwise"></i> <span data-i18n="config.fetch_libraries">Fetch Libraries</span>
                         </button>
@@ -1278,7 +1299,7 @@
         </div>
       </footer>
 
-    <script src="https://cdn.jsdelivr.net/gh/mdbassit/Coloris@latest/dist/coloris.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mdbassit/Coloris@0.25.0/dist/coloris.min.js" integrity="sha384-olpkBKjEFqOOAAUzqL1y4xnKDCVmmXNaoRDWmHnRTutomMnUySX9hqDgVQVcvMdc" crossorigin="anonymous"></script>
     <script src="script.js"></script>
 
     <!-- Auto-Map from Seerr Modal -->
