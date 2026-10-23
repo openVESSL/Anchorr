@@ -5,7 +5,7 @@ import {
   REST,
 } from "discord.js";
 import { registerCommands } from "../discord/commands.js";
-import { botState, loadPendingRequests } from "./botState.js";
+import { botState, loadPendingRequests, loadRequestChannels } from "./botState.js";
 import { registerInteractions } from "./interactions.js";
 import { scheduleDailyRandomPick } from "./dailyPick.js";
 import { start as startRoundupScheduler } from "./roundupScheduler.js";
@@ -19,6 +19,7 @@ export async function startBot() {
   }
 
   loadPendingRequests();
+  loadRequestChannels();
 
   const configLoaded = loadConfigToEnv();
   if (!configLoaded) {
