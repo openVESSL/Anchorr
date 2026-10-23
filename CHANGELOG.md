@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.3] - 2026-10-23
 
-> **⚠️ Security update, upgrading is strongly recommended.** Previous Docker images run on Node.js 18, which is affected by CVE-2026-111497 (possible remote code execution via Brotli) and will not receive a fix. This release switches the image to Node.js 22. Running without Docker? Update Node.js to 22.23.4, 24.22.1, 26.12.1 or newer.
+> **⚠️ Security update, upgrading is strongly recommended.** Previous Docker images run on Node.js 18, which is affected by CVE-2026-111497 (possible remote code execution via Brotli) and will not receive a fix. This release switches the image to Node.js 22. Running without Docker? Use Node.js 22 (22.23.4 or later), 24 (24.22.1 or later) or 26 (26.12.1 or later).
 
 ### 🐛 Fixed
 
