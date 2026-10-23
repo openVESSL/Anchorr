@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.6.3] - 2026-10-16
+## [1.6.3] - 2026-10-23
+
+> **⚠️ Security update, upgrading is strongly recommended.** Previous Docker images run on Node.js 18, which is affected by CVE-2026-111497 (possible remote code execution via Brotli) and will not receive a fix. This release switches the image to Node.js 22. Running without Docker? Update Node.js to 22.23.4, 24.22.1, 26.12.1 or newer.
 
 ### 🐛 Fixed
 
@@ -17,8 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔒 Security
 
+- **Docker image now runs on Node.js 22** instead of the end-of-life Node.js 18, which fixes CVE-2026-111497 (Brotli, possible remote code execution).
 - **Coloris color picker pinned to `v0.25.0` with Subresource Integrity** instead of loading `@latest` from the CDN.
-- **Dependencies updated** to clear all known advisories (including undici, joi, axios and proxy-addr).
+- **Dependencies updated** to clear all known advisories (including undici, joi, axios, proxy-addr and follow-redirects).
 
 No configuration change is needed.
 
