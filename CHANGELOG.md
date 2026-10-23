@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.3] - 2026-10-23
+
+> **⚠️ Security update, upgrading is strongly recommended.** Previous Docker images run on Node.js 18, which is affected by CVE-2026-111497 (possible remote code execution via Brotli) and will not receive a fix. This release switches the image to Node.js 22. Running without Docker? Use Node.js 22 (22.23.4 or later), 24 (24.22.1 or later) or 26 (26.12.1 or later).
+
+### 🐛 Fixed
+
+- **DMs and channel announcements are now independent** ([#134](https://github.com/openVESSL/Anchorr/issues/134)): Turning off a channel announcement no longer also disables "Send PM when request is available". New "Announce new movies/series in channel" checkboxes control channel posts on their own.
+- **Season and episode notifications showed the wrong artwork** ([#126](https://github.com/openVESSL/Anchorr/issues/126)): They now use the parent series, which also fixes "Send PM when request is available" for seasons and episodes. Thanks to @Lurk390.
+- **Smarter duplicate protection for series**: Quality upgrades no longer re-announce episodes or seasons, while new episodes of a known show still get announced.
+
+### 🔒 Security
+
+- **Docker image now runs on Node.js 22** instead of the end-of-life Node.js 18, which fixes CVE-2026-111497 (Brotli, possible remote code execution).
+- **Coloris color picker pinned to `v0.25.0` with Subresource Integrity** instead of loading `@latest` from the CDN.
+- **Dependencies updated** to clear all known advisories (including undici, joi, axios, proxy-addr and follow-redirects).
+
+No configuration change is needed.
+
+---
+
 ## [1.6.2] - 2026-09-23
 
 ### 🐛 Fixed

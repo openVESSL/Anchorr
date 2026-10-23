@@ -1,12 +1,12 @@
 {
   "name": "anchorr",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
     "create-translation": "node scripts/create-translation.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "type": "module",
   "keywords": [],
@@ -29,7 +29,7 @@
     "ws": "^8.18.0"
   },
   "overrides": {
-    "follow-redirects": "^1.16.0",
+    "follow-redirects": "^1.16.1",
     "undici": "^6.26.1",
     "body-parser": "^1.20.6"
   }
