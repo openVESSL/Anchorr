@@ -670,11 +670,21 @@ function configureWebServer() {
         oldGuildId !== process.env.GUILD_ID ||
         jellyfinApiKeyChanged;
 
+      // Apply polling setting changes without a full bot restart
+      if (botState.isBotRunning && !needsRestart) {
+        const pollingWanted = process.env.JELLYFIN_POLLING_ENABLED === "true";
+        if (jellyfinPoller.isRunning || pollingWanted) {
+          jellyfinPoller.stop();
+          jellyfinPoller.start(botState.discordClient, pendingRequests);
+        }
+      }
+
       if (botState.isBotRunning && needsRestart) {
         logger.warn(
           "Critical Discord settings changed. Restarting bot logic..."
         );
 
+        jellyfinPoller.stop();
         stopRoundupScheduler();
         await botState.discordClient.destroy();
         botState.isBotRunning = false;
