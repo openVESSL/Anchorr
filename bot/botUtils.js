@@ -1,4 +1,5 @@
 import logger from "../utils/logger.js";
+import { getUserMappings } from "../utils/configFile.js";
 
 export function pad2(n) {
   return String(n).padStart(2, "0");
@@ -180,4 +181,17 @@ export function getSeerrAutoApprove() {
     `[CONFIG CHECK] SEERR_AUTO_APPROVE is currently: ${val} (Evaluated to: ${isAuto})`
   );
   return isAuto;
+}
+
+/**
+ * Fill in the user's default quality profile (set on their user mapping) when the
+ * request did not specify one explicitly.
+ * @returns {Object} options, with `quality` set if the user has a default for this media type
+ */
+export function withUserQuality(options, discordUserId, mediaType) {
+  const base = options || {};
+  if (base.quality) return base;
+  const mapping = getUserMappings().find((m) => m.discordUserId === String(discordUserId));
+  const quality = mapping?.qualityProfiles?.[mediaType];
+  return quality ? { ...base, quality } : base;
 }

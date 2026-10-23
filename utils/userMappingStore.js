@@ -33,6 +33,12 @@ export function saveUserMapping(mapping) {
     createdAt: mapping.createdAt || new Date().toISOString(),
   };
 
+  // Re-saving a mapping (e.g. metadata refresh) must not drop its quality profiles
+  if (existingIndex >= 0 && !newMapping.qualityProfiles) {
+    const existingProfiles = config.USER_MAPPINGS[existingIndex].qualityProfiles;
+    if (existingProfiles) newMapping.qualityProfiles = existingProfiles;
+  }
+
   if (existingIndex >= 0) {
     config.USER_MAPPINGS[existingIndex] = newMapping;
     logger.info(
