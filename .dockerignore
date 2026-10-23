@@ -14,3 +14,4 @@ LICENSE
 .DS_Store
 *.log
 logs/
+config/
