@@ -1,3 +1,10 @@
+# install dependencies natively on the build host, not under QEMU emulation
+# (works because all dependencies are pure JavaScript)
+FROM --platform=$BUILDPLATFORM node:22-alpine AS deps
+WORKDIR /usr/src/app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
 # use a stable node LTS
 FROM node:22-alpine
 
@@ -6,7 +13,8 @@ WORKDIR /usr/src/app
 
 # install app dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force && apk add --no-cache su-exec
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+RUN apk add --no-cache su-exec
 
 # copy source
 COPY . .
