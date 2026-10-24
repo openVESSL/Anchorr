@@ -33,3 +33,7 @@ docs/
 config/dedup-*.json
 .worktrees/
 PRODUCT.md
+
+# Local skills (Claude Code / agent tooling)
+.agents/
+skills-lock.json
