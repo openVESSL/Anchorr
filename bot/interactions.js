@@ -317,9 +317,10 @@ async function handleSearchOrRequest(
 export function registerInteractions(client) {
   client.on("interactionCreate", async (interaction) => {
     try {
-      // Check role permissions for all commands
+      // Check role permissions for all commands, buttons, and select menus
       if (
         interaction.isCommand() ||
+        interaction.isButton() ||
         (interaction.isStringSelectMenu() &&
           !interaction.customId.startsWith("request_seasons|") &&
           !interaction.customId.startsWith("request_with_tags|"))
