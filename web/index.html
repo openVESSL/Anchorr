@@ -552,6 +552,16 @@
                         </div>
                       </div>
 
+                      <div class="form-group" style="margin-top: 1.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                          <input type="checkbox" id="JELLYFIN_POLLING_ENABLED" name="JELLYFIN_POLLING_ENABLED" />
+                          <span data-i18n="config.jellyfin_polling_label">Poll Jellyfin for new items</span>
+                        </label>
+                        <div class="form-text" data-i18n="config.jellyfin_polling_help">
+                          Fallback for missed webhooks: every 5 minutes Anchorr checks Jellyfin for recently added items and announces any it hasn't seen. Requires the Jellyfin URL, API key and Server ID above. Items already announced by webhook are not repeated.
+                        </div>
+                      </div>
+
                       <!-- Episode Debouncing Section -->
                       <div class="form-group" style="margin-top: 1.5rem;">
                         <label for="WEBHOOK_DEBOUNCE_SECONDS" style="font-size: 1.2rem; font-weight: 700; color: var(--mauve);" data-i18n="config.debounce_title">
