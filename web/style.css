@@ -1921,6 +1921,8 @@ input:checked + .slider:before {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding: 1rem;
   background: var(--background);
   border-radius: 12px;
