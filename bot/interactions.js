@@ -9,11 +9,7 @@ import {
   checkRolePermission,
   getSeerrAutoApprove,
 } from "./botUtils.js";
-import {
-  botState,
-  pendingRequests,
-  savePendingRequests,
-} from "./botState.js";
+import { botState, trackRequest } from "./botState.js";
 import { getUserMappings } from "../utils/configFile.js";
 import { getSeerrApiUrl } from "../utils/seerrUrl.js";
 import { t } from "../utils/i18n.js";
@@ -207,14 +203,7 @@ async function handleSearchOrRequest(
         `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
       );
 
-      if (process.env.NOTIFY_ON_AVAILABLE === "true") {
-        const requestKey = `${tmdbId}-${mediaType}`;
-        if (!pendingRequests.has(requestKey)) {
-          pendingRequests.set(requestKey, new Set());
-        }
-        pendingRequests.get(requestKey).add(interaction.user.id);
-        savePendingRequests();
-      }
+      trackRequest(tmdbId, mediaType, interaction.user.id, interaction.channelId);
     }
 
     const imdbId = await tmdbApi.tmdbGetExternalImdb(
@@ -736,14 +725,7 @@ export function registerInteractions(client) {
             `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
           );
 
-          if (process.env.NOTIFY_ON_AVAILABLE === "true") {
-            const requestKey = `${tmdbId}-${mediaType}`;
-            if (!pendingRequests.has(requestKey)) {
-              pendingRequests.set(requestKey, new Set());
-            }
-            pendingRequests.get(requestKey).add(interaction.user.id);
-            savePendingRequests();
-          }
+          trackRequest(tmdbId, mediaType, interaction.user.id, interaction.channelId);
 
           const imdbId = await tmdbApi.tmdbGetExternalImdb(
             tmdbId,
@@ -1090,14 +1072,7 @@ export function registerInteractions(client) {
             isAutoApproved: getSeerrAutoApprove(),
           });
 
-          if (process.env.NOTIFY_ON_AVAILABLE === "true") {
-            const requestKey = `${tmdbId}-${mediaType}`;
-            if (!pendingRequests.has(requestKey)) {
-              pendingRequests.set(requestKey, new Set());
-            }
-            pendingRequests.get(requestKey).add(interaction.user.id);
-            savePendingRequests();
-          }
+          trackRequest(tmdbId, mediaType, interaction.user.id, interaction.channelId);
 
           await interaction.followUp({
             content: `✅ **${details.title || details.name}** has been requested!`,

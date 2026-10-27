@@ -25,8 +25,19 @@ import {
   buildIdentityKey,
 } from "./jellyfin/libraryResolver.js";
 import { PersistentMap } from "./utils/persistentMap.js";
+import { takeRequestChannel } from "./bot/botState.js";
+import { fetchOpenRequests } from "./api/seerr.js";
+import { t } from "./utils/i18n.js";
+import { getUserMappings } from "./utils/configFile.js";
+import { getSeerrApiUrl } from "./utils/seerrUrl.js";
 
 const debouncedSenders = new Map();
+// Seerr request ids already announced, so repeat notifications (later
+// episodes, upgrades) don't tag the same request again.
+const announcedRequests = new PersistentMap(
+  "announced-requests",
+  5 * 365 * 24 * 60 * 60 * 1000
+);
 // Persistent so dedup state survives container restarts (otherwise a restart
 // re-notifies anything in the recently-added window via the next poll/WS reconnect).
 const sentNotifications = new PersistentMap(
@@ -151,6 +162,27 @@ function cleanTitle(title) {
     .trim();
 }
 
+// Jellyfin series id -> the show's TMDB id (episodes/seasons only carry their own)
+const seriesTmdbCache = new Map();
+
+async function resolveSeriesTmdbId(seriesId) {
+  if (!seriesId) return null;
+  if (seriesTmdbCache.has(seriesId)) return seriesTmdbCache.get(seriesId);
+  const apiKey = process.env.JELLYFIN_API_KEY;
+  const baseUrl = process.env.JELLYFIN_BASE_URL;
+  if (!apiKey || !baseUrl) return null;
+  try {
+    const { fetchItemDetails } = await import("./api/jellyfin.js");
+    const series = await fetchItemDetails(seriesId, apiKey, baseUrl);
+    const tmdb = series?.ProviderIds?.Tmdb || null;
+    if (tmdb) seriesTmdbCache.set(seriesId, tmdb);
+    return tmdb;
+  } catch (err) {
+    logger.warn(`Could not resolve series TMDB id for ${seriesId}: ${err?.message || err}`);
+    return null;
+  }
+}
+
 async function processAndSendNotification(
   data,
   client,
@@ -214,8 +246,12 @@ async function processAndSendNotification(
   const showButtonWatch = process.env.EMBED_SHOW_BUTTON_WATCH !== "false";
 
   // Check if anyone requested this content
-  const notifyEnabled = process.env.NOTIFY_ON_AVAILABLE === "true";
+  const dmEnabled = process.env.NOTIFY_ON_AVAILABLE === "true";
+  const tagEnabled = process.env.NOTIFY_TAG_REQUESTERS === "true";
+  const notifyEnabled = dmEnabled || tagEnabled;
   let usersToNotify = [];
+  let requestKey = null;
+  let requestChannelId;
 
   if (notifyEnabled && tmdbId && pendingRequests) {
     const movieKey = `${tmdbId}-movie`;
@@ -228,6 +264,8 @@ async function processAndSendNotification(
 
     if (ItemType === "Movie" && pendingRequests.has(movieKey)) {
       usersToNotify = Array.from(pendingRequests.get(movieKey));
+      requestKey = movieKey;
+      requestChannelId = takeRequestChannel(movieKey);
       pendingRequests.delete(movieKey);
       if (onPendingRequestsChanged) onPendingRequestsChanged();
       logger.info(
@@ -240,6 +278,8 @@ async function processAndSendNotification(
       pendingRequests.has(tvKey)
     ) {
       usersToNotify = Array.from(pendingRequests.get(tvKey));
+      requestKey = tvKey;
+      requestChannelId = takeRequestChannel(tvKey);
       pendingRequests.delete(tvKey);
       if (onPendingRequestsChanged) onPendingRequestsChanged();
       logger.info(
@@ -253,6 +293,38 @@ async function processAndSendNotification(
       `Notification check skipped: notifyEnabled=${notifyEnabled}, tmdbId=${tmdbId}, hasPendingRequests=${!!pendingRequests}`
     );
   }
+
+  // Requests made before tagging existed (or outside the bot) aren't tracked
+  // locally, so ask Seerr for the title's open requests and map their
+  // requesters to Discord users. Only requests still waiting on fulfilment and
+  // not yet announced count, so a later request for the same show is still
+  // tagged and a request fulfilled long ago is not. null = lookup failed or
+  // title unidentified; nothing is marked announced in that case.
+  let openRequests = null;
+  let tagUserIds = usersToNotify;
+  if (tagEnabled && !isTestNotif && process.env.SEERR_URL && process.env.SEERR_API_KEY) {
+    // An episode's/season's own Provider_tmdb is not the show's TMDB id, so
+    // resolve the show's id from its Jellyfin series item.
+    const isShowPart = ItemType === "Episode" || ItemType === "Season";
+    const lookupTmdbId = isShowPart ? await resolveSeriesTmdbId(SeriesId) : tmdbId;
+    if (lookupTmdbId) {
+      const found = await fetchOpenRequests(
+        lookupTmdbId,
+        ItemType === "Movie" ? "movie" : "tv",
+        getSeerrApiUrl(process.env.SEERR_URL),
+        process.env.SEERR_API_KEY
+      );
+      openRequests = found && found.filter((r) => !announcedRequests.has(r.id));
+    }
+    if (openRequests?.length) {
+      const seerrIds = openRequests.map((r) => r.userId);
+      const discordIds = getUserMappings()
+        .filter((m) => seerrIds.includes(String(m.seerrUserId)))
+        .map((m) => m.discordUserId);
+      tagUserIds = [...new Set([...usersToNotify, ...discordIds])];
+    }
+  }
+
   let details = null;
   if (tmdbId) {
     // Check cache first
@@ -673,6 +745,7 @@ async function processAndSendNotification(
     shouldAnnounceInChannel = false;
   }
 
+  let announceChannel = null;
   if (shouldAnnounceInChannel) {
     let channel;
     try {
@@ -681,6 +754,7 @@ async function processAndSendNotification(
       logger.error(`❌ Failed to fetch Discord channel ${channelId} for "${data.Name}" (${ItemType}): ${error.message}`);
       throw new Error(`Discord channel ${channelId} not accessible`);
     }
+    announceChannel = channel;
 
     // Check if this is a batched episode notification and we have an existing message to edit
     let editedExisting = false;
@@ -751,8 +825,18 @@ async function processAndSendNotification(
     logger.info(`${testPrefix}Sent notification for: ${embedTitle}`);
   }
 
+  // Tag requesters in the channel they requested from (falls back to the
+  // channel the notification was posted in)
+  let tagged = false;
+  if (tagEnabled && tagUserIds.length > 0) {
+    tagged = await sendRequesterTag(client, announceChannel, requestChannelId, tagUserIds, embedTitle);
+  }
+  if (openRequests?.length && (!tagEnabled || tagUserIds.length === 0 || tagged)) {
+    for (const r of openRequests) announcedRequests.set(r.id, true);
+  }
+
   // DMs are independent of the channel-announcement toggles above.
-  if (usersToNotify.length > 0) {
+  if (dmEnabled && usersToNotify.length > 0) {
     for (const userId of usersToNotify) {
       try {
         const user = await client.users.fetch(userId);
@@ -807,6 +891,30 @@ async function processAndSendNotification(
         );
       }
     }
+  }
+}
+
+/**
+ * Post the public "your request is available" message that @mentions requesters.
+ * @returns {Promise<boolean>} whether the message was sent
+ */
+async function sendRequesterTag(client, channel, requestChannelId, userIds, embedTitle) {
+  try {
+    let tagChannel = channel;
+    if (requestChannelId && requestChannelId !== channel?.id) {
+      tagChannel = await client.channels.fetch(requestChannelId).catch(() => channel);
+    }
+    if (!tagChannel) return false;
+    const mentions = userIds.map((id) => `<@${id}>`).join(" ");
+    await tagChannel.send({
+      content: `${mentions} ${t("bot.notifications.request_available_tag", { title: embedTitle })}`,
+      allowedMentions: { users: userIds },
+    });
+    logger.info(`Tagged ${userIds.length} requester(s) for ${embedTitle}`);
+    return true;
+  } catch (err) {
+    logger.error(`Failed to tag requesters for ${embedTitle}:`, err?.message || err);
+    return false;
   }
 }
 

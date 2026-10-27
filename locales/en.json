@@ -196,6 +196,8 @@
     "auto_start_label": "Auto-start bot on server boot",
     "auto_start_help": "If enabled, the bot starts automatically when the container/server restarts and valid Discord credentials are present.",
     "notify_on_available_label": "Send PM when request is available",
+    "notify_tag_requesters_label": "Tag requesters in channel when available",
+    "notify_tag_requesters_help": "When enabled, requesters are tagged publicly in the channel they requested from once their request becomes available, and each request is only announced once. Also works for requests made outside the bot (requires user mappings; those are tagged in the notification channel). Privacy: this publicly shows who requested what, even if the request was made with an ephemeral reply.",
     "notify_on_available_help": "When enabled, users will receive a private message when their requested content becomes available on Jellyfin.",
     "ephemeral_mode_label": "Ephemeral Message Mode",
     "ephemeral_mode_help": "When enabled, all bot responses are sent as ephemeral messages (only visible to the user who used the command). When disabled, successful results are visible to everyone in the channel.",
@@ -312,7 +314,8 @@
       "movie_added": "Movie added to library",
       "series_added": "Series added to library",
       "episode_added": "New episode available",
-      "season_added": "New season available"
+      "season_added": "New season available",
+      "request_available_tag": "✅ Your request **{title}** is now available!"
     }
   },
   "errors": {
