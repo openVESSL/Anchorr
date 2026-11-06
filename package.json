@@ -29,7 +29,7 @@
     "ws": "^8.18.0"
   },
   "overrides": {
-    "follow-redirects": "^1.16.0",
+    "follow-redirects": "^1.16.1",
     "undici": "^6.26.1",
     "body-parser": "^1.20.6"
   }
