@@ -144,9 +144,7 @@ export function parseQualityAndServerOptions(options, mediaType, isAnime = false
   return { profileId, serverId };
 }
 
-export function checkRolePermission(member) {
-  if (!member || !member.roles) return true;
-
+export function checkRolePermission(member, guildId) {
   let allowlist = [];
   let blocklist = [];
   try {
@@ -159,6 +157,16 @@ export function checkRolePermission(member) {
   } catch (e) {
     logger.error(`Invalid JSON in ROLE_BLOCKLIST — blocklist disabled, no users blocked: ${e.message}`);
   }
+
+  if (allowlist.length === 0 && blocklist.length === 0) return true;
+
+  // Roles are only meaningful in the configured guild; DMs and other guilds are denied
+  if (!member?.roles?.cache) return false;
+  if (!process.env.GUILD_ID) {
+    logger.warn("Role lists are set but GUILD_ID is empty — denying interaction");
+    return false;
+  }
+  if (guildId !== process.env.GUILD_ID) return false;
 
   const userRoles = member.roles.cache.map((r) => r.id);
 

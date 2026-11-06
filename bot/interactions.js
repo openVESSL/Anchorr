@@ -317,16 +317,16 @@ async function handleSearchOrRequest(
 export function registerInteractions(client) {
   client.on("interactionCreate", async (interaction) => {
     try {
-      // Check role permissions for all commands, buttons, and select menus
+      // Check role permissions for all commands, buttons, select menus, and autocomplete
       if (
         interaction.isCommand() ||
         interaction.isButton() ||
-        (interaction.isStringSelectMenu() &&
-          !interaction.customId.startsWith("request_seasons|") &&
-          !interaction.customId.startsWith("request_with_tags|"))
+        interaction.isStringSelectMenu() ||
+        interaction.isAutocomplete()
       ) {
-        if (!checkRolePermission(interaction.member)) {
-          return interaction.reply({
+        if (!checkRolePermission(interaction.member, interaction.guildId)) {
+          if (interaction.isAutocomplete()) return await interaction.respond([]);
+          return await interaction.reply({
             content: "❌ You don't have permission to use this command.",
             flags: 64,
           });
