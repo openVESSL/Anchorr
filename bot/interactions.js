@@ -326,8 +326,15 @@ export function registerInteractions(client) {
       ) {
         if (!checkRolePermission(interaction.member, interaction.guildId)) {
           if (interaction.isAutocomplete()) return await interaction.respond([]);
+          logger.info(
+            `[PERMISSION] Denied interaction from user ${interaction.user.id} (${interaction.guildId ? `guild ${interaction.guildId}` : "DM"})`
+          );
           return await interaction.reply({
-            content: "❌ You don't have permission to use this command.",
+            content: t(
+              interaction.guildId
+                ? "permission_errors.denied"
+                : "permission_errors.dm_denied"
+            ),
             flags: 64,
           });
         }
