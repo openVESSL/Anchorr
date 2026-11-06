@@ -942,6 +942,16 @@
 
                       <div class="form-group" style="margin-top: 1.5rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                          <input type="checkbox" id="NOTIFY_TAG_REQUESTERS" name="NOTIFY_TAG_REQUESTERS" />
+                          <span data-i18n="config.notify_tag_requesters_label">Tag requesters in channel when available</span>
+                        </label>
+                        <div class="form-text" data-i18n="config.notify_tag_requesters_help">
+                          When enabled, requesters are tagged publicly in the channel they requested from once their request becomes available, and each request is only announced once. Also works for requests made outside the bot (requires user mappings; those are tagged in the notification channel). Privacy: this publicly shows who requested what, even if the request was made with an ephemeral reply.
+                        </div>
+                      </div>
+
+                      <div class="form-group" style="margin-top: 1.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                           <input type="checkbox" id="PRIVATE_MESSAGE_MODE" name="PRIVATE_MESSAGE_MODE" />
                           <span data-i18n="config.ephemeral_mode_label">Ephemeral Message Mode</span>
                         </label>

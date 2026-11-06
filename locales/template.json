@@ -196,6 +196,8 @@
     "auto_start_label": "",
     "auto_start_help": "",
     "notify_on_available_label": "",
+    "notify_tag_requesters_label": "",
+    "notify_tag_requesters_help": "",
     "notify_on_available_help": "",
     "ephemeral_mode_label": "",
     "ephemeral_mode_help": "",
@@ -312,7 +314,8 @@
       "movie_added": "",
       "series_added": "",
       "episode_added": "",
-      "season_added": ""
+      "season_added": "",
+      "request_available_tag": ""
     }
   },
   "errors": {
