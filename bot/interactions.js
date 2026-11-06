@@ -318,16 +318,24 @@ async function handleSearchOrRequest(
 export function registerInteractions(client) {
   client.on("interactionCreate", async (interaction) => {
     try {
-      // Check role permissions for all commands
+      // Check role permissions for all commands, buttons, select menus, and autocomplete
       if (
         interaction.isCommand() ||
-        (interaction.isStringSelectMenu() &&
-          !interaction.customId.startsWith("request_seasons|") &&
-          !interaction.customId.startsWith("request_with_tags|"))
+        interaction.isButton() ||
+        interaction.isStringSelectMenu() ||
+        interaction.isAutocomplete()
       ) {
-        if (!checkRolePermission(interaction.member)) {
-          return interaction.reply({
-            content: "❌ You don't have permission to use this command.",
+        if (!checkRolePermission(interaction.member, interaction.guildId)) {
+          if (interaction.isAutocomplete()) return await interaction.respond([]);
+          logger.info(
+            `[PERMISSION] Denied interaction from user ${interaction.user.id} (${interaction.guildId ? `guild ${interaction.guildId}` : "DM"})`
+          );
+          return await interaction.reply({
+            content: t(
+              interaction.guildId
+                ? "permission_errors.denied"
+                : "permission_errors.dm_denied"
+            ),
             flags: 64,
           });
         }

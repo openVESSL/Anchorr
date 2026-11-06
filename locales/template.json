@@ -430,5 +430,9 @@
     "generic": "⚠️ Seerr error: {msg}",
     "unreachable": "⚠️ Could not reach Seerr. Check that your Seerr URL is correct and reachable.",
     "unknown": "⚠️ An error occurred: {msg}"
+  },
+  "permission_errors": {
+    "denied": "",
+    "dm_denied": ""
   }
 }

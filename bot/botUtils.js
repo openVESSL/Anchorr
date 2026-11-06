@@ -145,21 +145,54 @@ export function parseQualityAndServerOptions(options, mediaType, isAnime = false
   return { profileId, serverId };
 }
 
-export function checkRolePermission(member) {
-  if (!member || !member.roles) return true;
+// Config problems are logged when they appear, not on every interaction
+const activeRoleConfigErrors = new Map();
+function reportRoleConfigError(name, value, message) {
+  if (activeRoleConfigErrors.get(name) === value) return;
+  activeRoleConfigErrors.set(name, value);
+  logger.error(message);
+}
 
-  let allowlist = [];
-  let blocklist = [];
-  try {
-    allowlist = process.env.ROLE_ALLOWLIST ? JSON.parse(process.env.ROLE_ALLOWLIST) : [];
-  } catch (e) {
-    logger.error(`Invalid JSON in ROLE_ALLOWLIST — allowlist disabled, all users permitted: ${e.message}`);
+// Returns the parsed role ID list, or null if the value is set but invalid
+function parseRoleList(name) {
+  const raw = process.env[name];
+  if (!raw) {
+    activeRoleConfigErrors.delete(name);
+    return [];
   }
+  let parsed;
   try {
-    blocklist = process.env.ROLE_BLOCKLIST ? JSON.parse(process.env.ROLE_BLOCKLIST) : [];
-  } catch (e) {
-    logger.error(`Invalid JSON in ROLE_BLOCKLIST — blocklist disabled, no users blocked: ${e.message}`);
+    parsed = JSON.parse(raw);
+  } catch {
+    reportRoleConfigError(name, raw, `Invalid JSON in ${name}: denying role-restricted interactions`);
+    return null;
   }
+  if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+    activeRoleConfigErrors.delete(name);
+    return parsed;
+  }
+  reportRoleConfigError(name, raw, `${name} is not an array of role IDs: denying role-restricted interactions`);
+  return null;
+}
+
+export function checkRolePermission(member, guildId) {
+  const allowlist = parseRoleList("ROLE_ALLOWLIST");
+  const blocklist = parseRoleList("ROLE_BLOCKLIST");
+  if (allowlist === null || blocklist === null) return false;
+
+  if (allowlist.length === 0 && blocklist.length === 0) {
+    activeRoleConfigErrors.delete("GUILD_ID");
+    return true;
+  }
+
+  // Roles are only meaningful in the configured guild; DMs and other guilds are denied
+  if (!member?.roles?.cache) return false;
+  if (!process.env.GUILD_ID) {
+    reportRoleConfigError("GUILD_ID", "", "Role lists are set but GUILD_ID is empty: denying role-restricted interactions");
+    return false;
+  }
+  activeRoleConfigErrors.delete("GUILD_ID");
+  if (guildId !== process.env.GUILD_ID) return false;
 
   const userRoles = member.roles.cache.map((r) => r.id);
 
