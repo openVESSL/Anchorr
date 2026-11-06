@@ -8,6 +8,8 @@ import {
   loadConfigToEnv,
 } from "../utils/configFile.js";
 import { botState } from "../bot/botState.js";
+import * as seerrApi from "../api/seerr.js";
+import { getSeerrApiUrl } from "../utils/seerrUrl.js";
 import logger from "../utils/logger.js";
 
 const router = Router();
@@ -85,6 +87,68 @@ router.post(
         success: false,
         message: "Failed to save mapping - check server logs.",
       });
+    }
+  }
+);
+
+// Quality profiles (from Radarr/Sonarr via Seerr) for the per-user dropdowns
+router.get("/quality-profiles", authenticateToken, async (req, res) => {
+  if (!process.env.SEERR_URL || !process.env.SEERR_API_KEY) {
+    return res.status(400).json({ success: false, message: "Seerr is not configured." });
+  }
+  try {
+    const profiles = await seerrApi.fetchQualityProfiles(
+      getSeerrApiUrl(process.env.SEERR_URL),
+      process.env.SEERR_API_KEY
+    );
+    res.json({ success: true, profiles });
+  } catch (error) {
+    logger.error("Failed to fetch quality profiles:", error.message);
+    res.status(500).json({ success: false, message: "Failed to fetch quality profiles." });
+  }
+});
+
+// Set (or clear, with "") the default quality profile for a user's movie / TV requests.
+// Values use the same "profileId|serverId|type" format as the /request quality option.
+router.put(
+  "/user-mappings/:discordUserId/quality-profiles",
+  authenticateToken,
+  (req, res) => {
+    const { discordUserId } = req.params;
+    const existing = getUserMappings().find((m) => m.discordUserId === discordUserId);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Mapping not found." });
+    }
+
+    const qualityProfiles = { ...(existing.qualityProfiles || {}) };
+    for (const [mediaType, type] of [["movie", "radarr"], ["tv", "sonarr"]]) {
+      if (!(mediaType in (req.body || {}))) continue;
+      const value = req.body[mediaType];
+      if (value === "" || value === null) {
+        delete qualityProfiles[mediaType];
+      } else if (typeof value === "string" && new RegExp(`^\\d+\\|\\d+\\|${type}$`).test(value)) {
+        qualityProfiles[mediaType] = value;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid ${mediaType} quality profile.`,
+        });
+      }
+    }
+
+    try {
+      const updated = { ...existing };
+      if (Object.keys(qualityProfiles).length > 0) {
+        updated.qualityProfiles = qualityProfiles;
+      } else {
+        delete updated.qualityProfiles;
+      }
+      saveUserMapping(updated);
+      loadConfigToEnv();
+      res.json({ success: true, qualityProfiles: updated.qualityProfiles || {} });
+    } catch (error) {
+      logger.error("Error saving quality profiles:", error);
+      res.status(500).json({ success: false, message: "Failed to save - check server logs." });
     }
   }
 );

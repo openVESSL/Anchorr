@@ -347,6 +347,11 @@
     "webhook_url_copied": ""
   },
   "user_mapping": {
+    "quality_default": "",
+    "quality_movie": "",
+    "quality_tv": "",
+    "quality_saved": "",
+    "quality_save_failed": "",
     "mapping_removed": "",
     "mapping_added": "",
     "no_mappings_selected": "",

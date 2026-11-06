@@ -347,6 +347,11 @@
     "webhook_url_copied": "Webhook URL copied to clipboard!"
   },
   "user_mapping": {
+    "quality_default": "Default",
+    "quality_movie": "Movie quality",
+    "quality_tv": "TV quality",
+    "quality_saved": "Quality profile saved",
+    "quality_save_failed": "Failed to save quality profile",
     "mapping_removed": "Mapping removed successfully!",
     "mapping_added": "Mapping added successfully!",
     "no_mappings_selected": "No mappings selected.",

@@ -2520,6 +2520,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     trigger.setAttribute("readonly", "");
   }
 
+  // Quality profiles (Radarr/Sonarr via Seerr) for the per-user dropdowns
+  let qualityProfiles = [];
+  let qualityProfilesLoaded = false;
+
+  async function loadQualityProfiles() {
+    if (qualityProfilesLoaded) return;
+    try {
+      const response = await fetch("/api/quality-profiles");
+      if (!response.ok) return;
+      const data = await response.json();
+      qualityProfiles = Array.isArray(data.profiles) ? data.profiles : [];
+      qualityProfilesLoaded = qualityProfiles.length > 0;
+    } catch (error) {
+      console.warn("[MAPPINGS] Could not load quality profiles:", error);
+    }
+  }
+
   async function loadMappings() {
     try {
       const response = await fetch("/api/user-mappings");
@@ -2548,6 +2565,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (needsUpdate && membersLoaded && usersLoaded) {
         await updateMappingsMetadata();
       }
+
+      await loadQualityProfiles();
 
       // Display mappings (with avatars if members loaded)
       displayMappings();
@@ -2601,6 +2620,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       console.error("[MAPPINGS] Failed to reload after update:", error);
     }
+  }
+
+  function qualitySelectHtml(mapping, mediaType, serverType, label) {
+    const profiles = qualityProfiles.filter((p) => p.type === serverType);
+    if (profiles.length === 0) return "";
+    const current = mapping.qualityProfiles?.[mediaType] || "";
+    const options = profiles
+      .map((p) => {
+        const value = `${p.id}|${p.serverId}|${p.type}`;
+        return `<option value="${escapeHtml(value)}"${value === current ? " selected" : ""}>${escapeHtml(
+          `${p.name} (${p.serverName})`
+        )}</option>`;
+      })
+      .join("");
+    return `
+      <label style="display: flex; flex-direction: column; font-size: 0.8rem; opacity: 0.9;">
+        ${escapeHtml(label)}
+        <select class="mapping-quality-select" data-discord-id="${escapeHtml(
+          mapping.discordUserId
+        )}" data-media-type="${mediaType}" style="min-width: 160px; margin-top: 0.2rem;">
+          <option value="">${escapeHtml(t('user_mapping.quality_default'))}</option>
+          ${options}
+        </select>
+      </label>`;
   }
 
   function displayMappings() {
@@ -2668,15 +2711,48 @@ document.addEventListener("DOMContentLoaded", async () => {
               )}</div>
             </div>
           </div>
-          <button class="btn btn-danger btn-sm" onclick="deleteMapping('${
-            escapeHtml(mapping.discordUserId)
-          }')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
-            <i class="bi bi-trash"></i> Remove
-          </button>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            ${qualitySelectHtml(mapping, "movie", "radarr", t('user_mapping.quality_movie'))}
+            ${qualitySelectHtml(mapping, "tv", "sonarr", t('user_mapping.quality_tv'))}
+            <button class="btn btn-danger btn-sm" onclick="deleteMapping('${
+              escapeHtml(mapping.discordUserId)
+            }')" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+              <i class="bi bi-trash"></i> Remove
+            </button>
+          </div>
         </div>
       `;
       })
       .join("");
+  }
+
+  const mappingsListEl = document.getElementById("mappings-list");
+  if (mappingsListEl) {
+    mappingsListEl.addEventListener("change", async (event) => {
+      const select = event.target.closest(".mapping-quality-select");
+      if (!select) return;
+      const { discordId, mediaType } = select.dataset;
+      try {
+        const response = await fetch(
+          `/api/user-mappings/${encodeURIComponent(discordId)}/quality-profiles`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ [mediaType]: select.value }),
+          }
+        );
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || t('user_mapping.quality_save_failed'));
+        }
+        const mapping = currentMappings.find((m) => m.discordUserId === discordId);
+        if (mapping) mapping.qualityProfiles = result.qualityProfiles;
+        showToast(t('user_mapping.quality_saved'));
+      } catch (error) {
+        showToast(error.message || t('user_mapping.quality_save_failed'));
+        await loadMappings();
+      }
+    });
   }
 
   window.deleteMapping = async function (discordUserId) {
