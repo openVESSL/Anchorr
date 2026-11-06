@@ -131,6 +131,8 @@
     "reseed_library_help": "",
     "jellyfin_server_id": "",
     "jellyfin_server_id_help": "",
+    "jellyfin_polling_label": "",
+    "jellyfin_polling_help": "",
     "notification_testing_title": "",
     "notification_testing_help": "",
     "test_movie_notification": "",

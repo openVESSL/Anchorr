@@ -5,7 +5,8 @@ import {
   REST,
 } from "discord.js";
 import { registerCommands } from "../discord/commands.js";
-import { botState, loadPendingRequests } from "./botState.js";
+import { botState, pendingRequests, loadPendingRequests } from "./botState.js";
+import { jellyfinPoller } from "../jellyfinPoller.js";
 import { registerInteractions } from "./interactions.js";
 import { scheduleDailyRandomPick } from "./dailyPick.js";
 import { start as startRoundupScheduler } from "./roundupScheduler.js";
@@ -70,6 +71,9 @@ export async function startBot() {
       botState.isBotRunning = true;
 
       logger.info("ℹ️ Jellyfin notifications will be received via webhooks.");
+
+      // Optional fallback: poll Jellyfin for recently added items (JELLYFIN_POLLING_ENABLED=true)
+      jellyfinPoller.start(client, pendingRequests);
 
       scheduleDailyRandomPick(client);
       startRoundupScheduler(client);
