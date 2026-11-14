@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<CommunityApplications>
+  <Profile>Official Unraid template for Anchorr, maintained by openVESSL. Anchorr is a Discord bot for requesting movies and TV shows via Seerr and posting notifications when new content arrives in your Jellyfin library. Bug reports and support via GitHub Issues.</Profile>
+  <Icon>https://raw.githubusercontent.com/openVESSL/Anchorr/main/assets/logo.png</Icon>
+  <WebPage>https://github.com/openVESSL/Anchorr</WebPage>
+  <Forum>https://github.com/openVESSL/Anchorr/issues</Forum>
+</CommunityApplications>
