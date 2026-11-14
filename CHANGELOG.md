@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.4] - 2026-11-14
+
+### 🔒 Security
+
+- **Dependencies updated** to clear new advisories in undici, joi, qs, body-parser and follow-redirects, including a TLS certificate validation bypass in undici.
+
+No configuration change is needed.
+
+---
+
 ## [1.6.3] - 2026-10-23
 
 > **⚠️ Security update, upgrading is strongly recommended.** Previous Docker images run on Node.js 18, which is affected by CVE-2026-111497 (possible remote code execution via Brotli) and will not receive a fix. This release switches the image to Node.js 22. Running without Docker? Use Node.js 22 (22.23.4 or later), 24 (24.22.1 or later) or 26 (26.12.1 or later).
