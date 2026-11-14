@@ -2,25 +2,20 @@
 <Container version="2">
   <Name>Anchorr</Name>
   <Repository>nairdah/anchorr:latest</Repository>
-  <Registry>https://hub.docker.com/r/nairdah/anchorr/</Registry>
+  <Registry>https://hub.docker.com/r/nairdah/anchorr</Registry>
   <Network>bridge</Network>
-  <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://forums.unraid.net/topic/196118-support-anchorr-discord-bot-for-requesting-moviestv-and-receiving-notifications-when-items-are-added-to-your-media-server/</Support>
-  <Project>https://github.com/nairdahh/Anchorr</Project>
-  <Overview>Discord bot for requesting movies/TV and receiving notifications when items are added to your Jellyfin server.</Overview>
-  <Category>Tools:</Category>
-  <WebUI>http://[IP]:8282</WebUI>
-  <TemplateURL/>
-  <Icon>https://raw.githubusercontent.com/nairdahh/Anchorr/refs/heads/main/assets/logo.png</Icon>
-  <ExtraParams/>
-  <PostArgs/>
-  <CPUset/>
-  <DonateText/>
-  <DonateLink/>
-  <Requires/>
-  <Config Name="Host Path 1" Target="/config" Default="" Mode="rw" Description="" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/anchorr</Config>
-  <Config Name="Host Port 1" Target="8282" Default="8282" Mode="tcp" Description="Web UI port" Type="Port" Display="always" Required="false" Mask="false">8282</Config>
-  <TailscaleStateDir/>
+  <Support>https://github.com/openVESSL/Anchorr/issues</Support>
+  <Project>https://github.com/openVESSL/Anchorr</Project>
+  <Overview>Discord bot for requesting movies and TV shows via Seerr and posting notifications when new content arrives in your Jellyfin library. Configure everything in the web dashboard after the first start.</Overview>
+  <Category>MediaServer:Other</Category>
+  <WebUI>http://[IP]:[PORT:8282]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/openVESSL/Anchorr/main/anchorr.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/openVESSL/Anchorr/main/assets/logo.png</Icon>
+  <Changes>Release notes: https://github.com/openVESSL/Anchorr/blob/main/CHANGELOG.md</Changes>
+  <Requires>A running Jellyfin server and Seerr (Jellyseerr) instance, plus a Discord bot token.</Requires>
+  <Config Name="WebUI Port" Target="8282" Default="8282" Mode="tcp" Description="Port for the web dashboard and the Jellyfin webhook endpoint." Type="Port" Display="always" Required="true" Mask="false">8282</Config>
+  <Config Name="Config" Target="/usr/src/app/config" Default="/mnt/user/appdata/anchorr" Mode="rw" Description="Stores config.json and notification state. Required, or settings are lost on container updates." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/anchorr</Config>
+  <Config Name="Bind Host" Target="BIND_HOST" Default="0.0.0.0" Mode="" Description="Address the dashboard listens on inside the container. Keep 0.0.0.0, otherwise the WebUI is unreachable." Type="Variable" Display="advanced" Required="true" Mask="false">0.0.0.0</Config>
 </Container>
