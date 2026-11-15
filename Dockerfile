@@ -59,6 +59,8 @@ LABEL org.opencontainers.image.title="Anchorr" \
 
 # set production mode
 ENV NODE_ENV=production
+# Inside a container the app must listen on all interfaces; -p decides what is exposed
+ENV BIND_HOST=0.0.0.0
 
 # Declare config directory as a persistent volume
 # This ensures data persists when container is recreated/updated
