@@ -206,12 +206,3 @@ export function checkRolePermission(member, guildId) {
 
   return true;
 }
-
-export function getSeerrAutoApprove() {
-  const val = settings.SEERR_AUTO_APPROVE;
-  const isAuto = val === "true";
-  logger.info(
-    `[CONFIG CHECK] SEERR_AUTO_APPROVE is currently: ${val} (Evaluated to: ${isAuto})`
-  );
-  return isAuto;
-}

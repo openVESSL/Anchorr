@@ -421,6 +421,7 @@
     "server_error": "⚠️ Seerr returnerade ett serverfel. Försök igen senare.",
     "generic": "⚠️ Seerr-fel: {msg}",
     "unreachable": "⚠️ Kunde inte nå Seerr. Kontrollera att Seerr-URL:en är korrekt och nåbar.",
-    "unknown": "⚠️ Ett fel uppstod: {msg}"
+    "unknown": "⚠️ Ett fel uppstod: {msg}",
+    "not_linked": "⚠️ Ditt Discord-konto är inte kopplat till Seerr och gästförfrågningar är inte tillgängliga just nu. Be en admin att koppla ditt konto."
   }
 }

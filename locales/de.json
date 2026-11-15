@@ -491,7 +491,8 @@
     "server_error": "⚠️ Seerr hat einen Serverfehler zurückgegeben. Versuche es später erneut.",
     "generic": "⚠️ Seerr-Fehler: {msg}",
     "unreachable": "⚠️ Seerr konnte nicht erreicht werden. Prüfe, ob die Seerr-URL korrekt und erreichbar ist.",
-    "unknown": "⚠️ Ein Fehler ist aufgetreten: {msg}"
+    "unknown": "⚠️ Ein Fehler ist aufgetreten: {msg}",
+    "not_linked": "⚠️ Dein Discord-Konto ist nicht mit Seerr verknüpft und Gastanfragen sind gerade nicht verfügbar. Bitte einen Admin, dein Konto zu verknüpfen."
   },
   "permission_errors": {
     "denied": "❌ Du hast keine Berechtigung, diesen Befehl zu verwenden.",

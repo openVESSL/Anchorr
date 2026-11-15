@@ -45,6 +45,7 @@ const { pendingRequests } = await import("../bot/botState.js");
 
 let seerr;
 let dispatch;
+let guestCreationFails = false;
 before(async () => {
   seerr = await startFakeServer({
     ...Object.fromEntries(Object.entries(MOVIES).map(([id, m]) => [`GET /api/v1/movie/${id}`, () => m])),
@@ -63,6 +64,8 @@ before(async () => {
     "GET /api/v1/service/sonarr": () => [{ id: 1, name: "Sonarr", isDefault: true }],
     "GET /api/v1/service/radarr/0": () => ({ profiles: [{ id: 4, name: "HD-1080p" }], tags: [{ id: 3, label: "kids" }] }),
     "GET /api/v1/service/sonarr/1": () => ({ profiles: [{ id: 6, name: "WEB-720p" }], tags: [{ id: 7, label: "anime" }] }),
+    "POST /api/v1/user": () => (guestCreationFails ? { status: 500, json: { message: "nope" } } : { status: 201, json: { id: 500 } }),
+    "GET /api/v1/user/500": () => ({ id: 500, permissions: 32 }),
     "POST /api/v1/request": ({ body }) =>
       body.mediaId === 605 ? { status: 403, json: { message: "Movie Quota exceeded" } } : { status: 201, json: { id: 99 } },
   });
@@ -85,7 +88,7 @@ after(() => seerr.close());
 const MAUVE_SUCCESS = 0xa6e3a1;
 const PEACH_SEARCH = 0xfab387;
 
-const posts = () => seerr.requests.filter((r) => r.method === "POST");
+const posts = () => seerr.requests.filter((r) => r.method === "POST" && r.path === "/api/v1/request");
 const lastPost = () => posts().at(-1);
 const command = (commandName, options) => createInteraction({ type: "command", commandName, options });
 const autocomplete = (commandName, focused, options = {}) =>
@@ -132,7 +135,7 @@ test("/request movie: requests as the mapped Seerr user and remembers the reques
 
   const post = lastPost();
   assert.equal(post.headers["x-api-user"], "42");
-  assert.deepEqual(post.body, { mediaType: "movie", mediaId: 603, isAutoApproved: false });
+  assert.deepEqual(post.body, { mediaType: "movie", mediaId: 603 });
 
   const [embed] = calls.at(-1).embeds;
   assert.equal(embed.author.name, "✅ Successfully requested!");
@@ -230,7 +233,7 @@ test("picking a season enables the Request button for that season", async () => 
 test("Request button for chosen seasons requests exactly those seasons", async () => {
   const calls = await dispatch(button("request_btn|1399|tv|1,2|"));
   assert.equal(lastPost().headers["x-api-user"], "42");
-  assert.deepEqual(lastPost().body, { mediaType: "tv", mediaId: 1399, seasons: [1, 2], isAutoApproved: false });
+  assert.deepEqual(lastPost().body, { mediaType: "tv", mediaId: 1399, seasons: [1, 2] });
   assert.equal(calls.at(-1).embeds[0].author.name, "✅ Successfully requested!");
   assert.deepEqual(buttons(calls.at(-1)).at(-1), ["Requested seasons 1 and 2, stay tuned!", "requested|1399|tv", true]);
 });
@@ -239,7 +242,7 @@ test("Request button for a movie requests it", async () => {
   const before = posts().length;
   await dispatch(button("request_btn|603|movie||"));
   assert.equal(posts().length, before + 1);
-  assert.deepEqual(lastPost().body, { mediaType: "movie", mediaId: 603, isAutoApproved: false });
+  assert.deepEqual(lastPost().body, { mediaType: "movie", mediaId: 603 });
 });
 
 test("the disabled Requested button explains itself", async () => {
@@ -249,7 +252,7 @@ test("the disabled Requested button explains itself", async () => {
 
 test("Daily Random Pick button requests the title and confirms privately", async () => {
   const calls = await dispatch(button("request_random_603_movie"));
-  assert.deepEqual(lastPost().body, { mediaType: "movie", mediaId: 603, isAutoApproved: false });
+  assert.deepEqual(lastPost().body, { mediaType: "movie", mediaId: 603 });
   assert.deepEqual(calls.at(-1), { method: "followUp", content: "✅ **The Matrix** has been requested!", flags: 64 });
 });
 
@@ -307,4 +310,29 @@ test("denied users get a private message; denied autocomplete returns nothing", 
   const dm = await dispatch(createInteraction({ type: "button", customId: "request_btn|603|movie||", guildId: null, member: null }));
   assert.deepEqual(dm, [{ method: "reply", content: translate("permission_errors.dm_denied"), flags: 64 }]);
   assert.equal(posts().length, before);
+});
+
+// ----- Discord users without a mapping (audit S1) -----
+
+test("unmapped user, guest account cannot be created: told to link, nothing requested as admin", async () => {
+  guestCreationFails = true;
+  const before = posts().length;
+  const calls = await dispatch(createInteraction({ type: "command", commandName: "request", options: { title: "603|movie" }, userId: "user-2" }));
+  guestCreationFails = false;
+
+  assert.equal(posts().length, before);
+  assert.deepEqual(calls.at(-1), { method: "followUp", content: translate("seerr_request_errors.not_linked"), flags: 64 });
+});
+
+test("unmapped user requests through the guest account, which is created once and remembered", async () => {
+  const userPosts = () => seerr.requests.filter((r) => r.method === "POST" && r.path === "/api/v1/user").length;
+  const created = userPosts();
+
+  await dispatch(createInteraction({ type: "command", commandName: "request", options: { title: "603|movie" }, userId: "user-2" }));
+  assert.equal(lastPost().headers["x-api-user"], "500");
+  assert.equal(userPosts(), created + 1);
+
+  await dispatch(createInteraction({ type: "button", customId: "request_btn|603|movie||", userId: "user-3" }));
+  assert.equal(lastPost().headers["x-api-user"], "500");
+  assert.equal(userPosts(), created + 1, "the saved guest id is reused");
 });

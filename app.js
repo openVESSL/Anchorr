@@ -32,6 +32,7 @@ import jellyfinRouter from "./routes/jellyfinRoutes.js";
 import { botState, pendingRequests, savePendingRequests } from "./bot/botState.js";
 import { createBotRoutes } from "./routes/botRoutes.js";
 import { startBot } from "./bot/botManager.js";
+import { setGuestAutoApprove } from "./api/seerr.js";
 import {
   CONFIG_PATH,
   readConfig,
@@ -589,6 +590,7 @@ function configureWebServer() {
       const oldToken = settings.DISCORD_TOKEN;
       const oldGuildId = settings.GUILD_ID;
       const oldJellyfinApiKey = settings.JELLYFIN_API_KEY;
+      const oldAutoApprove = settings.SEERR_AUTO_APPROVE;
 
       // Normalize SEERR_URL to remove /api/v1 suffix if present
       if (
@@ -657,6 +659,16 @@ function configureWebServer() {
       }
 
       loadConfig(); // Reload config into the settings store
+
+      // The auto-approve switch only governs the guest account; mapped users keep their own Seerr permissions
+      if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE && settings.SEERR_GUEST_USER_ID) {
+        setGuestAutoApprove({
+          seerrUrl: settings.SEERR_URL,
+          apiKey: settings.SEERR_API_KEY,
+          guestUserId: settings.SEERR_GUEST_USER_ID,
+          autoApprove: settings.SEERR_AUTO_APPROVE === "true",
+        }).catch((err) => logger.warn(`Could not update the guest account's auto-approve permission: ${err.message}`));
+      }
 
       // Check if Discord credentials are complete and changed
       const hasDiscordCreds = settings.DISCORD_TOKEN && settings.BOT_ID;

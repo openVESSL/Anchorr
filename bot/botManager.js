@@ -7,6 +7,7 @@ import {
 import { registerCommands } from "../discord/commands.js";
 import { botState, loadPendingRequests } from "./botState.js";
 import { registerInteractions } from "./interactions.js";
+import { prepareGuestUser } from "./guestUser.js";
 import { scheduleDailyRandomPick } from "./dailyPick.js";
 import { start as startRoundupScheduler } from "./roundupScheduler.js";
 import { loadSettings } from "../utils/configFile.js";
@@ -36,6 +37,9 @@ export async function startBot() {
       `Bot cannot start. Missing required Discord variables: ${missing.join(", ")}`
     );
   }
+
+  // Not awaited: requests that arrive before it finishes wait for the same attempt
+  prepareGuestUser();
 
   const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],

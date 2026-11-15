@@ -424,7 +424,8 @@
     "server_error": "⚠️ Seerr returned a server error. Try again later.",
     "generic": "⚠️ Seerr error: {msg}",
     "unreachable": "⚠️ Could not reach Seerr. Check that your Seerr URL is correct and reachable.",
-    "unknown": "⚠️ An error occurred: {msg}"
+    "unknown": "⚠️ An error occurred: {msg}",
+    "not_linked": "⚠️ Your Discord account is not linked to Seerr and guest requests are unavailable right now. Ask an admin to link your account."
   },
   "permission_errors": {
     "denied": "",

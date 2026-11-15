@@ -6,7 +6,6 @@ import {
   getOptionStringRobust,
   parseQualityAndServerOptions,
   checkRolePermission,
-  getSeerrAutoApprove,
 } from "./botUtils.js";
 import {
   botState,
@@ -14,6 +13,7 @@ import {
   savePendingRequests,
 } from "./botState.js";
 import { getUserMappings } from "../utils/configFile.js";
+import { getGuestUserId } from "./guestUser.js";
 import { getSeerrApiUrl } from "../utils/seerrUrl.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
@@ -62,6 +62,9 @@ async function getKnownSonarrTags(tagLabels) {
 
 // Returns a user-facing error message for a failed Seerr request.
 function getSeerrErrorMessage(err) {
+  if (err?.name === "NoSeerrUserError") {
+    return t("seerr_request_errors.not_linked");
+  }
   if (err.response) {
     const status = err.response.status;
     const msg = err.response.data?.message || "";
@@ -236,10 +239,10 @@ async function handleSearchOrRequest(
         apiKey: getSeerrApiKey(),
         discordUserId: interaction.user.id,
         userMappings: getUserMappings(),
-        isAutoApproved: getSeerrAutoApprove(),
+        guestUserId: getGuestUserId,
       });
       logger.info(
-        `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
+        `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}${isAnime ? " [anime]" : ""}`
       );
 
       if (settings.NOTIFY_ON_AVAILABLE === "true") {
@@ -780,11 +783,11 @@ export function registerInteractions(client) {
             apiKey: getSeerrApiKey(),
             discordUserId: interaction.user.id,
             userMappings: getUserMappings(),
-            isAutoApproved: getSeerrAutoApprove(),
+            guestUserId: getGuestUserId,
           });
           pendingRequestOptions.delete(pendingOptionsKey(interaction.user.id, mediaType, tmdbId));
           logger.info(
-            `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
+            `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}${isAnime ? " [anime]" : ""}`
           );
 
           if (settings.NOTIFY_ON_AVAILABLE === "true") {
@@ -1122,7 +1125,7 @@ export function registerInteractions(client) {
             apiKey: getSeerrApiKey(),
             discordUserId: interaction.user.id,
             userMappings: getUserMappings(),
-            isAutoApproved: getSeerrAutoApprove(),
+            guestUserId: getGuestUserId,
           });
 
           if (settings.NOTIFY_ON_AVAILABLE === "true") {
