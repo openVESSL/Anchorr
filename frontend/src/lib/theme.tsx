@@ -1,8 +1,8 @@
-// Catppuccin flavor + accent, saved in this browser. "auto" follows the system: Latte when
-// light, Mocha when dark. index.html applies the saved choice before first paint.
+// Catppuccin flavor + accent, saved in this browser (Macchiato by default).
+// public/theme-init.js applies the saved choice before first paint.
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 
-export const FLAVORS = ["auto", "latte", "frappe", "macchiato", "mocha"] as const
+export const FLAVORS = ["latte", "frappe", "macchiato", "mocha"] as const
 export const ACCENTS = [
   "rosewater", "flamingo", "pink", "mauve", "red", "maroon", "peach",
   "yellow", "green", "teal", "sky", "sapphire", "blue", "lavender",
@@ -11,14 +11,18 @@ export const ACCENTS = [
 export type Flavor = (typeof FLAVORS)[number]
 export type Accent = (typeof ACCENTS)[number]
 
-const read = (key: string) => {
+export const DEFAULT_FLAVOR: Flavor = "macchiato"
+export const DEFAULT_ACCENT: Accent = "mauve"
+
+function read<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   try {
-    return localStorage.getItem(key)
+    const value = localStorage.getItem(key)
+    return value && (allowed as readonly string[]).includes(value) ? (value as T) : fallback
   } catch {
-    return null
+    return fallback
   }
 }
-const write = (key: string, value: string) => {
+function write(key: string, value: string) {
   try {
     localStorage.setItem(key, value)
   } catch {
@@ -26,24 +30,16 @@ const write = (key: string, value: string) => {
   }
 }
 
-const systemDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches
-
-export function resolveFlavor(flavor: Flavor): Exclude<Flavor, "auto"> {
-  return flavor === "auto" ? (systemDark() ? "mocha" : "latte") : flavor
-}
-
 function apply(flavor: Flavor, accent: Accent) {
-  const resolved = resolveFlavor(flavor)
   const root = document.documentElement
-  root.dataset.flavor = resolved
+  root.dataset.flavor = flavor
   root.dataset.accent = accent
-  root.classList.toggle("dark", resolved !== "latte")
+  root.classList.toggle("dark", flavor !== "latte")
 }
 
 interface ThemeValue {
   flavor: Flavor
   accent: Accent
-  resolved: Exclude<Flavor, "auto">
   setFlavor: (flavor: Flavor) => void
   setAccent: (accent: Accent) => void
 }
@@ -51,27 +47,14 @@ interface ThemeValue {
 const ThemeContext = createContext<ThemeValue | null>(null)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [flavor, setFlavorState] = useState<Flavor>(() => (FLAVORS as readonly string[]).includes(read("anchorr.flavor") ?? "") ? (read("anchorr.flavor") as Flavor) : "auto")
-  const [accent, setAccentState] = useState<Accent>(() => (ACCENTS as readonly string[]).includes(read("anchorr.accent") ?? "") ? (read("anchorr.accent") as Accent) : "mauve")
-  const [, rerender] = useState(0)
+  const [flavor, setFlavorState] = useState<Flavor>(() => read("anchorr.flavor", FLAVORS, DEFAULT_FLAVOR))
+  const [accent, setAccentState] = useState<Accent>(() => read("anchorr.accent", ACCENTS, DEFAULT_ACCENT))
 
   useEffect(() => apply(flavor, accent), [flavor, accent])
-
-  useEffect(() => {
-    if (flavor !== "auto") return
-    const media = window.matchMedia("(prefers-color-scheme: dark)")
-    const onChange = () => {
-      apply("auto", accent)
-      rerender((n) => n + 1)
-    }
-    media.addEventListener("change", onChange)
-    return () => media.removeEventListener("change", onChange)
-  }, [flavor, accent])
 
   const value: ThemeValue = {
     flavor,
     accent,
-    resolved: resolveFlavor(flavor),
     setFlavor: (next) => {
       write("anchorr.flavor", next)
       setFlavorState(next)

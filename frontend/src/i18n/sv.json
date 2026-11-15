@@ -19,7 +19,6 @@
   "Announcement channel": "Kanal för meddelanden",
   "Appearance": "Utseende",
   "Approval": "Godkännande",
-  "Auto": "Auto",
   "Auto-approve requests from members without a linked account": "Godkänn förfrågningar automatiskt från medlemmar utan kopplat konto",
   "Back": "Tillbaka",
   "Backdrop image": "Bakgrundsbild",
@@ -81,7 +80,6 @@
   "Every (minutes)": "Var (minuter)",
   "Every Seerr user with a Discord ID is already linked": "Alla Seerr-användare med ett Discord-ID är redan kopplade",
   "Everything": "Allt",
-  "Follows your system: Latte when light, Mocha when dark.": "Följer ditt system: Latte när det är ljust, Mocha när det är mörkt.",
   "Friday": "Fredag",
   "Genre": "Genre",
   "Grouping window (seconds)": "Grupperingsfönster (sekunder)",
@@ -297,5 +295,6 @@
   "The bot already works in this server": "Boten arbetar redan på den här servern",
   "Discord server saved, the bot restarted": "Discord-servern sparad, boten startades om",
   "Discord is rate limiting requests. Wait a few seconds and try again.": "Discord begränsar förfrågningarna just nu. Vänta några sekunder och försök igen.",
-  "Too many failed sign-ins from this address. Try again in a few minutes.": "För många misslyckade inloggningar från den här adressen. Försök igen om några minuter."
+  "Too many failed sign-ins from this address. Try again in a few minutes.": "För många misslyckade inloggningar från den här adressen. Försök igen om några minuter.",
+  "Color palette by": "Färgpalett av"
 }

@@ -47,7 +47,7 @@ Anchorr connects three things you already run: **Jellyfin**, **Seerr** and a **D
 
 - Guided setup: Jellyfin, Seerr and Discord in three steps
 - Sign in with your Jellyfin administrator account, or an optional local account
-- All four Catppuccin flavors with a choice of accent color, following your system by default
+- All four [Catppuccin](https://catppuccin.com) flavors with a choice of accent color (Macchiato by default)
 - English, German, French and Swedish (the bot and the dashboard)
 
 ## Requirements

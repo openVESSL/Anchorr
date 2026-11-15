@@ -1,6 +1,7 @@
 // Building blocks for the settings pages: a form hook that saves only its own keys and
 // shows server validation errors next to the field, plus cards, rows and pickers.
 import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useLocation } from "react-router"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -10,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { ApiError, type Config } from "@/lib/api"
 import { useT } from "@/lib/i18n"
+import { PAGE_ICONS } from "@/lib/nav"
 import { useChannels, useConfig, useSaveConfig } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
@@ -71,11 +73,19 @@ export function useSettingsForm(defaults: FormValues) {
 export type SettingsForm = ReturnType<typeof useSettingsForm>
 
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
+  const Icon = PAGE_ICONS[useLocation().pathname]
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {description && <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{description}</p>}
+      <div className="flex items-start gap-3">
+        {Icon && (
+          <span className="bg-primary/15 text-primary grid size-10 shrink-0 place-items-center rounded-lg">
+            <Icon className="size-5" />
+          </span>
+        )}
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          {description && <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{description}</p>}
+        </div>
       </div>
       {actions}
     </div>
@@ -86,7 +96,7 @@ export function Section({ title, description, children }: { title: string; descr
   return (
     <Card className="mb-4">
       <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
+        <CardTitle className="text-primary text-base">{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-5">{children}</CardContent>

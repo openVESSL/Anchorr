@@ -26,6 +26,7 @@ export function TopBar() {
 
   return (
     <header className="bg-background/80 sticky top-0 z-20 flex h-14 items-center gap-2 border-b px-4 backdrop-blur md:px-6">
+      <span aria-hidden className="from-primary/70 via-primary/25 pointer-events-none absolute inset-x-0 bottom-[-1px] h-px bg-gradient-to-r to-transparent" />
       <SidebarTrigger />
       <div className="ml-1 flex items-center gap-2">
         <Badge variant="outline" className="gap-1.5 font-normal">

@@ -1,26 +1,12 @@
-import {
-  Bell,
-  Bot,
-  CalendarDays,
-  CheckCircle2,
-  Circle,
-  Clapperboard,
-  Dices,
-  Inbox,
-  LayoutDashboard,
-  Palette,
-  ScrollText,
-  Send,
-  Settings,
-  Users,
-  type LucideIcon,
-} from "lucide-react"
+import { CheckCircle2, Circle } from "lucide-react"
 import { Link, useLocation } from "react-router"
 
 import { Logo } from "@/components/logo"
+import { CatppuccinCredit } from "@/components/theme-picker"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -31,12 +17,12 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useT } from "@/lib/i18n"
+import { PAGE_ICONS } from "@/lib/nav"
 import { useSetupState } from "@/lib/queries"
 
 interface Item {
   to: string
   label: string
-  icon: LucideIcon
   done?: boolean
 }
 
@@ -47,31 +33,31 @@ export function AppSidebar() {
   const setup = useSetupState().data
 
   const groups: { label?: string; items: Item[] }[] = [
-    { items: [{ to: "/", label: t("Overview"), icon: LayoutDashboard }] },
+    { items: [{ to: "/", label: t("Overview") }] },
     {
       label: t("Connections"),
       items: [
-        { to: "/jellyfin", label: "Jellyfin", icon: Clapperboard, done: setup?.jellyfin },
-        { to: "/seerr", label: "Seerr", icon: Inbox, done: setup?.seerr },
-        { to: "/discord", label: "Discord", icon: Bot, done: setup?.discord && setup?.discordServer },
+        { to: "/jellyfin", label: "Jellyfin", done: setup?.jellyfin },
+        { to: "/seerr", label: "Seerr", done: setup?.seerr },
+        { to: "/discord", label: "Discord", done: setup?.discord && setup?.discordServer },
       ],
     },
     {
       label: t("Bot"),
       items: [
-        { to: "/notifications", label: t("Notifications"), icon: Bell },
-        { to: "/requests", label: t("Requests"), icon: Send },
-        { to: "/users", label: t("Users"), icon: Users },
-        { to: "/embeds", label: t("Appearance"), icon: Palette },
-        { to: "/daily-pick", label: t("Daily pick"), icon: Dices },
-        { to: "/roundup", label: t("Weekly roundup"), icon: CalendarDays },
+        { to: "/notifications", label: t("Notifications") },
+        { to: "/requests", label: t("Requests") },
+        { to: "/users", label: t("Users") },
+        { to: "/embeds", label: t("Appearance") },
+        { to: "/daily-pick", label: t("Daily pick") },
+        { to: "/roundup", label: t("Weekly roundup") },
       ],
     },
     {
       label: t("System"),
       items: [
-        { to: "/system", label: t("Settings"), icon: Settings },
-        { to: "/logs", label: t("Logs"), icon: ScrollText },
+        { to: "/system", label: t("Settings") },
+        { to: "/logs", label: t("Logs") },
       ],
     },
   ]
@@ -90,11 +76,13 @@ export function AppSidebar() {
             {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => (
+                {group.items.map((item) => {
+                  const Icon = PAGE_ICONS[item.to]
+                  return (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton asChild isActive={pathname === item.to}>
                       <Link to={item.to} onClick={() => setOpenMobile(false)}>
-                        <item.icon />
+                        <Icon />
                         <span>{item.label}</span>
                         {item.done !== undefined &&
                           (item.done ? (
@@ -105,12 +93,16 @@ export function AppSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
+                  )
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
       </SidebarContent>
+      <SidebarFooter className="px-4 pb-4">
+        <CatppuccinCredit />
+      </SidebarFooter>
     </Sidebar>
   )
 }

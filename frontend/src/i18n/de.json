@@ -19,7 +19,6 @@
   "Announcement channel": "Ankündigungskanal",
   "Appearance": "Darstellung",
   "Approval": "Freigabe",
-  "Auto": "Auto",
   "Auto-approve requests from members without a linked account": "Anfragen von Mitgliedern ohne verknüpftes Konto automatisch freigeben",
   "Back": "Zurück",
   "Backdrop image": "Hintergrundbild",
@@ -81,7 +80,6 @@
   "Every (minutes)": "Alle (Minuten)",
   "Every Seerr user with a Discord ID is already linked": "Alle Seerr-Benutzer mit einer Discord-ID sind bereits verknüpft",
   "Everything": "Alles",
-  "Follows your system: Latte when light, Mocha when dark.": "Folgt deinem System: Latte bei hell, Mocha bei dunkel.",
   "Friday": "Freitag",
   "Genre": "Genre",
   "Grouping window (seconds)": "Bündelungszeitraum (Sekunden)",
@@ -297,5 +295,6 @@
   "The bot already works in this server": "Der Bot arbeitet bereits auf diesem Server",
   "Discord server saved, the bot restarted": "Discord-Server gespeichert, der Bot wurde neu gestartet",
   "Discord is rate limiting requests. Wait a few seconds and try again.": "Discord begrenzt gerade die Anfragen. Warte ein paar Sekunden und versuche es erneut.",
-  "Too many failed sign-ins from this address. Try again in a few minutes.": "Zu viele fehlgeschlagene Anmeldungen von dieser Adresse. Versuche es in ein paar Minuten erneut."
+  "Too many failed sign-ins from this address. Try again in a few minutes.": "Zu viele fehlgeschlagene Anmeldungen von dieser Adresse. Versuche es in ein paar Minuten erneut.",
+  "Color palette by": "Farbpalette von"
 }

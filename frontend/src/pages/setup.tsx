@@ -105,9 +105,9 @@ export function SetupPage() {
 
 function StepCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
-    <Card>
+    <Card className="border-t-primary border-t-2">
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle className="text-primary">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>{children}</CardContent>
