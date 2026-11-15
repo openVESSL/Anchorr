@@ -1,12 +1,10 @@
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
 import net from "net";
 import { fileURLToPath } from "url";
 import express from "express";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
-import { handleJellyfinWebhook } from "./jellyfinWebhook.js";
 import { configTemplate } from "./lib/config.js";
 import { sendDailyRandomPick } from "./bot/dailyPick.js";
 import { sendWeeklyRoundupTest } from "./bot/weeklyRoundup.js";
@@ -21,8 +19,7 @@ const __dirname = path.dirname(__filename);
 // --- MODULE IMPORTS ---
 import logger from "./utils/logger.js";
 import { validateBody, saveConfigSchema, DASHBOARD_PROTECTED_KEYS } from "./utils/validation.js";
-import { authenticateToken, WEBHOOK_SECRET } from "./utils/auth.js";
-import { jellyfinPoller } from "./jellyfinPoller.js";
+import { authenticateToken } from "./utils/auth.js";
 import logRouter from "./routes/logRoutes.js";
 import authRouter from "./routes/authRoutes.js";
 import userMappingRouter from "./routes/userMappingRoutes.js";
@@ -194,7 +191,7 @@ function configureWebServer() {
   app.use("/api", jellyfinRouter);
 
   // Bot management routes (health, status, start-bot, stop-bot)
-  app.use("/api", createBotRoutes({ startBot, jellyfinPoller }));
+  app.use("/api", createBotRoutes({ startBot }));
 
   // Endpoint for Discord servers list (guilds)
   app.get("/api/discord/guilds", authenticateToken, async (_req, res) => {
@@ -529,55 +526,20 @@ function configureWebServer() {
     legacyHeaders: false,
   });
 
-  // Verify the shared secret sent by Jellyfin in the X-Webhook-Secret header.
-  // Configure WEBHOOK_SECRET in the dashboard, then add a matching custom header
-  // in the Jellyfin webhook plugin: X-Webhook-Secret: <your-secret>
-  function verifyWebhookSecret(req, res, next) {
-    const provided = req.headers["x-webhook-secret"];
-    const expected = WEBHOOK_SECRET;
-    const providedBuf = Buffer.from(provided || "", "utf8");
-    const expectedBuf = Buffer.from(expected, "utf8");
-    const valid =
-      providedBuf.length === expectedBuf.length &&
-      crypto.timingSafeEqual(providedBuf, expectedBuf);
-    if (!valid) {
-      logger.warn(`⚠️ Webhook rejected: invalid or missing X-Webhook-Secret (from ${req.ip})`);
-      return res.status(401).json({ success: false, error: "Unauthorized" });
+  // --- LEGACY JELLYFIN WEBHOOK ENDPOINT ---
+  // Anchorr now watches Jellyfin directly, so the Webhook plugin is no longer needed.
+  // Calls are acknowledged and ignored (handling them too would announce items twice);
+  // the dashboard shows a hint to remove the plugin. Removed in v2.1.
+  let legacyWebhookWarnedAt = 0;
+  app.post("/jellyfin-webhook", webhookLimiter, (req, res) => {
+    botState.legacyWebhookLastSeen = Date.now();
+    if (Date.now() - legacyWebhookWarnedAt > 60 * 60 * 1000) {
+      legacyWebhookWarnedAt = Date.now();
+      logger.warn(
+        "Received a call from the Jellyfin Webhook plugin. Anchorr no longer needs it and ignores these calls; you can remove the plugin's Anchorr destination."
+      );
     }
-    next();
-  }
-
-  // --- JELLYFIN WEBHOOK ENDPOINT ---
-  app.post("/jellyfin-webhook", webhookLimiter, verifyWebhookSecret, express.json({ type: "*/*" }), async (req, res) => {
-    try {
-      logger.info("📥 Received Jellyfin webhook");
-      logger.debug("Webhook payload (ItemType, ItemId, Name):", JSON.stringify({
-        ItemType: req.body?.ItemType,
-        ItemId: req.body?.ItemId,
-        Name: req.body?.Name,
-      }));
-
-      // Acknowledge receipt immediately
-      res.status(200).json({ success: true, message: "Webhook received" });
-
-      if (!req.body || Object.keys(req.body).length === 0) {
-        logger.warn("⚠️ Webhook body is empty — check that 'Send All Properties' is enabled in Jellyfin and the webhook is correctly configured");
-        return;
-      }
-
-      // Process webhook asynchronously
-      if (botState.discordClient && botState.isBotRunning) {
-        // Don't pass res since we already responded
-        await handleJellyfinWebhook(req, null, botState.discordClient, pendingRequests, savePendingRequests);
-      } else {
-        logger.warn(
-          `⚠️ Jellyfin webhook received but Discord bot is not running — notification dropped (ItemType: ${req.body?.ItemType}, Name: ${req.body?.Name})`
-        );
-      }
-    } catch (error) {
-      logger.error(`❌ Error processing Jellyfin webhook (ItemType: ${req.body?.ItemType}, Name: ${req.body?.Name}):`, error);
-      // Don't send error response since we already sent 200
-    }
+    res.status(200).json({ success: true, message: "Ignored: Anchorr no longer needs the Jellyfin Webhook plugin." });
   });
 
   app.post(
@@ -688,6 +650,8 @@ function configureWebServer() {
         );
 
         stopRoundupScheduler();
+        botState.jellyfinFeed?.stop();
+        botState.jellyfinFeed = null;
         await botState.discordClient.destroy();
         botState.isBotRunning = false;
         botState.discordClient = null;

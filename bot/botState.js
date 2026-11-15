@@ -8,7 +8,7 @@ import logger from "../utils/logger.js";
 export const botState = {
   isBotRunning: false,
   discordClient: null,
-  jellyfinWebSocketClient: null,
+  jellyfinFeed: null,
 };
 
 // --- PENDING REQUESTS TRACKING ---

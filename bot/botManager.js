@@ -5,7 +5,9 @@ import {
   REST,
 } from "discord.js";
 import { registerCommands } from "../discord/commands.js";
-import { botState, loadPendingRequests } from "./botState.js";
+import { botState, loadPendingRequests, pendingRequests, savePendingRequests } from "./botState.js";
+import { JellyfinFeed } from "../jellyfin/feed.js";
+import { handleJellyfinWebhook } from "../jellyfinWebhook.js";
 import { registerInteractions } from "./interactions.js";
 import { prepareGuestUser } from "./guestUser.js";
 import { scheduleDailyRandomPick } from "./dailyPick.js";
@@ -74,7 +76,13 @@ export async function startBot() {
       logger.info(`✅ Bot logged in as ${client.user.tag}`);
       botState.isBotRunning = true;
 
-      logger.info("ℹ️ Jellyfin notifications will be received via webhooks.");
+      // New Jellyfin items go through the same handler the webhook plugin used to feed
+      botState.jellyfinFeed?.stop();
+      botState.jellyfinFeed = new JellyfinFeed({
+        dispatch: (payload) =>
+          handleJellyfinWebhook({ body: payload }, null, client, pendingRequests, savePendingRequests),
+      });
+      botState.jellyfinFeed.start();
 
       scheduleDailyRandomPick(client);
       startRoundupScheduler(client);

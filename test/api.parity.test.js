@@ -149,9 +149,12 @@ test("invalid values are rejected per field (contract used by inline dashboard e
   assert.equal(typeof res.json.errors[0].message, "string");
 });
 
-test("v1: the Jellyfin webhook rejects calls without the shared secret", async () => {
+test("the old Jellyfin Webhook plugin is acknowledged, ignored and reported to the dashboard", async () => {
+  assert.equal((await api("GET", "/api/status")).json.legacyWebhookLastSeen, null);
   const res = await api("POST", "/jellyfin-webhook", { ItemId: "x", ItemType: "Movie" }, { auth: false });
-  assert.equal(res.status, 401);
+  assert.equal(res.status, 200);
+  assert.match(res.json.message, /no longer needs/);
+  assert.equal(typeof (await api("GET", "/api/status")).json.legacyWebhookLastSeen, "number");
 });
 
 test("logout revokes the session", async () => {

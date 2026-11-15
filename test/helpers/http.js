@@ -30,6 +30,7 @@ export async function startFakeServer(routes) {
   return {
     url: `http://127.0.0.1:${port}`,
     requests,
-    close: () => new Promise((resolve) => server.close(resolve)),
+    server,
+    close: () => new Promise((resolve) => { server.closeAllConnections?.(); server.close(resolve); }),
   };
 }

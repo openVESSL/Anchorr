@@ -68,11 +68,13 @@ router.get("/status", authenticateToken, (req, res) => {
       botState.isBotRunning && botState.discordClient?.user
         ? botState.discordClient.user.tag
         : null,
+    // Set when the old Jellyfin Webhook plugin still calls Anchorr (it can be removed)
+    legacyWebhookLastSeen: botState.legacyWebhookLastSeen ?? null,
   });
 });
 
-// Factory so routes can call startBot() and jellyfinPoller.stop() from app.js
-export function createBotRoutes({ startBot, jellyfinPoller }) {
+// Factory so routes can call startBot() from app.js
+export function createBotRoutes({ startBot }) {
   router.post("/start-bot", botControlLimiter, authenticateToken, async (req, res) => {
     if (botState.isBotRunning) {
       return res.status(400).json({ message: "Bot is already running." });
@@ -90,22 +92,8 @@ export function createBotRoutes({ startBot, jellyfinPoller }) {
       return res.status(400).json({ message: "Bot is not running." });
     }
 
-    try {
-      if (botState.jellyfinWebSocketClient) {
-        botState.jellyfinWebSocketClient.stop();
-        botState.jellyfinWebSocketClient = null;
-        logger.info("Jellyfin WebSocket client stopped");
-      }
-    } catch (error) {
-      logger.error("Error stopping Jellyfin WebSocket client:", error);
-    }
-
-    try {
-      jellyfinPoller.stop();
-      logger.info("Jellyfin poller stopped");
-    } catch (error) {
-      logger.error("Error stopping Jellyfin poller:", error);
-    }
+    botState.jellyfinFeed?.stop();
+    botState.jellyfinFeed = null;
 
     try {
       stopRoundupScheduler();
