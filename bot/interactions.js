@@ -34,10 +34,8 @@ function pendingOptionsKey(userId, tmdbId) {
   return `${userId}|${tmdbId}`;
 }
 
-function takePendingOptions(userId, tmdbId) {
-  const key = pendingOptionsKey(userId, tmdbId);
-  const entry = pendingRequestOptions.get(key);
-  pendingRequestOptions.delete(key);
+function getPendingOptions(userId, tmdbId) {
+  const entry = pendingRequestOptions.get(pendingOptionsKey(userId, tmdbId));
   if (!entry || Date.now() - entry.timestamp > PENDING_OPTIONS_TTL_MS) return {};
   return entry.options;
 }
@@ -255,19 +253,21 @@ async function handleSearchOrRequest(
       tmdbId
     );
 
-    if (
-      mode === "request" &&
-      mediaType === "tv" &&
-      (options.server || options.quality)
-    ) {
-      const now = Date.now();
-      for (const [k, v] of pendingRequestOptions) {
-        if (now - v.timestamp > PENDING_OPTIONS_TTL_MS) pendingRequestOptions.delete(k);
+    // The latest /search or /request for a show decides which options its Request button uses
+    if (mediaType === "tv") {
+      const key = pendingOptionsKey(interaction.user.id, tmdbId);
+      if (mode === "request" && (options.server || options.quality)) {
+        const now = Date.now();
+        for (const [k, v] of pendingRequestOptions) {
+          if (now - v.timestamp > PENDING_OPTIONS_TTL_MS) pendingRequestOptions.delete(k);
+        }
+        pendingRequestOptions.set(key, {
+          options: { server: options.server, quality: options.quality },
+          timestamp: now,
+        });
+      } else {
+        pendingRequestOptions.delete(key);
       }
-      pendingRequestOptions.set(pendingOptionsKey(interaction.user.id, tmdbId), {
-        options: { server: options.server, quality: options.quality },
-        timestamp: now,
-      });
     }
 
     const components = buildButtons(
@@ -760,7 +760,7 @@ export function registerInteractions(client) {
           if (isAnime) logger.info(`[REQUEST BTN] Detected anime content: ${tmdbId}`);
 
           const { profileId, serverId } = parseQualityAndServerOptions(
-            takePendingOptions(interaction.user.id, tmdbId),
+            getPendingOptions(interaction.user.id, tmdbId),
             mediaType,
             isAnime
           );
@@ -779,6 +779,7 @@ export function registerInteractions(client) {
             userMappings: getUserMappings(),
             isAutoApproved: getSeerrAutoApprove(),
           });
+          pendingRequestOptions.delete(pendingOptionsKey(interaction.user.id, tmdbId));
           logger.info(
             `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
           );
