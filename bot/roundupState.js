@@ -1,5 +1,6 @@
 import { PersistentMap } from "../utils/persistentMap.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 const NEVER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 
@@ -58,7 +59,7 @@ export function recordFailure(ms = Date.now()) {
   try {
     const existing = map.get(LAST_POSTED_AT_KEY);
     if (typeof existing === "number" && Number.isFinite(existing)) return;
-    const legacy = process.env.WEEKLY_ROUNDUP_LAST_POSTED_AT;
+    const legacy = settings.WEEKLY_ROUNDUP_LAST_POSTED_AT;
     if (!legacy) return;
     const parsed = Date.parse(legacy);
     if (!Number.isFinite(parsed)) {

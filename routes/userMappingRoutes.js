@@ -5,7 +5,7 @@ import {
   getUserMappings,
   saveUserMapping,
   deleteUserMapping,
-  loadConfigToEnv,
+  loadSettings,
 } from "../utils/configFile.js";
 import { botState } from "../bot/botState.js";
 import logger from "../utils/logger.js";
@@ -76,7 +76,7 @@ router.post(
       };
 
       saveUserMapping(mapping);
-      loadConfigToEnv();
+      loadSettings();
 
       res.json({ success: true, message: "Mapping saved successfully." });
     } catch (error) {
@@ -148,7 +148,7 @@ router.post("/user-mappings/auto-map", authenticateToken, async (req, res) => {
     }
   }
 
-  if (saved > 0) loadConfigToEnv();
+  if (saved > 0) loadSettings();
 
   logger.info(`[AUTO-MAP] Saved ${saved} mappings, skipped ${skipped}`);
   res.json({ success: true, saved, skipped });
@@ -189,9 +189,9 @@ router.post("/user-mappings/sync-remove", authenticateToken, (req, res) => {
   }
 
   if (removed > 0) {
-    const envLoaded = loadConfigToEnv();
+    const envLoaded = loadSettings();
     if (!envLoaded) {
-      logger.error("[SYNC-REMOVE] loadConfigToEnv failed after deleting mappings — bot env may be stale");
+      logger.error("[SYNC-REMOVE] loadSettings failed after deleting mappings, bot settings may be stale");
       return res.status(500).json({
         success: false,
         message: `Deleted ${removed} mapping(s) from disk but failed to reload config. Restart the bot or check disk permissions.`,
@@ -219,7 +219,7 @@ router.delete("/user-mappings/:discordUserId", authenticateToken, (req, res) => 
         .json({ success: false, message: "Mapping not found." });
     }
 
-    loadConfigToEnv();
+    loadSettings();
 
     res.json({ success: true, message: "Mapping deleted successfully." });
   } catch (error) {

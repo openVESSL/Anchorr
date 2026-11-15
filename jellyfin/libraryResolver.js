@@ -1,6 +1,7 @@
 import * as jellyfinApi from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
 import { PersistentMap } from "../utils/persistentMap.js";
+import { settings } from "../utils/settings.js";
 
 // Also backs the library seed's permanent "already existed" markers (see
 // jellyfin/librarySeeder.js), which must outlive Sonarr/Radarr upgrade
@@ -15,8 +16,8 @@ const SEEN_THRESHOLD_MS = 5 * 365 * 24 * 60 * 60 * 1000;
  * Map of CollectionId → VirtualFolderItemId for config lookups.
  */
 export async function fetchLibraryMap() {
-  const apiKey = process.env.JELLYFIN_API_KEY;
-  const baseUrl = process.env.JELLYFIN_BASE_URL;
+  const apiKey = settings.JELLYFIN_API_KEY;
+  const baseUrl = settings.JELLYFIN_BASE_URL;
   const libraries = await jellyfinApi.fetchLibraries(apiKey, baseUrl);
 
   const libraryIdMap = new Map(); // CollectionId → VirtualFolderItemId
@@ -55,12 +56,12 @@ export function resolveConfigLibraryId(libraryId, libraryIdMap) {
  */
 export function getLibraryChannels() {
   try {
-    const raw = process.env.JELLYFIN_NOTIFICATION_LIBRARIES;
+    const raw = settings.JELLYFIN_NOTIFICATION_LIBRARIES;
     if (!raw) return {};
     const parsed = typeof raw === "object" ? raw : JSON.parse(raw);
     // Legacy: array of library IDs — convert to object mapped to default channel
     if (Array.isArray(parsed)) {
-      const defaultCh = process.env.JELLYFIN_CHANNEL_ID || "";
+      const defaultCh = settings.JELLYFIN_CHANNEL_ID || "";
       return Object.fromEntries(parsed.map((id) => [id, defaultCh]));
     }
     return parsed;
@@ -77,7 +78,7 @@ export function getLibraryChannels() {
  * Returns null if the library is not in the notification list.
  */
 export function resolveTargetChannel(configLibraryId, libraryChannels) {
-  const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID;
+  const defaultChannelId = settings.JELLYFIN_CHANNEL_ID;
   const libConfig = libraryChannels[configLibraryId];
   if (Object.keys(libraryChannels).length > 0 && libConfig === undefined) {
     logger.info(`❌ Skipping item from library ${configLibraryId} (not in notification list)`);

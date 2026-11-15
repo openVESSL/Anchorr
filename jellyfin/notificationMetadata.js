@@ -1,6 +1,7 @@
 import axios from "axios";
 import { jellyfinAuthHeaders } from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 const CACHE_DURATION_MS = 6 * 60 * 60 * 1000;
 // Short, so a series whose TMDB ID Jellyfin adds later is picked up soon.
@@ -47,8 +48,8 @@ export function getBackdropItemId(data) {
 export async function resolveSeriesProviderIds(
   data,
   {
-    apiKey = process.env.JELLYFIN_API_KEY,
-    baseUrl = process.env.JELLYFIN_BASE_URL,
+    apiKey = settings.JELLYFIN_API_KEY,
+    baseUrl = settings.JELLYFIN_BASE_URL,
     httpClient = axios,
   } = {}
 ) {

@@ -8,6 +8,7 @@ import * as seerrApi from "../api/seerr.js";
 import { getUserMappings } from "../utils/configFile.js";
 import { botState } from "../bot/botState.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 const router = Router();
 
@@ -35,8 +36,8 @@ function isSameConfiguredHost(submittedUrl, configuredUrl) {
 router.get("/seerr-users", authenticateToken, async (req, res) => {
   try {
     logger.debug("[SEERR USERS API] Request received");
-    const seerrUrl = process.env.SEERR_URL;
-    const apiKey = process.env.SEERR_API_KEY;
+    const seerrUrl = settings.SEERR_URL;
+    const apiKey = settings.SEERR_API_KEY;
 
     logger.debug("[SEERR USERS API] SEERR_URL:", seerrUrl);
     logger.debug("[SEERR USERS API] API_KEY present:", !!apiKey);
@@ -112,10 +113,10 @@ router.get("/seerr-users", authenticateToken, async (req, res) => {
 router.post("/test-seerr", authenticateToken, async (req, res) => {
   const { url, apiKey } = req.body;
   const isMasked = isMaskedValue(apiKey);
-  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
+  if (isMasked && !isSameConfiguredHost(url, settings.SEERR_URL)) {
     return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
   }
-  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
+  const effectiveApiKey = isMasked ? settings.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
   }
@@ -145,10 +146,10 @@ router.post("/test-seerr", authenticateToken, async (req, res) => {
 router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
   const { url, apiKey } = req.body;
   const isMasked = isMaskedValue(apiKey);
-  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
+  if (isMasked && !isSameConfiguredHost(url, settings.SEERR_URL)) {
     return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
   }
-  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
+  const effectiveApiKey = isMasked ? settings.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
   }
@@ -170,10 +171,10 @@ router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
 router.post("/seerr/servers", authenticateToken, async (req, res) => {
   const { url, apiKey } = req.body;
   const isMasked = isMaskedValue(apiKey);
-  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
+  if (isMasked && !isSameConfiguredHost(url, settings.SEERR_URL)) {
     return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
   }
-  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
+  const effectiveApiKey = isMasked ? settings.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
     return res.status(400).json({ success: false, message: "URL and API Key are required." });
   }
@@ -193,8 +194,8 @@ router.post("/seerr/servers", authenticateToken, async (req, res) => {
 });
 
 router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
-  const seerrUrl = process.env.SEERR_URL;
-  const apiKey = process.env.SEERR_API_KEY;
+  const seerrUrl = settings.SEERR_URL;
+  const apiKey = settings.SEERR_API_KEY;
 
   if (!seerrUrl || !apiKey) {
     return res.status(400).json({ success: false, message: "Seerr not configured." });
@@ -282,8 +283,8 @@ router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
 });
 
 router.get("/seerr/sync-preview", authenticateToken, async (_req, res) => {
-  const seerrUrl = process.env.SEERR_URL;
-  const apiKey = process.env.SEERR_API_KEY;
+  const seerrUrl = settings.SEERR_URL;
+  const apiKey = settings.SEERR_API_KEY;
 
   if (!seerrUrl || !apiKey) {
     return res.status(400).json({ success: false, message: "Seerr not configured." });

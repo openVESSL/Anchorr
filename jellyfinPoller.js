@@ -9,6 +9,7 @@ import {
   getLibraryAnimeFlag,
   deduplicator,
 } from "./jellyfin/libraryResolver.js";
+import { settings } from "./utils/settings.js";
 
 class JellyfinPoller {
   constructor() {
@@ -35,9 +36,9 @@ class JellyfinPoller {
       return;
     }
 
-    const apiKey = process.env.JELLYFIN_API_KEY;
-    const baseUrl = process.env.JELLYFIN_BASE_URL;
-    const serverId = process.env.JELLYFIN_SERVER_ID;
+    const apiKey = settings.JELLYFIN_API_KEY;
+    const baseUrl = settings.JELLYFIN_BASE_URL;
+    const serverId = settings.JELLYFIN_SERVER_ID;
 
     if (!apiKey || !baseUrl || !serverId) {
       logger.error(
@@ -84,9 +85,9 @@ class JellyfinPoller {
    */
   async poll() {
     try {
-      const apiKey = process.env.JELLYFIN_API_KEY;
-      const baseUrl = process.env.JELLYFIN_BASE_URL;
-      const serverId = process.env.JELLYFIN_SERVER_ID;
+      const apiKey = settings.JELLYFIN_API_KEY;
+      const baseUrl = settings.JELLYFIN_BASE_URL;
+      const serverId = settings.JELLYFIN_SERVER_ID;
 
       logger.info("🔍 Polling Jellyfin for recently added items...");
 
@@ -133,7 +134,7 @@ class JellyfinPoller {
       }
 
       const libraryChannels = getLibraryChannels();
-      const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID;
+      const defaultChannelId = settings.JELLYFIN_CHANNEL_ID;
 
       logger.info(`📚 Library channels configured: ${JSON.stringify(libraryChannels)}`);
       logger.info(`📢 Default channel: ${defaultChannelId}`);

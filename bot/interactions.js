@@ -18,11 +18,12 @@ import { getUserMappings } from "../utils/configFile.js";
 import { getSeerrApiUrl } from "../utils/seerrUrl.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
-// Convenience accessors — read process.env at call time so config reloads are respected
-const getSeerrUrl = () => getSeerrApiUrl(process.env.SEERR_URL || "");
-const getSeerrApiKey = () => process.env.SEERR_API_KEY;
-const getTmdbApiKey = () => process.env.TMDB_API_KEY;
+// Convenience accessors: read settings at call time so config reloads are respected
+const getSeerrUrl = () => getSeerrApiUrl(settings.SEERR_URL || "");
+const getSeerrApiKey = () => settings.SEERR_API_KEY;
+const getTmdbApiKey = () => settings.TMDB_API_KEY;
 
 // Server/quality picked in /request for a TV show, held until the user presses the
 // season Request button (customIds are too small to carry them). Keyed by user + show;
@@ -93,7 +94,7 @@ async function handleSearchOrRequest(
   tags = [],
   options = {}
 ) {
-  const isPrivateMode = process.env.PRIVATE_MESSAGE_MODE === "true";
+  const isPrivateMode = settings.PRIVATE_MESSAGE_MODE === "true";
 
   try {
     await interaction.deferReply({ flags: isPrivateMode ? 64 : undefined });
@@ -247,7 +248,7 @@ async function handleSearchOrRequest(
         `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
       );
 
-      if (process.env.NOTIFY_ON_AVAILABLE === "true") {
+      if (settings.NOTIFY_ON_AVAILABLE === "true") {
         const requestKey = `${tmdbId}-${mediaType}`;
         if (!pendingRequests.has(requestKey)) {
           pendingRequests.set(requestKey, new Set());
@@ -805,7 +806,7 @@ export function registerInteractions(client) {
             `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
           );
 
-          if (process.env.NOTIFY_ON_AVAILABLE === "true") {
+          if (settings.NOTIFY_ON_AVAILABLE === "true") {
             const requestKey = `${tmdbId}-${mediaType}`;
             if (!pendingRequests.has(requestKey)) {
               pendingRequests.set(requestKey, new Set());
@@ -1159,7 +1160,7 @@ export function registerInteractions(client) {
             isAutoApproved: getSeerrAutoApprove(),
           });
 
-          if (process.env.NOTIFY_ON_AVAILABLE === "true") {
+          if (settings.NOTIFY_ON_AVAILABLE === "true") {
             const requestKey = `${tmdbId}-${mediaType}`;
             if (!pendingRequests.has(requestKey)) {
               pendingRequests.set(requestKey, new Set());

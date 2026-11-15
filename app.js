@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename);
 
 // --- MODULE IMPORTS ---
 import logger from "./utils/logger.js";
-import { validateBody, configSchema } from "./utils/validation.js";
+import { validateBody, saveConfigSchema, DASHBOARD_PROTECTED_KEYS } from "./utils/validation.js";
 import { authenticateToken, WEBHOOK_SECRET } from "./utils/auth.js";
 import { jellyfinPoller } from "./jellyfinPoller.js";
 import logRouter from "./routes/logRoutes.js";
@@ -36,9 +36,10 @@ import {
   CONFIG_PATH,
   readConfig,
   writeConfig,
-  loadConfigToEnv,
+  loadSettings,
 } from "./utils/configFile.js";
 import { SENSITIVE_FIELDS, isMaskedValue } from "./utils/configSanitize.js";
+import { settings } from "./utils/settings.js";
 
 // --- Helper Functions ---
 // --- CONFIGURATION ---
@@ -47,22 +48,13 @@ function loadConfig() {
   logger.debug("[LOADCONFIG] Checking CONFIG_PATH:", CONFIG_PATH);
   logger.debug("[LOADCONFIG] File exists:", fs.existsSync(CONFIG_PATH));
 
-  // Use centralized loadConfigToEnv (includes all migrations)
-  const success = loadConfigToEnv();
+  // Centralized loader (includes all migrations)
+  const success = loadSettings();
 
   if (success) {
     logger.debug(
-      "[LOADCONFIG] Config keys loaded:",
-      Object.keys(process.env).filter(
-        (k) =>
-          k.startsWith("DISCORD") ||
-          k.startsWith("JELLYFIN") ||
-          k.startsWith("SEERR")
-      ).length
-    );
-    logger.debug(
-      "[LOADCONFIG] DISCORD_TOKEN in process.env:",
-      process.env.DISCORD_TOKEN ? "SET" : "UNDEFINED"
+      "[LOADCONFIG] DISCORD_TOKEN:",
+      settings.DISCORD_TOKEN ? "SET" : "UNDEFINED"
     );
   } else {
     logger.warn("[LOADCONFIG] No config.json found — the bot cannot start correctly.");
@@ -84,7 +76,7 @@ function verifyVolumeConfiguration() {
   // Ensure config directory exists
   if (!fs.existsSync(configDir)) {
     try {
-      fs.mkdirSync(configDir, { recursive: true, mode: 0o777 });
+      fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
       logger.info(`✅ Created config directory at ${configDir}`);
     } catch (error) {
       logger.error(
@@ -118,7 +110,7 @@ function verifyVolumeConfiguration() {
 }
 
 const app = express();
-let port = process.env.WEBHOOK_PORT || 8282;
+let port = settings.WEBHOOK_PORT || 8282;
 
 if (process.env.TRUST_PROXY === "true") {
   app.set("trust proxy", 1);
@@ -343,7 +335,7 @@ function configureWebServer() {
         return res.json({ success: false, message: "Bot not running" });
       }
 
-      const guildId = process.env.GUILD_ID;
+      const guildId = settings.GUILD_ID;
       logger.debug("[MEMBERS API] GUILD_ID from env:", guildId);
       if (!guildId) {
         logger.debug("[MEMBERS API] No guild selected");
@@ -466,7 +458,7 @@ function configureWebServer() {
         return res.json({ success: false, message: "Bot not running" });
       }
 
-      const guildId = process.env.GUILD_ID;
+      const guildId = settings.GUILD_ID;
       logger.debug("[ROLES API] GUILD_ID from env:", guildId);
       if (!guildId) {
         logger.debug("[ROLES API] No guild selected");
@@ -591,12 +583,12 @@ function configureWebServer() {
     "/api/save-config",
     authenticateToken,
     configLimiter,
-    validateBody(configSchema),
+    validateBody(saveConfigSchema, { stripUnknown: true }),
     async (req, res) => {
       const configData = req.body;
-      const oldToken = process.env.DISCORD_TOKEN;
-      const oldGuildId = process.env.GUILD_ID;
-      const oldJellyfinApiKey = process.env.JELLYFIN_API_KEY;
+      const oldToken = settings.DISCORD_TOKEN;
+      const oldGuildId = settings.GUILD_ID;
+      const oldJellyfinApiKey = settings.JELLYFIN_API_KEY;
 
       // Normalize SEERR_URL to remove /api/v1 suffix if present
       if (
@@ -629,6 +621,14 @@ function configureWebServer() {
             {},
         };
 
+        // Deployment settings and server-managed state are never taken from the request
+        for (const key of DASHBOARD_PROTECTED_KEYS) {
+          if (["USER_MAPPINGS", "USERS", "JWT_SECRET", "WEBHOOK_SECRET"].includes(key)) continue;
+          if (key in existingConfig) finalConfig[key] = existingConfig[key];
+          else delete finalConfig[key];
+        }
+        delete finalConfig.startBot; // one-shot flag, v1 used to persist it
+
         // Preserve sensitive fields only when the frontend sends a masked placeholder
         // or omits the field entirely — an explicit empty string intentionally clears the credential
         for (const field of SENSITIVE_FIELDS) {
@@ -656,18 +656,18 @@ function configureWebServer() {
         });
       }
 
-      loadConfig(); // Reload config into process.env
+      loadConfig(); // Reload config into the settings store
 
       // Check if Discord credentials are complete and changed
-      const hasDiscordCreds = process.env.DISCORD_TOKEN && process.env.BOT_ID;
-      const discordCredsChanged = oldToken !== process.env.DISCORD_TOKEN;
+      const hasDiscordCreds = settings.DISCORD_TOKEN && settings.BOT_ID;
+      const discordCredsChanged = oldToken !== settings.DISCORD_TOKEN;
 
       // If bot is running and critical settings changed, restart the bot logic
       const jellyfinApiKeyChanged =
-        oldJellyfinApiKey !== process.env.JELLYFIN_API_KEY;
+        oldJellyfinApiKey !== settings.JELLYFIN_API_KEY;
       const needsRestart =
-        oldToken !== process.env.DISCORD_TOKEN ||
-        oldGuildId !== process.env.GUILD_ID ||
+        oldToken !== settings.DISCORD_TOKEN ||
+        oldGuildId !== settings.GUILD_ID ||
         jellyfinApiKeyChanged;
 
       if (botState.isBotRunning && needsRestart) {
@@ -722,11 +722,11 @@ function configureWebServer() {
   // Check if saving config would trigger bot auto-start
   app.post("/api/check-autostart", authenticateToken, async (req, res) => {
     const configData = req.body;
-    const oldToken = process.env.DISCORD_TOKEN;
+    const oldToken = settings.DISCORD_TOKEN;
 
     // Resolve effective token (masked values mean "use existing")
     const effectiveToken = isMaskedValue(configData.DISCORD_TOKEN)
-      ? process.env.DISCORD_TOKEN
+      ? settings.DISCORD_TOKEN
       : configData.DISCORD_TOKEN;
 
     // Check if Discord credentials are complete and changed
@@ -762,8 +762,8 @@ function configureWebServer() {
         });
       }
 
-      const guildId = process.env.GUILD_ID;
-      const channelId = process.env.JELLYFIN_CHANNEL_ID;
+      const guildId = settings.GUILD_ID;
+      const channelId = settings.JELLYFIN_CHANNEL_ID;
 
       if (!guildId || !channelId) {
         return res.status(400).json({
@@ -775,7 +775,7 @@ function configureWebServer() {
       // Fetch real data from TMDB/OMDB for realistic test notifications
       const { tmdbGetDetails, tmdbGetExternalImdb } = await import("./api/tmdb.js");
 
-      const TMDB_API_KEY = process.env.TMDB_API_KEY;
+      const TMDB_API_KEY = settings.TMDB_API_KEY;
       if (!TMDB_API_KEY) {
         return res.status(400).json({
           success: false,
@@ -798,8 +798,8 @@ function configureWebServer() {
           Overview: movieDetails.overview,
           Provider_tmdb: "157336",
           Provider_imdb: imdbId,
-          ServerUrl: process.env.JELLYFIN_BASE_URL || process.env.JELLYFIN_URL || "https://jellyfin.example.com",
-          ServerId: process.env.JELLYFIN_SERVER_ID || "test-server-id",
+          ServerUrl: settings.JELLYFIN_BASE_URL || settings.JELLYFIN_URL || "https://jellyfin.example.com",
+          ServerId: settings.JELLYFIN_SERVER_ID || "test-server-id",
           ItemId: "test-movie-" + Date.now(),
         };
       } else if (type === "series") {
@@ -814,8 +814,8 @@ function configureWebServer() {
           Overview: seriesDetails.overview,
           Provider_tmdb: "1396",
           Provider_imdb: imdbId,
-          ServerUrl: process.env.JELLYFIN_BASE_URL || process.env.JELLYFIN_URL || "https://jellyfin.example.com",
-          ServerId: process.env.JELLYFIN_SERVER_ID || "test-server-id",
+          ServerUrl: settings.JELLYFIN_BASE_URL || settings.JELLYFIN_URL || "https://jellyfin.example.com",
+          ServerId: settings.JELLYFIN_SERVER_ID || "test-server-id",
           ItemId: "test-series-" + Date.now(),
         };
       } else if (type === "season") {
@@ -833,8 +833,8 @@ function configureWebServer() {
           Overview: "High school chemistry teacher Walter White's life is suddenly transformed by a dire medical diagnosis. Street-savvy former student Jesse Pinkman \"teaches\" Walter a new trade.",
           SeriesProvider_tmdb: "1396",
           SeriesProvider_imdb: imdbId,
-          ServerUrl: process.env.JELLYFIN_BASE_URL || process.env.JELLYFIN_URL || "https://jellyfin.example.com",
-          ServerId: process.env.JELLYFIN_SERVER_ID || "test-server-id",
+          ServerUrl: settings.JELLYFIN_BASE_URL || settings.JELLYFIN_URL || "https://jellyfin.example.com",
+          ServerId: settings.JELLYFIN_SERVER_ID || "test-server-id",
           ItemId: "test-season-" + Date.now(),
         };
       } else if (type === "episodes") {
@@ -853,8 +853,8 @@ function configureWebServer() {
           Overview: "When an unassuming high school chemistry teacher discovers he has a rare form of lung cancer, he decides to team up with a former student and create a top of the line crystal meth in a used RV, to provide for his family once he is gone.",
           SeriesProvider_tmdb: "1396",
           SeriesProvider_imdb: imdbId,
-          ServerUrl: process.env.JELLYFIN_BASE_URL || process.env.JELLYFIN_URL || "https://jellyfin.example.com",
-          ServerId: process.env.JELLYFIN_SERVER_ID || "test-server-id",
+          ServerUrl: settings.JELLYFIN_BASE_URL || settings.JELLYFIN_URL || "https://jellyfin.example.com",
+          ServerId: settings.JELLYFIN_SERVER_ID || "test-server-id",
           ItemId: "test-episode-" + Date.now(),
         };
       } else if (type === "batch-seasons") {
@@ -876,8 +876,8 @@ function configureWebServer() {
           Overview: "After the fall of the Galactic Empire, lawlessness has spread throughout the galaxy. A lone gunfighter makes his way through the outer reaches, earning his keep as a bounty hunter.",
           SeriesProvider_tmdb: "82856",
           SeriesProvider_imdb: imdbId,
-          ServerUrl: process.env.JELLYFIN_BASE_URL || process.env.JELLYFIN_URL || "https://jellyfin.example.com",
-          ServerId: process.env.JELLYFIN_SERVER_ID || "test-server-id",
+          ServerUrl: settings.JELLYFIN_BASE_URL || settings.JELLYFIN_URL || "https://jellyfin.example.com",
+          ServerId: settings.JELLYFIN_SERVER_ID || "test-server-id",
           ItemId: "batch-season-1-" + Date.now(),
         };
 
@@ -892,8 +892,8 @@ function configureWebServer() {
           Overview: "The Mandalorian and the Child continue their journey, facing enemies and rallying allies as they make their way through a dangerous galaxy in the tumultuous era after the collapse of the Galactic Empire.",
           SeriesProvider_tmdb: "82856",
           SeriesProvider_imdb: imdbId,
-          ServerUrl: process.env.JELLYFIN_BASE_URL || process.env.JELLYFIN_URL || "https://jellyfin.example.com",
-          ServerId: process.env.JELLYFIN_SERVER_ID || "test-server-id",
+          ServerUrl: settings.JELLYFIN_BASE_URL || settings.JELLYFIN_URL || "https://jellyfin.example.com",
+          ServerId: settings.JELLYFIN_SERVER_ID || "test-server-id",
           ItemId: "batch-season-2-" + Date.now(),
         };
 
@@ -938,8 +938,8 @@ function configureWebServer() {
             Overview: ep.overview,
             SeriesProvider_tmdb: "66732",
             SeriesProvider_imdb: imdbId,
-            ServerUrl: process.env.JELLYFIN_BASE_URL || process.env.JELLYFIN_URL || "https://jellyfin.example.com",
-            ServerId: process.env.JELLYFIN_SERVER_ID || "test-server-id",
+            ServerUrl: settings.JELLYFIN_BASE_URL || settings.JELLYFIN_URL || "https://jellyfin.example.com",
+            ServerId: settings.JELLYFIN_SERVER_ID || "test-server-id",
             ItemId: "batch-episode-" + ep.num + "-" + Date.now(),
           };
 
@@ -990,7 +990,7 @@ function configureWebServer() {
         });
       }
 
-      const channelId = process.env.DAILY_RANDOM_PICK_CHANNEL_ID;
+      const channelId = settings.DAILY_RANDOM_PICK_CHANNEL_ID;
       if (!channelId) {
         return res.status(400).json({
           success: false,
@@ -998,7 +998,7 @@ function configureWebServer() {
         });
       }
 
-      const TMDB_API_KEY = process.env.TMDB_API_KEY;
+      const TMDB_API_KEY = settings.TMDB_API_KEY;
       if (!TMDB_API_KEY) {
         return res.status(400).json({
           success: false,
@@ -1031,7 +1031,7 @@ function configureWebServer() {
         });
       }
 
-      const channelId = process.env.WEEKLY_ROUNDUP_CHANNEL_ID;
+      const channelId = settings.WEEKLY_ROUNDUP_CHANNEL_ID;
       if (!channelId) {
         return res.status(400).json({
           success: false,
@@ -1082,11 +1082,11 @@ function startServer() {
   verifyVolumeConfiguration();
 
   loadConfig();
-  port = process.env.WEBHOOK_PORT || 8282;
+  port = settings.WEBHOOK_PORT || 8282;
   // Default to localhost-only for bare-metal safety. Docker sets BIND_HOST=0.0.0.0
   // so that container port mapping works. Never expose the dashboard externally
   // without a reverse proxy and authentication. Must be a valid IPv4/IPv6 address.
-  const bindHost = process.env.BIND_HOST || "127.0.0.1";
+  const bindHost = settings.BIND_HOST || "127.0.0.1";
   if (net.isIP(bindHost) === 0) {
     logger.error(
       `❌ Invalid BIND_HOST value "${bindHost}". Must be a valid IPv4 or IPv6 address (e.g. 127.0.0.1 or 0.0.0.0).`
@@ -1110,9 +1110,9 @@ function startServer() {
     // Auto-start bot if a valid config.json is present
     try {
       const autoStartFlag = String(
-        typeof process.env.AUTO_START_BOT === "undefined"
+        typeof settings.AUTO_START_BOT === "undefined"
           ? "true"
-          : process.env.AUTO_START_BOT
+          : settings.AUTO_START_BOT
       )
         .trim()
         .toLowerCase();
@@ -1126,7 +1126,7 @@ function startServer() {
       const hasConfigFile = fs.existsSync(CONFIG_PATH);
       const required = ["DISCORD_TOKEN", "BOT_ID"];
       const hasDiscordCreds = required.every(
-        (k) => process.env[k] && String(process.env[k]).trim() !== ""
+        (k) => settings[k] && String(settings[k]).trim() !== ""
       );
 
       if (!botState.isBotRunning && hasConfigFile && hasDiscordCreds) {
@@ -1155,7 +1155,7 @@ function startServer() {
     // triggers a "new item" Discord notification. Runs async — webhook/
     // poller/websocket are already listening and handle items normally
     // while this is in progress.
-    if (process.env.LIBRARY_SEEDED !== "true") {
+    if (settings.LIBRARY_SEEDED !== "true") {
       seedLibrary().catch((err) =>
         logger.error(`librarySeeder: unexpected rejection on boot (${err?.message || err})`)
       );

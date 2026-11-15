@@ -2,6 +2,7 @@ import * as jellyfinApi from "../api/jellyfin.js";
 import { fetchLibraryMap, deduplicator } from "./libraryResolver.js";
 import { deriveSeedKeys, isScanInProgress, setScanInProgress } from "./librarySeeder.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 /**
  * Daily background scan: re-enumerates every Jellyfin library and removes
@@ -20,8 +21,8 @@ export async function pruneLibrary() {
     return;
   }
 
-  const apiKey = process.env.JELLYFIN_API_KEY;
-  const baseUrl = process.env.JELLYFIN_BASE_URL;
+  const apiKey = settings.JELLYFIN_API_KEY;
+  const baseUrl = settings.JELLYFIN_BASE_URL;
   if (!apiKey || !baseUrl) {
     logger.warn("libraryPruner: Jellyfin not configured — skipping prune");
     return;

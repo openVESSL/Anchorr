@@ -6,6 +6,7 @@ import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
 import { recordOrGet } from "./roundupFirstSeen.js";
 import { getInstalledAt } from "./roundupState.js";
+import { settings } from "../utils/settings.js";
 
 // Rolling window of new items to include in the digest.
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -17,8 +18,8 @@ const MAX_ENTRIES = 25;
 const FETCH_LIMIT = 200;
 
 async function fetchWindowItems() {
-  const apiKey = process.env.JELLYFIN_API_KEY;
-  const baseUrl = process.env.JELLYFIN_BASE_URL;
+  const apiKey = settings.JELLYFIN_API_KEY;
+  const baseUrl = settings.JELLYFIN_BASE_URL;
   if (!apiKey || !baseUrl) {
     throw new Error("JELLYFIN_API_KEY or JELLYFIN_BASE_URL not set");
   }
@@ -356,7 +357,7 @@ export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   // never sees a digest full of unclickable links — they get an ops log and
   // the scheduler records the failure normally. Reaching this with no value
   // at all (empty/undefined) is also misconfig: bail the same way.
-  const baseUrl = process.env.JELLYFIN_BASE_URL;
+  const baseUrl = settings.JELLYFIN_BASE_URL;
   let baseUrlOk = false;
   try {
     if (baseUrl) {
@@ -492,7 +493,7 @@ export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   }
 
   try {
-    const roleId = process.env.WEEKLY_ROUNDUP_ROLE_ID;
+    const roleId = settings.WEEKLY_ROUNDUP_ROLE_ID;
     const validRoleId = typeof roleId === "string" && /^\d{17,20}$/.test(roleId);
     const sendOptions = { embeds: [embed] };
     if (validRoleId && !isTest) {
@@ -615,8 +616,8 @@ function renderFieldGroup(name, entries) {
 }
 
 async function resolveLibraryNames(libraryIds) {
-  const apiKey = process.env.JELLYFIN_API_KEY;
-  const baseUrl = process.env.JELLYFIN_BASE_URL;
+  const apiKey = settings.JELLYFIN_API_KEY;
+  const baseUrl = settings.JELLYFIN_BASE_URL;
   let libs;
   try {
     libs = await jellyfinApi.fetchLibraries(apiKey, baseUrl);
@@ -655,7 +656,7 @@ function formatDate(d) {
   // LANGUAGE uses locale-file keys (en/de/sv) — these happen to be valid
   // BCP-47 primary tags today. Normalize anything else (e.g. "pt_BR") to
   // its primary subtag so Intl does not throw on an unknown locale.
-  const raw = process.env.LANGUAGE || "en";
+  const raw = settings.LANGUAGE || "en";
   const lang = /^[a-zA-Z]{2,3}$/.test(raw) ? raw : "en";
   try {
     return d.toLocaleDateString(lang, {
@@ -672,9 +673,9 @@ function formatDate(d) {
 }
 
 function resolveColor() {
-  const configured = process.env.WEEKLY_ROUNDUP_EMBED_COLOR;
+  const configured = settings.WEEKLY_ROUNDUP_EMBED_COLOR;
   if (configured && /^#?[0-9a-fA-F]{6}$/.test(configured)) {
     return configured.startsWith("#") ? configured : `#${configured}`;
   }
-  return process.env.EMBED_COLOR_SERIES || "#cba6f7";
+  return settings.EMBED_COLOR_SERIES || "#cba6f7";
 }

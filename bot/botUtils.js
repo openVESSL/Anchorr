@@ -1,4 +1,5 @@
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 export function pad2(n) {
   return String(n).padStart(2, "0");
@@ -84,13 +85,13 @@ export function parseQualityAndServerOptions(options, mediaType, isAnime = false
   if (profileId === null && serverId === null) {
     let defaultQualityConfig;
     if (isAnime && mediaType === "movie") {
-      defaultQualityConfig = process.env.DEFAULT_QUALITY_PROFILE_ANIME_MOVIE || process.env.DEFAULT_QUALITY_PROFILE_MOVIE;
+      defaultQualityConfig = settings.DEFAULT_QUALITY_PROFILE_ANIME_MOVIE || settings.DEFAULT_QUALITY_PROFILE_MOVIE;
     } else if (isAnime) {
-      defaultQualityConfig = process.env.DEFAULT_QUALITY_PROFILE_ANIME || process.env.DEFAULT_QUALITY_PROFILE_TV;
+      defaultQualityConfig = settings.DEFAULT_QUALITY_PROFILE_ANIME || settings.DEFAULT_QUALITY_PROFILE_TV;
     } else {
       defaultQualityConfig = mediaType === "movie"
-        ? process.env.DEFAULT_QUALITY_PROFILE_MOVIE
-        : process.env.DEFAULT_QUALITY_PROFILE_TV;
+        ? settings.DEFAULT_QUALITY_PROFILE_MOVIE
+        : settings.DEFAULT_QUALITY_PROFILE_TV;
     }
 
     if (defaultQualityConfig) {
@@ -115,13 +116,13 @@ export function parseQualityAndServerOptions(options, mediaType, isAnime = false
   if (serverId === null) {
     let defaultServerConfig;
     if (isAnime && mediaType === "movie") {
-      defaultServerConfig = process.env.DEFAULT_SERVER_ANIME_MOVIE || process.env.DEFAULT_SERVER_MOVIE;
+      defaultServerConfig = settings.DEFAULT_SERVER_ANIME_MOVIE || settings.DEFAULT_SERVER_MOVIE;
     } else if (isAnime) {
-      defaultServerConfig = process.env.DEFAULT_SERVER_ANIME || process.env.DEFAULT_SERVER_TV;
+      defaultServerConfig = settings.DEFAULT_SERVER_ANIME || settings.DEFAULT_SERVER_TV;
     } else {
       defaultServerConfig = mediaType === "movie"
-        ? process.env.DEFAULT_SERVER_MOVIE
-        : process.env.DEFAULT_SERVER_TV;
+        ? settings.DEFAULT_SERVER_MOVIE
+        : settings.DEFAULT_SERVER_TV;
     }
 
     if (defaultServerConfig) {
@@ -154,7 +155,7 @@ function reportRoleConfigError(name, value, message) {
 
 // Returns the parsed role ID list, or null if the value is set but invalid
 function parseRoleList(name) {
-  const raw = process.env[name];
+  const raw = settings[name];
   if (!raw) {
     activeRoleConfigErrors.delete(name);
     return [];
@@ -186,12 +187,12 @@ export function checkRolePermission(member, guildId) {
 
   // Roles are only meaningful in the configured guild; DMs and other guilds are denied
   if (!member?.roles?.cache) return false;
-  if (!process.env.GUILD_ID) {
+  if (!settings.GUILD_ID) {
     reportRoleConfigError("GUILD_ID", "", "Role lists are set but GUILD_ID is empty: denying role-restricted interactions");
     return false;
   }
   activeRoleConfigErrors.delete("GUILD_ID");
-  if (guildId !== process.env.GUILD_ID) return false;
+  if (guildId !== settings.GUILD_ID) return false;
 
   const userRoles = member.roles.cache.map((r) => r.id);
 
@@ -207,7 +208,7 @@ export function checkRolePermission(member, guildId) {
 }
 
 export function getSeerrAutoApprove() {
-  const val = process.env.SEERR_AUTO_APPROVE;
+  const val = settings.SEERR_AUTO_APPROVE;
   const isAuto = val === "true";
   logger.info(
     `[CONFIG CHECK] SEERR_AUTO_APPROVE is currently: ${val} (Evaluated to: ${isAuto})`

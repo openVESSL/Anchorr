@@ -11,6 +11,7 @@ import { COLORS } from "../lib/constants.js";
 import { getSeerrApiUrl, normalizeSeerrUrl } from "../utils/seerrUrl.js";
 import { isDiscordLinkableUrl, isValidUrl } from "../utils/url.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 // Holds the URL rather than a flag, so a config change warns again.
 let warnedUnlinkableSeerrUrl = null;
@@ -48,7 +49,7 @@ export function buildNotificationEmbed(
         : "📺 TV show found:";
 
   let seerrMediaUrl;
-  const currentSeerrUrl = normalizeSeerrUrl(process.env.SEERR_URL || "");
+  const currentSeerrUrl = normalizeSeerrUrl(settings.SEERR_URL || "");
   if (tmdbId && currentSeerrUrl) {
     const baseUrl = `${currentSeerrUrl}/${mediaType}/${tmdbId}`;
     seerrMediaUrl = status === "success" ? `${baseUrl}?manage=1` : baseUrl;

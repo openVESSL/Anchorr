@@ -7,6 +7,7 @@ import {
 import * as tmdbApi from "../api/tmdb.js";
 import { isValidUrl } from "../utils/url.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 let dailyRandomPickTimer = null;
 
@@ -15,11 +16,11 @@ export function scheduleDailyRandomPick(client) {
     clearInterval(dailyRandomPickTimer);
   }
 
-  const enabled = process.env.DAILY_RANDOM_PICK_ENABLED === "true";
+  const enabled = settings.DAILY_RANDOM_PICK_ENABLED === "true";
   if (!enabled) return;
 
-  const channelId = process.env.DAILY_RANDOM_PICK_CHANNEL_ID;
-  const intervalMinutes = parseInt(process.env.DAILY_RANDOM_PICK_INTERVAL || "1440");
+  const channelId = settings.DAILY_RANDOM_PICK_CHANNEL_ID;
+  const intervalMinutes = parseInt(settings.DAILY_RANDOM_PICK_INTERVAL || "1440");
 
   if (!channelId) {
     logger.warn("Daily Random Pick is enabled but no channel is configured. Skipping.");
@@ -48,8 +49,8 @@ export function scheduleDailyRandomPick(client) {
 
 export async function sendDailyRandomPick(client) {
   try {
-    const TMDB_API_KEY = process.env.TMDB_API_KEY;
-    const channelId = process.env.DAILY_RANDOM_PICK_CHANNEL_ID;
+    const TMDB_API_KEY = settings.TMDB_API_KEY;
+    const channelId = settings.DAILY_RANDOM_PICK_CHANNEL_ID;
 
     if (!TMDB_API_KEY || !channelId) return;
 

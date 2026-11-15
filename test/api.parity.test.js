@@ -113,6 +113,34 @@ test("saved secrets come back masked; resending the mask keeps them, an empty st
   assert.equal((await api("GET", "/api/config")).json.SEERR_API_KEY, "");
 });
 
+test("save keeps every dashboard field but drops unknown and protected keys (audit S5)", async () => {
+  const res = await api("POST", "/api/save-config", {
+    EMBED_COLOR_MOVIE: "#ff0000",
+    EMBED_SHOW_GENRE: "false",
+    DAILY_RANDOM_PICK_ENABLED: "true",
+    DAILY_RANDOM_PICK_INTERVAL: "60",
+    DEFAULT_SERVER_TV: "1|sonarr",
+    startBot: false,
+    WEBHOOK_PORT: "1",
+    BIND_HOST: "0.0.0.0",
+    LIBRARY_SEEDED: "false",
+    NODE_TLS_REJECT_UNAUTHORIZED: "0",
+    "lib-checkbox": "true",
+  });
+  assert.equal(res.status, 200);
+
+  const config = (await api("GET", "/api/config")).json;
+  assert.equal(config.EMBED_COLOR_MOVIE, "#ff0000");
+  assert.equal(config.EMBED_SHOW_GENRE, "false");
+  assert.equal(config.DAILY_RANDOM_PICK_ENABLED, "true");
+  assert.equal(config.DAILY_RANDOM_PICK_INTERVAL, "60");
+  assert.equal(config.DEFAULT_SERVER_TV, "1|sonarr");
+  for (const key of ["startBot", "WEBHOOK_PORT", "BIND_HOST", "LIBRARY_SEEDED", "NODE_TLS_REJECT_UNAUTHORIZED", "lib-checkbox"]) {
+    assert.equal(key in config, false, `${key} must not be saved`);
+  }
+  assert.equal((await api("GET", "/api/health", undefined, { auth: false })).status, 200, "server still on its port");
+});
+
 test("invalid values are rejected per field (contract used by inline dashboard errors)", async () => {
   const res = await api("POST", "/api/save-config", { SEERR_URL: "not a url" });
   assert.equal(res.status, 400);

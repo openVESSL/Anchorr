@@ -6,6 +6,7 @@ import {
 } from "./libraryResolver.js";
 import { updateConfig } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 // Shared flag: prevents concurrent seed and prune scans from running simultaneously.
 let scanInProgress = false;
@@ -28,7 +29,7 @@ export function checkSeedPreconditions() {
   if (scanInProgress) {
     return { ok: false, reason: "a library scan is already running" };
   }
-  if (!process.env.JELLYFIN_API_KEY || !process.env.JELLYFIN_BASE_URL) {
+  if (!settings.JELLYFIN_API_KEY || !settings.JELLYFIN_BASE_URL) {
     return { ok: false, reason: "Jellyfin URL or API key is not configured" };
   }
   return { ok: true, reason: null };
@@ -79,8 +80,8 @@ export async function seedLibrary() {
     return;
   }
 
-  const apiKey = process.env.JELLYFIN_API_KEY;
-  const baseUrl = process.env.JELLYFIN_BASE_URL;
+  const apiKey = settings.JELLYFIN_API_KEY;
+  const baseUrl = settings.JELLYFIN_BASE_URL;
 
   scanInProgress = true;
   logger.info("librarySeeder: starting library seed scan...");
@@ -123,7 +124,6 @@ export async function seedLibrary() {
     if (!updateConfig({ LIBRARY_SEEDED: "true" })) {
       throw new Error("failed to persist LIBRARY_SEEDED flag to config.json");
     }
-    process.env.LIBRARY_SEEDED = "true";
 
     logger.info(
       `librarySeeder: seed complete — ${totalKeys} identity keys stored across ${libraries.length} libraries`

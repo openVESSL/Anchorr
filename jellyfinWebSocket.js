@@ -10,6 +10,7 @@ import {
   getLibraryAnimeFlag,
   deduplicator,
 } from "./jellyfin/libraryResolver.js";
+import { settings } from "./utils/settings.js";
 
 /**
  * Jellyfin WebSocket Client for real-time notifications
@@ -51,8 +52,8 @@ export class JellyfinWebSocketClient {
    */
   async connect() {
     try {
-      const apiKey = process.env.JELLYFIN_API_KEY;
-      const baseUrl = process.env.JELLYFIN_BASE_URL;
+      const apiKey = settings.JELLYFIN_API_KEY;
+      const baseUrl = settings.JELLYFIN_BASE_URL;
 
       if (!apiKey || !baseUrl) {
         logger.warn(
@@ -252,11 +253,11 @@ export class JellyfinWebSocketClient {
         } updated, - ${(libraryUpdate.ItemsRemoved || []).length} removed)`
       );
 
-      const apiKey = process.env.JELLYFIN_API_KEY;
-      const baseUrl = process.env.JELLYFIN_BASE_URL;
-      const serverId = process.env.JELLYFIN_SERVER_ID;
+      const apiKey = settings.JELLYFIN_API_KEY;
+      const baseUrl = settings.JELLYFIN_BASE_URL;
+      const serverId = settings.JELLYFIN_SERVER_ID;
       const libraryChannels = getLibraryChannels();
-      const defaultChannelId = process.env.JELLYFIN_CHANNEL_ID;
+      const defaultChannelId = settings.JELLYFIN_CHANNEL_ID;
 
       for (const itemId of itemsAdded) {
         try {

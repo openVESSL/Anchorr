@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import logger from "./logger.js";
 import { configSchema } from "./validation.js";
+import { replaceSettings } from "./settings.js";
 
 // Fields that contain sensitive credentials and should be base64-encoded at rest
 const SENSITIVE_FIELDS = new Set([
@@ -122,7 +123,7 @@ function migrateConfigIfNeeded() {
     // Ensure new directory exists
     const configDir = path.dirname(CONFIG_PATH);
     if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true, mode: 0o777 });
+      fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
     }
 
     // Write to new location
@@ -181,7 +182,7 @@ export function writeConfig(config) {
     // Ensure /config directory exists
     if (!fs.existsSync(configDir)) {
       logger.info(`Creating config directory: ${configDir}`);
-      fs.mkdirSync(configDir, { recursive: true, mode: 0o777 });
+      fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
     }
 
     // Atomic write: write to a temp file then rename so a mid-write kill never
@@ -196,6 +197,7 @@ export function writeConfig(config) {
     // config.json via the rename, so set it explicitly.
     fs.chmodSync(tmpPath, 0o600);
     fs.renameSync(tmpPath, CONFIG_PATH);
+    replaceSettings(config);
 
     logger.debug(`Config saved successfully to ${CONFIG_PATH}`);
     return true;
@@ -249,11 +251,11 @@ export function updateConfig(updates) {
 }
 
 /**
- * Loads config into process.env for compatibility with existing code
+ * Loads config.json into the runtime settings store (utils/settings.js)
  * Includes automatic migrations for backwards compatibility
  * @returns {boolean} True if load succeeded
  */
-export function loadConfigToEnv() {
+export function loadSettings() {
   // First: Perform migration if needed (one-time operation on startup)
   try {
     migrateConfigIfNeeded();
@@ -280,17 +282,6 @@ export function loadConfigToEnv() {
   }
 
   // --- AUTO-MIGRATIONS ---
-
-  // 1. Normalize SEERR_URL (remove /api/v1 suffix)
-  if (config.SEERR_URL && typeof config.SEERR_URL === "string") {
-    const originalUrl = config.SEERR_URL;
-    config.SEERR_URL = config.SEERR_URL.replace(/\/api\/v1\/?$/, "");
-    if (originalUrl !== config.SEERR_URL) {
-      logger.debug(
-        `Normalized SEERR_URL: ${originalUrl} → ${config.SEERR_URL}`
-      );
-    }
-  }
 
   // 2. Auto-migrate JELLYFIN_NOTIFICATION_LIBRARIES from array to object
   if (Array.isArray(config.JELLYFIN_NOTIFICATION_LIBRARIES)) {
@@ -331,6 +322,19 @@ export function loadConfigToEnv() {
       delete config[oldKey];
       seerrKeysMigrated = true;
       logger.info(`🔄 Migrated config key: ${oldKey} → ${newKey}`);
+    }
+  }
+
+  // 1. Normalize SEERR_URL (remove /api/v1 suffix). Runs after the key rename so a
+  // legacy JELLYSEERR_URL is cleaned too, and before the save below persists it.
+  if (config.SEERR_URL && typeof config.SEERR_URL === "string") {
+    const originalUrl = config.SEERR_URL;
+    config.SEERR_URL = config.SEERR_URL.replace(/\/api\/v1\/?$/, "");
+    if (originalUrl !== config.SEERR_URL) {
+      seerrKeysMigrated = true;
+      logger.debug(
+        `Normalized SEERR_URL: ${originalUrl} → ${config.SEERR_URL}`
+      );
     }
   }
 
@@ -395,16 +399,8 @@ export function loadConfigToEnv() {
     }
   }
 
-  // --- LOAD INTO PROCESS.ENV ---
-  for (const [key, value] of Object.entries(config)) {
-    // Convert objects/arrays to JSON strings to avoid "[object Object]"
-    process.env[key] =
-      typeof value === "object" ? JSON.stringify(value) : String(value);
-  }
-
-  logger.debug(
-    `Config loaded into process.env (${Object.keys(config).length} keys)`
-  );
+  replaceSettings(config);
+  logger.debug(`Config loaded (${Object.keys(config).length} keys)`);
   return true;
 }
 

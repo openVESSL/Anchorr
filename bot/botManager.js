@@ -9,8 +9,9 @@ import { botState, loadPendingRequests } from "./botState.js";
 import { registerInteractions } from "./interactions.js";
 import { scheduleDailyRandomPick } from "./dailyPick.js";
 import { start as startRoundupScheduler } from "./roundupScheduler.js";
-import { loadConfigToEnv } from "../utils/configFile.js";
+import { loadSettings } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 export async function startBot() {
   if (botState.isBotRunning && botState.discordClient) {
@@ -20,7 +21,7 @@ export async function startBot() {
 
   loadPendingRequests();
 
-  const configLoaded = loadConfigToEnv();
+  const configLoaded = loadSettings();
   if (!configLoaded) {
     throw new Error(
       "Configuration file (config.json) not found or is invalid."
@@ -29,7 +30,7 @@ export async function startBot() {
 
   // ----------------- VALIDATE ENV -----------------
   const REQUIRED_DISCORD = ["DISCORD_TOKEN", "BOT_ID"];
-  const missing = REQUIRED_DISCORD.filter((k) => !process.env[k]);
+  const missing = REQUIRED_DISCORD.filter((k) => !settings[k]);
   if (missing.length) {
     throw new Error(
       `Bot cannot start. Missing required Discord variables: ${missing.join(", ")}`
@@ -43,13 +44,13 @@ export async function startBot() {
   botState.discordClient = client;
 
   // ----------------- REGISTER COMMANDS -----------------
-  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+  const rest = new REST({ version: "10" }).setToken(settings.DISCORD_TOKEN);
 
   try {
     await registerCommands(
       rest,
-      process.env.BOT_ID,
-      process.env.GUILD_ID,
+      settings.BOT_ID,
+      settings.GUILD_ID,
       logger
     );
   } catch (err) {
@@ -77,7 +78,7 @@ export async function startBot() {
       resolve({ success: true, message: `Logged in as ${client.user.tag}` });
     });
 
-    client.login(process.env.DISCORD_TOKEN).catch((err) => {
+    client.login(settings.DISCORD_TOKEN).catch((err) => {
       logger.error("[DISCORD LOGIN ERROR] Bot login failed:");
       if (err && err.message) {
         logger.error("[DISCORD LOGIN ERROR] Message:", err.message);

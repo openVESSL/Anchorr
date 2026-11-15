@@ -25,6 +25,7 @@ import {
   buildIdentityKey,
 } from "./jellyfin/libraryResolver.js";
 import { PersistentMap } from "./utils/persistentMap.js";
+import { settings } from "./utils/settings.js";
 
 const debouncedSenders = new Map();
 // Persistent so dedup state survives container restarts (otherwise a restart
@@ -203,18 +204,18 @@ async function processAndSendNotification(
   );
 
   // Get embed customization settings from environment
-  const showBackdrop = process.env.EMBED_SHOW_BACKDROP !== "false";
-  const showOverviewMovies = process.env.EMBED_SHOW_OVERVIEW_MOVIES !== "false";
-  const showOverviewEpisodes = process.env.EMBED_SHOW_OVERVIEW_EPISODES !== "false";
-  const showGenre = process.env.EMBED_SHOW_GENRE !== "false";
-  const showRuntime = process.env.EMBED_SHOW_RUNTIME !== "false";
-  const showRating = process.env.EMBED_SHOW_RATING !== "false";
-  const showButtonLetterboxd = process.env.EMBED_SHOW_BUTTON_LETTERBOXD !== "false";
-  const showButtonImdb = process.env.EMBED_SHOW_BUTTON_IMDB !== "false";
-  const showButtonWatch = process.env.EMBED_SHOW_BUTTON_WATCH !== "false";
+  const showBackdrop = settings.EMBED_SHOW_BACKDROP !== "false";
+  const showOverviewMovies = settings.EMBED_SHOW_OVERVIEW_MOVIES !== "false";
+  const showOverviewEpisodes = settings.EMBED_SHOW_OVERVIEW_EPISODES !== "false";
+  const showGenre = settings.EMBED_SHOW_GENRE !== "false";
+  const showRuntime = settings.EMBED_SHOW_RUNTIME !== "false";
+  const showRating = settings.EMBED_SHOW_RATING !== "false";
+  const showButtonLetterboxd = settings.EMBED_SHOW_BUTTON_LETTERBOXD !== "false";
+  const showButtonImdb = settings.EMBED_SHOW_BUTTON_IMDB !== "false";
+  const showButtonWatch = settings.EMBED_SHOW_BUTTON_WATCH !== "false";
 
   // Check if anyone requested this content
-  const notifyEnabled = process.env.NOTIFY_ON_AVAILABLE === "true";
+  const notifyEnabled = settings.NOTIFY_ON_AVAILABLE === "true";
   let usersToNotify = [];
 
   if (notifyEnabled && tmdbId && pendingRequests) {
@@ -272,7 +273,7 @@ async function processAndSendNotification(
           }/${tmdbIdNum}`,
           {
             params: {
-              api_key: process.env.TMDB_API_KEY,
+              api_key: settings.TMDB_API_KEY,
               append_to_response: "images,external_ids",
             },
           }
@@ -417,20 +418,20 @@ async function processAndSendNotification(
 
   // Smart color coding based on content type and count
   // Use custom colors from config or fallback to defaults
-  let embedColor = process.env.EMBED_COLOR_EPISODE_SINGLE || "#89b4fa"; // Default blue for episodes
+  let embedColor = settings.EMBED_COLOR_EPISODE_SINGLE || "#89b4fa"; // Default blue for episodes
   if (ItemType === "Movie") {
-    embedColor = process.env.EMBED_COLOR_MOVIE || "#cba6f7"; // Purple/Mauve for movies
+    embedColor = settings.EMBED_COLOR_MOVIE || "#cba6f7"; // Purple/Mauve for movies
   } else if (ItemType === "Series") {
-    embedColor = process.env.EMBED_COLOR_SERIES || "#cba6f7"; // Purple/Mauve for new series
+    embedColor = settings.EMBED_COLOR_SERIES || "#cba6f7"; // Purple/Mauve for new series
   } else if (ItemType === "Season") {
-    embedColor = process.env.EMBED_COLOR_SEASON || "#89b4fa"; // Blue for seasons
+    embedColor = settings.EMBED_COLOR_SEASON || "#89b4fa"; // Blue for seasons
   } else if (ItemType === "Episode") {
     if (episodeCount > 5) {
-      embedColor = process.env.EMBED_COLOR_EPISODE_MANY || "#89b4fa"; // Blue for many episodes
+      embedColor = settings.EMBED_COLOR_EPISODE_MANY || "#89b4fa"; // Blue for many episodes
     } else if (episodeCount > 1) {
-      embedColor = process.env.EMBED_COLOR_EPISODE_FEW || "#89b4fa"; // Blue for few episodes
+      embedColor = settings.EMBED_COLOR_EPISODE_FEW || "#89b4fa"; // Blue for few episodes
     } else {
-      embedColor = process.env.EMBED_COLOR_EPISODE_SINGLE || "#89b4fa"; // Blue for single episode
+      embedColor = settings.EMBED_COLOR_EPISODE_SINGLE || "#89b4fa"; // Blue for single episode
     }
   }
 
@@ -616,8 +617,8 @@ async function processAndSendNotification(
   let shouldAnnounceInChannel = true;
 
   if (ItemType === "Episode") {
-    const episodeNotifyEnabled = process.env.JELLYFIN_NOTIFY_EPISODES === "true";
-    const episodeChannelId = process.env.JELLYFIN_EPISODE_CHANNEL_ID;
+    const episodeNotifyEnabled = settings.JELLYFIN_NOTIFY_EPISODES === "true";
+    const episodeChannelId = settings.JELLYFIN_EPISODE_CHANNEL_ID;
 
     if (!episodeNotifyEnabled) {
       // Episode notifications disabled - skip channel announcement only
@@ -629,12 +630,12 @@ async function processAndSendNotification(
       logger.debug(`Using episode-specific channel: ${channelId}`);
     } else {
       // Episode notifications enabled but no specific channel - fallback to library or default
-      channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
+      channelId = targetChannelId || settings.JELLYFIN_CHANNEL_ID;
       logger.debug(`Episode notifications enabled, using fallback channel: ${channelId}`);
     }
   } else if (ItemType === "Season") {
-    const seasonNotifyEnabled = process.env.JELLYFIN_NOTIFY_SEASONS === "true";
-    const seasonChannelId = process.env.JELLYFIN_SEASON_CHANNEL_ID;
+    const seasonNotifyEnabled = settings.JELLYFIN_NOTIFY_SEASONS === "true";
+    const seasonChannelId = settings.JELLYFIN_SEASON_CHANNEL_ID;
 
     if (!seasonNotifyEnabled) {
       // Season notifications disabled - skip channel announcement only
@@ -646,26 +647,26 @@ async function processAndSendNotification(
       logger.debug(`Using season-specific channel: ${channelId}`);
     } else {
       // Season notifications enabled but no specific channel - fallback to library or default
-      channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
+      channelId = targetChannelId || settings.JELLYFIN_CHANNEL_ID;
       logger.debug(`Season notifications enabled, using fallback channel: ${channelId}`);
     }
   } else if (ItemType === "Movie") {
-    if (process.env.JELLYFIN_NOTIFY_MOVIES === "false") {
+    if (settings.JELLYFIN_NOTIFY_MOVIES === "false") {
       logger.info(`Movie notifications disabled. Skipping channel announcement for: ${data.Name}`);
       shouldAnnounceInChannel = false;
     } else {
-      channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
+      channelId = targetChannelId || settings.JELLYFIN_CHANNEL_ID;
     }
   } else if (ItemType === "Series") {
-    if (process.env.JELLYFIN_NOTIFY_SERIES === "false") {
+    if (settings.JELLYFIN_NOTIFY_SERIES === "false") {
       logger.info(`Series notifications disabled. Skipping channel announcement for: ${data.Name}`);
       shouldAnnounceInChannel = false;
     } else {
-      channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
+      channelId = targetChannelId || settings.JELLYFIN_CHANNEL_ID;
     }
   } else {
     // Other item types - use library channel or default
-    channelId = targetChannelId || process.env.JELLYFIN_CHANNEL_ID;
+    channelId = targetChannelId || settings.JELLYFIN_CHANNEL_ID;
   }
 
   if (shouldAnnounceInChannel && !channelId) {
@@ -768,7 +769,7 @@ async function processAndSendNotification(
           dmEmbed.setURL(dmJellyfinUrl);
         }
         dmEmbed
-          .setColor(process.env.EMBED_COLOR_SUCCESS || "#a6e3a1")
+          .setColor(settings.EMBED_COLOR_SUCCESS || "#a6e3a1")
           .setDescription(
             `${
               Name || SeriesName || "Your requested content"
@@ -832,8 +833,8 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
     // Skip library detection for test notifications
     if (!libraryId && data.ItemId && !isTestNotification) {
       try {
-        const apiKey = process.env.JELLYFIN_API_KEY;
-        const baseUrl = process.env.JELLYFIN_BASE_URL;
+        const apiKey = settings.JELLYFIN_API_KEY;
+        const baseUrl = settings.JELLYFIN_BASE_URL;
 
         if (!apiKey || !baseUrl) {
           logger.warn(
@@ -932,7 +933,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
 
     // Check if this is a test notification - if so, use default channel
     if (isTestNotification) {
-      libraryChannelId = process.env.JELLYFIN_CHANNEL_ID;
+      libraryChannelId = settings.JELLYFIN_CHANNEL_ID;
       logger.info(`🧪 Test notification detected. Using default channel: ${libraryChannelId}`);
     } else {
       const notificationLibraries = getLibraryChannels();
@@ -955,13 +956,13 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
         );
       } else if (libraryKeys.length > 0 && !libraryId) {
         // Libraries are configured but we couldn't detect which library this item belongs to
-        libraryChannelId = process.env.JELLYFIN_CHANNEL_ID;
+        libraryChannelId = settings.JELLYFIN_CHANNEL_ID;
         logger.warn(
           `⚠️ Could not detect library for item "${data.Name}". Using default channel: ${libraryChannelId}`
         );
       } else {
         // No library filtering configured - use default channel
-        libraryChannelId = process.env.JELLYFIN_CHANNEL_ID;
+        libraryChannelId = settings.JELLYFIN_CHANNEL_ID;
         logger.debug(`No library filtering configured. Using default channel: ${libraryChannelId}`);
       }
     }
@@ -1211,7 +1212,7 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           ? 3000 // Force 3 seconds for batch test notifications
           : shouldUseLongerDebounce
           ? NEW_SERIES_DEBOUNCE_MS
-          : parseInt(process.env.WEBHOOK_DEBOUNCE_MS) || DEFAULT_DEBOUNCE_MS;
+          : parseInt(settings.WEBHOOK_DEBOUNCE_MS) || DEFAULT_DEBOUNCE_MS;
 
         logger.info(
           `[DEBOUNCER] Creating debouncer for ${data.ItemType} "${data.Name}" with ${debounceMs}ms timeout (new series: ${isNewSeries}, lower level: ${isLowerLevel}${isBatchTest ? ', batch test' : ''})`

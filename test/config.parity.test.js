@@ -4,9 +4,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import { CONFIG_PATH, loadConfigToEnv, readConfig, writeConfig } from "../utils/configFile.js";
+import { CONFIG_PATH, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { MASKED_PREFIX, isMaskedValue, sanitizeConfigForClient } from "../utils/configSanitize.js";
 import { normalizeSeerrUrl } from "../utils/seerrUrl.js";
+import { settings } from "../utils/settings.js";
 import { configSchema } from "../utils/validation.js";
 
 test("config lives in ANCHORR_CONFIG_DIR during tests", () => {
@@ -31,17 +32,31 @@ test("loading a v1 config migrates legacy keys and formats", () => {
     USER_MAPPINGS: [{ discordUserId: "d1", jellyseerrUserId: 5, jellyseerrDisplayName: "Bob" }],
   });
 
-  assert.equal(loadConfigToEnv(), true);
+  assert.equal(loadSettings(), true);
   const migrated = readConfig();
 
-  // v1 renames the key after normalizing, so the suffix survives on disk; every caller
-  // normalizes again, which is what matters. v2 migration should store it clean.
+  assert.equal(migrated.SEERR_URL, "http://seerr.example.com", "legacy URL is stored clean");
   assert.equal(normalizeSeerrUrl(migrated.SEERR_URL), "http://seerr.example.com");
   assert.equal(migrated.SEERR_API_KEY, "old-key");
   assert.equal(migrated.SEERR_AUTO_APPROVE, "true");
   assert.equal(migrated.JELLYSEERR_URL, undefined);
   assert.deepEqual(migrated.JELLYFIN_NOTIFICATION_LIBRARIES, { "lib-a": "chan-default", "lib-b": "chan-default" });
   assert.deepEqual(migrated.USER_MAPPINGS, [{ discordUserId: "d1", seerrUserId: 5, seerrDisplayName: "Bob" }]);
+});
+
+test("loaded config is readable through settings but never leaks into process.env (audit S5)", () => {
+  writeConfig({ SEERR_URL: "http://seerr.local", NODE_TLS_REJECT_UNAUTHORIZED: "0", TRUST_PROXY: "true" });
+  assert.equal(loadSettings(), true);
+  assert.equal(settings.SEERR_URL, "http://seerr.local");
+  assert.equal(process.env.SEERR_URL, undefined);
+  assert.equal(process.env.NODE_TLS_REJECT_UNAUTHORIZED, undefined);
+  assert.equal(settings.TRUST_PROXY, process.env.TRUST_PROXY, "deployment keys come from the environment only");
+});
+
+test("writing config refreshes settings without a reload", () => {
+  writeConfig({ LANGUAGE: "sv" });
+  assert.equal(settings.LANGUAGE, "sv");
+  assert.equal(settings.SEERR_URL, process.env.SEERR_URL, "keys removed from config fall back to the environment");
 });
 
 test("dashboard sees masked secrets and never the internal secrets or password hashes", () => {

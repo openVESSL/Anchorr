@@ -7,6 +7,7 @@ import {
   getFailureCount,
   recordFailure,
 } from "./roundupState.js";
+import { settings } from "../utils/settings.js";
 
 const ALREADY_POSTED_MIN_AGE_MS = 6 * 24 * 60 * 60 * 1000;
 const MAX_FAILURES_PER_WEEK = 3;
@@ -42,20 +43,20 @@ function msUntilNextHour(now = new Date()) {
 }
 
 export function evaluateTick(now = new Date()) {
-  if (process.env.WEEKLY_ROUNDUP_ENABLED !== "true") {
+  if (settings.WEEKLY_ROUNDUP_ENABLED !== "true") {
     return { action: "skip", reason: "not-enabled" };
   }
-  if (!process.env.WEEKLY_ROUNDUP_CHANNEL_ID) {
+  if (!settings.WEEKLY_ROUNDUP_CHANNEL_ID) {
     return { action: "skip", reason: "no-channel" };
   }
   const targetWeekday = parseIntInRange(
-    process.env.WEEKLY_ROUNDUP_WEEKDAY,
+    settings.WEEKLY_ROUNDUP_WEEKDAY,
     0,
     0,
     6
   );
   const targetHour = parseIntInRange(
-    process.env.WEEKLY_ROUNDUP_HOUR,
+    settings.WEEKLY_ROUNDUP_HOUR,
     18,
     0,
     23
@@ -105,7 +106,7 @@ async function runTick(client, now = new Date()) {
   }
   if (decision.action !== "post") return;
 
-  const channelId = process.env.WEEKLY_ROUNDUP_CHANNEL_ID;
+  const channelId = settings.WEEKLY_ROUNDUP_CHANNEL_ID;
   try {
     // Only stamp the week as done when something was actually posted —
     // otherwise a misconfig that skips the post would block retries for six
@@ -143,14 +144,14 @@ export function start(client) {
   // Named only here, not in evaluateTick — this runs once per start, so a
   // rejected value is reported without flooding the hourly tick log.
   const targetWeekday = parseIntInRange(
-    process.env.WEEKLY_ROUNDUP_WEEKDAY,
+    settings.WEEKLY_ROUNDUP_WEEKDAY,
     0,
     0,
     6,
     "WEEKLY_ROUNDUP_WEEKDAY"
   );
   const targetHour = parseIntInRange(
-    process.env.WEEKLY_ROUNDUP_HOUR,
+    settings.WEEKLY_ROUNDUP_HOUR,
     18,
     0,
     23,
@@ -163,14 +164,14 @@ export function start(client) {
   // One-shot misconfig warnings so users don't have to wait an hour to find
   // out their setup is wrong from the per-tick skip log.
   if (
-    process.env.WEEKLY_ROUNDUP_ENABLED === "true" &&
-    !process.env.WEEKLY_ROUNDUP_CHANNEL_ID
+    settings.WEEKLY_ROUNDUP_ENABLED === "true" &&
+    !settings.WEEKLY_ROUNDUP_CHANNEL_ID
   ) {
     logger.warn(
       "Weekly Roundup is enabled but WEEKLY_ROUNDUP_CHANNEL_ID is empty; ticks will skip until a channel is configured"
     );
   }
-  const roleId = process.env.WEEKLY_ROUNDUP_ROLE_ID;
+  const roleId = settings.WEEKLY_ROUNDUP_ROLE_ID;
   if (roleId && !/^\d{17,20}$/.test(roleId)) {
     logger.warn(
       `Weekly Roundup: WEEKLY_ROUNDUP_ROLE_ID="${roleId}" is not a valid Discord role ID (17–20 digits); posting without role mention`

@@ -8,6 +8,7 @@ import { jellyfinAuthHeaders } from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
 import { seedLibrary, checkSeedPreconditions } from "../jellyfin/librarySeeder.js";
 import { updateConfig } from "../utils/configFile.js";
+import { settings } from "../utils/settings.js";
 
 const router = Router();
 
@@ -31,7 +32,6 @@ router.post("/seed/reset", authenticateToken, (_req, res) => {
       message: "Failed to update config.json.",
     });
   }
-  process.env.LIBRARY_SEEDED = "false";
 
   seedLibrary().catch((err) =>
     logger.error(`librarySeeder: unexpected rejection from re-seed (${err?.message || err})`)
@@ -70,10 +70,10 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
     const { url } = req.body;
     let { apiKey } = req.body;
     if (isMaskedValue(apiKey)) {
-      if (!isSameConfiguredHost(url, process.env.JELLYFIN_BASE_URL)) {
+      if (!isSameConfiguredHost(url, settings.JELLYFIN_BASE_URL)) {
         return res.status(403).json({ success: false, message: "URL does not match the configured Jellyfin server." });
       }
-      apiKey = process.env.JELLYFIN_API_KEY;
+      apiKey = settings.JELLYFIN_API_KEY;
     }
 
     if (!url || !apiKey) {
@@ -144,8 +144,8 @@ router.post("/test-jellyfin", authenticateToken, async (req, res) => {
 // Fetch libraries from configured Jellyfin instance
 router.get("/jellyfin/libraries", authenticateToken, async (req, res) => {
   try {
-    const apiKey = process.env.JELLYFIN_API_KEY;
-    const baseUrl = process.env.JELLYFIN_BASE_URL;
+    const apiKey = settings.JELLYFIN_API_KEY;
+    const baseUrl = settings.JELLYFIN_BASE_URL;
 
     if (!apiKey || !baseUrl) {
       return res.status(400).json({
