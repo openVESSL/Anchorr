@@ -1,4 +1,4 @@
-import axios from "axios";
+import http from "../utils/http.js";
 import { createRequire } from "module";
 import logger from "../utils/logger.js";
 
@@ -38,7 +38,7 @@ export async function fetchLibraries(apiKey, baseUrl) {
     const basePathNoSlash = safeBase.pathname.replace(/\/$/, "");
     safeBase.pathname = basePathNoSlash + "/Library/VirtualFolders";
     const url = safeBase.href;
-    const response = await axios.get(url, {
+    const response = await http.get(url, {
       headers: jellyfinAuthHeaders(apiKey),
       timeout: 5000,
     });
@@ -56,7 +56,7 @@ export async function fetchLibraries(apiKey, baseUrl) {
         const itemsUrlObj = new URL(baseUrl);
         itemsUrlObj.pathname = basePathNoSlash + "/Items";
         const itemsUrl = itemsUrlObj.href;
-        const itemsResponse = await axios.get(itemsUrl, {
+        const itemsResponse = await http.get(itemsUrl, {
           headers: jellyfinAuthHeaders(apiKey),
           params: {
             Ids: vf.ItemId,
@@ -131,7 +131,7 @@ export async function findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl) {
     const safeBase = new URL(baseUrl);
     safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
     const url = safeBase.href;
-    const response = await axios.get(url, {
+    const response = await http.get(url, {
       headers: jellyfinAuthHeaders(apiKey),
       params: {
         Recursive: true,
@@ -180,7 +180,7 @@ export async function findLibraryByAncestors(
       ""
     )}/Items/${itemId}/Ancestors`;
 
-    const response = await axios.get(ancestorsUrl, {
+    const response = await http.get(ancestorsUrl, {
       headers: jellyfinAuthHeaders(apiKey),
       timeout: 5000,
     });
@@ -259,7 +259,7 @@ export async function findLibraryByAncestors(
 
         try {
           const libItemsUrl = `${baseUrl.replace(/\/$/, "")}/Items`;
-          const libResponse = await axios.get(libItemsUrl, {
+          const libResponse = await http.get(libItemsUrl, {
             headers: jellyfinAuthHeaders(apiKey),
             params: {
               ParentId: library.ItemId,
@@ -335,7 +335,7 @@ export async function fetchRecentlyAdded(
     }
 
     if (!minDateCreated) {
-      const response = await axios.get(url, {
+      const response = await http.get(url, {
         headers: jellyfinAuthHeaders(apiKey),
         params: baseParams,
         timeout: 10000,
@@ -357,7 +357,7 @@ export async function fetchRecentlyAdded(
       const params = { ...baseParams, StartIndex: startIndex };
       let page;
       try {
-        const response = await axios.get(url, {
+        const response = await http.get(url, {
           headers: jellyfinAuthHeaders(apiKey),
           params,
           timeout: 10000,

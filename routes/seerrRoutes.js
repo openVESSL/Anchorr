@@ -1,5 +1,5 @@
 import { Router } from "express";
-import axios from "axios";
+import http from "../utils/http.js";
 import { authenticateToken } from "../utils/auth.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
@@ -57,7 +57,7 @@ router.get("/seerr-users", authenticateToken, async (req, res) => {
     let response;
     try {
       logger.info("[SEERR USERS API] Fetching users from Seerr (real-time)...");
-      response = await axios.get(`${baseUrl}/user?take=1000`, {
+      response = await http.get(`${baseUrl}/user?take=1000`, {
         headers: { "X-Api-Key": apiKey },
         timeout: TIMEOUTS.SEERR_API,
       });
@@ -128,7 +128,7 @@ router.post("/test-seerr", authenticateToken, async (req, res) => {
     const safeUrl = new URL(getSeerrApiUrl(url));
     safeUrl.pathname = safeUrl.pathname.replace(/\/$/, "") + "/settings/about";
 
-    const response = await axios.get(safeUrl.href, {
+    const response = await http.get(safeUrl.href, {
       headers: { "X-Api-Key": effectiveApiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
@@ -204,7 +204,7 @@ router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
   try {
     const baseUrl = getSeerrApiUrl(seerrUrl);
 
-    const usersRes = await axios.get(`${baseUrl}/user?take=1000`, {
+    const usersRes = await http.get(`${baseUrl}/user?take=1000`, {
       headers: { "X-Api-Key": apiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
@@ -222,7 +222,7 @@ router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
       const batch = userData.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
         batch.map(async (user) => {
-          const settingsRes = await axios.get(
+          const settingsRes = await http.get(
             `${baseUrl}/user/${user.id}/settings/notifications`,
             { headers: { "X-Api-Key": apiKey }, timeout: TIMEOUTS.SEERR_API }
           );
@@ -305,7 +305,7 @@ router.get("/seerr/sync-preview", authenticateToken, async (_req, res) => {
       const batch = existingMappings.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
         batch.map(async (mapping) => {
-          const settingsRes = await axios.get(
+          const settingsRes = await http.get(
             `${baseUrl}/user/${mapping.seerrUserId}/settings/notifications`,
             { headers: { "X-Api-Key": apiKey }, timeout: TIMEOUTS.SEERR_API }
           );

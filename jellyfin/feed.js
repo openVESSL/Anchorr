@@ -7,7 +7,7 @@
  * goes through the same handler, so dedup, episode batching and channel routing are shared.
  * Like the plugin, an item waits until Jellyfin has identified it (provider IDs).
  */
-import axios from "axios";
+import http from "../utils/http.js";
 import WebSocket from "ws";
 import { fetchRecentlyAdded, jellyfinAuthHeaders } from "../api/jellyfin.js";
 import { TIMEOUTS } from "../lib/constants.js";
@@ -214,7 +214,7 @@ export class JellyfinFeed {
     for (let i = 0; i < ids.length; i += 50) {
       const url = new URL(settings.JELLYFIN_BASE_URL);
       url.pathname = url.pathname.replace(/\/$/, "") + "/Items";
-      const res = await axios.get(url.href, {
+      const res = await http.get(url.href, {
         headers: jellyfinAuthHeaders(settings.JELLYFIN_API_KEY),
         params: { Ids: ids.slice(i, i + 50).join(","), Fields: ITEM_FIELDS, EnableImages: false },
         timeout: TIMEOUTS.JELLYFIN_API,

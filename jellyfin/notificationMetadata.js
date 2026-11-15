@@ -1,4 +1,4 @@
-import axios from "axios";
+import http from "../utils/http.js";
 import { jellyfinAuthHeaders } from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
@@ -50,7 +50,7 @@ export async function resolveSeriesProviderIds(
   {
     apiKey = settings.JELLYFIN_API_KEY,
     baseUrl = settings.JELLYFIN_BASE_URL,
-    httpClient = axios,
+    httpClient = http,
   } = {}
 ) {
   if (!data || !isSeriesChild(data.ItemType) || !data.SeriesId) return null;

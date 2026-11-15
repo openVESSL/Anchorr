@@ -1,5 +1,5 @@
 import { Router } from "express";
-import axios from "axios";
+import http from "../utils/http.js";
 import { authenticateToken } from "../utils/auth.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
@@ -52,7 +52,7 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
 
     const safeUrl = new URL(url);
     safeUrl.pathname = safeUrl.pathname.replace(/\/$/, "") + "/Library/VirtualFolders";
-    const response = await axios.get(
+    const response = await http.get(
       safeUrl.href,
       {
         headers: jellyfinAuthHeaders(apiKey),
@@ -92,7 +92,7 @@ router.post("/test-jellyfin", authenticateToken, async (req, res) => {
   try {
     const safeUrl = new URL(url);
     safeUrl.pathname = safeUrl.pathname.replace(/\/$/, "") + "/System/Info/Public";
-    const response = await axios.get(safeUrl.href, { timeout: TIMEOUTS.JELLYFIN_API });
+    const response = await http.get(safeUrl.href, { timeout: TIMEOUTS.JELLYFIN_API });
 
     if (response.data?.ServerName && response.data?.Version) {
       return res.json({

@@ -4,7 +4,7 @@
  */
 
 import crypto from "node:crypto";
-import axios from "axios";
+import http from "../utils/http.js";
 import logger from "../utils/logger.js";
 import { TIMEOUTS, CACHE_TTL } from "../lib/constants.js";
 import { getSeerrApiUrl } from "../utils/seerrUrl.js";
@@ -47,7 +47,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
 
   // Fetch from Radarr servers
   try {
-    const radarrListResponse = await axios.get(
+    const radarrListResponse = await http.get(
       buildUrl("/service/radarr"),
       {
         headers: { "X-Api-Key": apiKey },
@@ -59,7 +59,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
       try {
         if (fetchDetails) {
           const serverId = parseInt(server.id, 10);
-          const detailsResponse = await axios.get(
+          const detailsResponse = await http.get(
             buildUrl(`/service/radarr/${serverId}`),
             {
               headers: { "X-Api-Key": apiKey },
@@ -85,7 +85,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
 
   // Fetch from Sonarr servers
   try {
-    const sonarrListResponse = await axios.get(
+    const sonarrListResponse = await http.get(
       buildUrl("/service/sonarr"),
       {
         headers: { "X-Api-Key": apiKey },
@@ -97,7 +97,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
       try {
         if (fetchDetails) {
           const serverId = parseInt(server.id, 10);
-          const detailsResponse = await axios.get(
+          const detailsResponse = await http.get(
             buildUrl(`/service/sonarr/${serverId}`),
             {
               headers: { "X-Api-Key": apiKey },
@@ -148,7 +148,7 @@ export async function checkMediaStatus(
         ? `${apiUrl}/movie/${tmdbId}`
         : `${apiUrl}/tv/${tmdbId}`;
 
-    const response = await axios.get(url, {
+    const response = await http.get(url, {
       headers: { "X-Api-Key": apiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
@@ -421,7 +421,7 @@ export async function sendRequest({
     `[SEERR] Requesting ${mediaType} ${tmdbId} for Discord user ${discordUserId} as Seerr user ${seerrUserId}${mappedUserId === null ? " (guest)" : ""}`
   );
   try {
-    const response = await axios.post(`${normalizeApiUrl(seerrUrl)}/request`, payload, {
+    const response = await http.post(`${normalizeApiUrl(seerrUrl)}/request`, payload, {
       headers: { "X-Api-Key": apiKey, "Content-Type": "application/json", "x-api-user": String(seerrUserId) },
       timeout: TIMEOUTS.SEERR_POST,
     });
@@ -442,7 +442,7 @@ export const GUEST_EMAIL = "discord@anchorr.invalid";
 export const GUEST_USERNAME = "Discord (Anchorr)";
 
 function seerrCall(method, seerrUrl, apiKey, path, data) {
-  return axios({
+  return http.request({
     method,
     url: `${normalizeApiUrl(seerrUrl)}${path}`,
     data,

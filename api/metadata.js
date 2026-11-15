@@ -4,7 +4,7 @@
  * in the snake_case TMDB shape the embeds already use; `getExtras` returns the
  * OMDb-style fields (imdbRating, Director, Writer) the embeds read.
  */
-import axios from "axios";
+import http from "../utils/http.js";
 import cache from "../utils/cache.js";
 import logger from "../utils/logger.js";
 import { TIMEOUTS } from "../lib/constants.js";
@@ -27,7 +27,7 @@ const encodeQuery = (params) =>
 
 async function seerrGet(path, params = {}) {
   const query = encodeQuery({ language: LANGUAGE, ...params });
-  const res = await axios.get(`${getSeerrApiUrl(settings.SEERR_URL)}${path}?${query}`, {
+  const res = await http.get(`${getSeerrApiUrl(settings.SEERR_URL)}${path}?${query}`, {
     headers: { "X-Api-Key": settings.SEERR_API_KEY },
     timeout: TIMEOUTS.SEERR_API,
   });

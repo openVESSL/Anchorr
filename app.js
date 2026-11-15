@@ -1020,7 +1020,7 @@ function configureWebServer() {
     } catch (error) {
       logger.error("Failed to send test weekly roundup:", error);
       // Cap message length, coerce to string, and strip any URL-shaped
-      // substrings before returning to the dashboard. axios occasionally
+      // substrings before returning to the dashboard. HTTP errors can
       // embeds the request URL (which may carry tokens or api_key query
       // params) in error.message; we never want that to surface in an HTTP
       // response.
