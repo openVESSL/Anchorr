@@ -4,10 +4,13 @@ const toJSON = (value) =>
   value && typeof value.toJSON === "function" ? value.toJSON() : value;
 
 function serialize(payload) {
-  return {
+  const out = {
     embeds: (payload.embeds || []).map(toJSON),
     components: (payload.components || []).filter(Boolean).map(toJSON),
   };
+  if (payload.content !== undefined) out.content = payload.content;
+  if (payload.allowedMentions !== undefined) out.allowedMentions = payload.allowedMentions;
+  return out;
 }
 
 export function createFakeDiscord({ missingChannels = [] } = {}) {
