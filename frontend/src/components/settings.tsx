@@ -76,16 +76,12 @@ export function PageHeader({ title, description, actions }: { title: string; des
   const Icon = PAGE_ICONS[useLocation().pathname]
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div className="flex items-start gap-3">
-        {Icon && (
-          <span className="bg-primary/15 text-primary grid size-10 shrink-0 place-items-center rounded-lg">
-            <Icon className="size-5" />
-          </span>
-        )}
-        <div>
+      <div>
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="text-primary size-6 shrink-0" />}
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {description && <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{description}</p>}
         </div>
+        {description && <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{description}</p>}
       </div>
       {actions}
     </div>

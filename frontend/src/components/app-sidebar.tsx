@@ -2,11 +2,9 @@ import { CheckCircle2, Circle } from "lucide-react"
 import { Link, useLocation } from "react-router"
 
 import { Logo } from "@/components/logo"
-import { CatppuccinCredit } from "@/components/theme-picker"
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -100,9 +98,6 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="px-4 pb-4">
-        <CatppuccinCredit />
-      </SidebarFooter>
     </Sidebar>
   )
 }

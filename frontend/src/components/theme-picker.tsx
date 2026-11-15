@@ -29,7 +29,7 @@ export function ThemePicker() {
   const { t } = useT()
   const { flavor, accent, setFlavor, setAccent } = useTheme()
   return (
-    <div className="space-y-4">
+    <div className="max-w-sm space-y-4">
       <div>
         <p className="mb-2 text-sm font-medium">{t("Theme")}</p>
         <div className="grid grid-cols-2 gap-1.5">
@@ -52,7 +52,7 @@ export function ThemePicker() {
       </div>
       <div>
         <p className="mb-2 text-sm font-medium">{t("Accent color")}</p>
-        <div className="grid grid-cols-7 gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {ACCENTS.map((a) => (
             <button
               key={a}
@@ -60,7 +60,7 @@ export function ThemePicker() {
               aria-label={a}
               aria-pressed={accent === a}
               title={a}
-              className="grid aspect-square place-items-center rounded-full ring-offset-2 ring-offset-[var(--popover)] focus-visible:ring-2"
+              className="grid size-7 place-items-center rounded-full ring-offset-2 ring-offset-[var(--popover)] focus-visible:ring-2"
               style={{ background: `var(--ctp-${a})` }}
             >
               {accent === a && <Check className="size-3.5" style={{ color: "var(--on-accent)" }} />}

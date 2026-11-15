@@ -48,8 +48,8 @@ export function LoginPage() {
 
   return (
     <div className="grid min-h-svh place-items-center p-4">
-      <Card className="border-t-primary w-full max-w-sm border-t-2">
-        <CardHeader className="items-center text-center">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="justify-items-center text-center">
           <Logo className="mb-2 size-12" />
           <CardTitle className="text-xl">{t("Sign in to Anchorr")}</CardTitle>
           <CardDescription>
