@@ -1,5 +1,7 @@
 // Dashboard test buttons: sample notifications, Daily Random Pick and Weekly Roundup.
 import { Router } from "express";
+import * as metadata from "../api/metadata.js";
+import { handleJellyfinWebhook } from "../jellyfinWebhook.js";
 import { sendDailyRandomPick } from "../bot/dailyPick.js";
 import { botState, pendingRequests, savePendingRequests } from "../bot/botState.js";
 import { sendWeeklyRoundupTest } from "../bot/weeklyRoundup.js";
@@ -40,7 +42,6 @@ router.post("/test-notification", authenticateToken, async (req, res) => {
     }
 
     // Real titles from Seerr make the test notifications realistic
-    const metadata = await import("./api/metadata.js");
     if (!metadata.isMetadataConfigured()) {
       return res.status(400).json({
         success: false,
@@ -126,8 +127,6 @@ router.post("/test-notification", authenticateToken, async (req, res) => {
       // The Mandalorian - Send 2 separate season notifications to test batching (TMDB ID: 82856)
       const seriesDetails = await metadata.getDetails(82856, "tv");
       const imdbId = await metadata.getImdbId(82856, "tv");
-
-      const { handleJellyfinWebhook } = await import("./jellyfinWebhook.js");
       const baseSeriesId = "batch-test-series-" + Date.now();
 
       // Send Season 1
@@ -177,8 +176,6 @@ router.post("/test-notification", authenticateToken, async (req, res) => {
       // Stranger Things - Send 6 separate episode notifications to test batching (TMDB ID: 66732)
       const seriesDetails = await metadata.getDetails(66732, "tv");
       const imdbId = await metadata.getImdbId(66732, "tv");
-
-      const { handleJellyfinWebhook } = await import("./jellyfinWebhook.js");
       const baseSeriesId = "batch-test-series-" + Date.now();
 
       const episodes = [
@@ -221,7 +218,6 @@ router.post("/test-notification", authenticateToken, async (req, res) => {
     }
 
     // Import webhook handler
-    const { handleJellyfinWebhook } = await import("./jellyfinWebhook.js");
 
     // Create a fake request object with the test data
     const fakeReq = {
@@ -262,9 +258,7 @@ router.post("/test-random-pick", authenticateToken, async (_req, res) => {
         message: "Daily Random Pick channel must be configured first.",
       });
     }
-
-    const { isMetadataConfigured } = await import("./api/metadata.js");
-    if (!isMetadataConfigured()) {
+    if (!metadata.isMetadataConfigured()) {
       return res.status(400).json({
         success: false,
         message: "Seerr must be configured for the Daily Random Pick.",
