@@ -1,57 +1,34 @@
-// Parity net for the dashboard HTTP API. Starts the real app.js in a child process
-// (temp data dir, free port, bot auto-start off, network guard) and talks to it over HTTP.
+// Parity net for the dashboard HTTP API: the real app.js in a child process, over HTTP.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import net from "node:net";
-import path from "node:path";
 import test, { after, before } from "node:test";
-import { fileURLToPath } from "node:url";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+import { startApp } from "./helpers/app.js";
+import { startFakeServer } from "./helpers/http.js";
 
-async function freePort() {
-  const srv = net.createServer();
-  await new Promise((resolve) => srv.listen(0, "127.0.0.1", resolve));
-  const { port } = srv.address();
-  await new Promise((resolve) => srv.close(resolve));
-  return port;
-}
-
-let child;
-let base;
+let app;
+let jellyfin;
 before(async () => {
-  const port = await freePort();
-  base = `http://127.0.0.1:${port}`;
-  child = spawn(process.execPath, ["--import", "./test/setup.js", "app.js"], {
-    cwd: ROOT,
-    env: { ...process.env, WEBHOOK_PORT: String(port), BIND_HOST: "127.0.0.1", AUTO_START_BOT: "false" },
-    stdio: "ignore",
+  // Minimal Jellyfin so the first run can be claimed by an administrator (audit S4)
+  jellyfin = await startFakeServer({
+    "GET /System/Info/Public": () => ({ ServerName: "Home", Version: "12.4.0", Id: "srv-1" }),
+    "POST /Users/AuthenticateByName": ({ body }) =>
+      body.Username === "jf-admin" && body.Pw === "jf-pw"
+        ? { AccessToken: "tok", User: { Id: "u1", Name: "jf-admin", Policy: { IsAdministrator: true } }, ServerId: "srv-1" }
+        : { status: 401, json: {} },
+    "GET /Auth/Keys": () => ({ Items: [{ AppName: "Anchorr", AccessToken: "jf-key", IsActive: true, DateCreated: "2026-01-01" }] }),
+    "POST /Sessions/Logout": () => ({ status: 204 }),
   });
-  for (let i = 0; i < 100; i++) {
-    try {
-      if ((await fetch(`${base}/api/health`)).ok) return;
-    } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error("app.js did not start");
+  app = await startApp();
 });
-after(() => child?.kill());
+after(async () => {
+  app?.stop();
+  await jellyfin?.close();
+});
 
 let cookie = "";
 async function api(method, url, body, { auth = true, headers = {} } = {}) {
-  const res = await fetch(base + url, {
-    method,
-    headers: {
-      ...(body !== undefined && { "content-type": "application/json" }),
-      ...(auth && cookie && { cookie }),
-      ...headers,
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  let json = null;
-  try { json = JSON.parse(text); } catch {}
-  return { status: res.status, json, setCookie: res.headers.get("set-cookie") };
+  app.cookie = cookie;
+  return app.call(method, url, body, { auth, headers });
 }
 const tokenFrom = (setCookie) => setCookie?.match(/auth_token=[^;]+/)?.[0];
 
@@ -68,18 +45,21 @@ test("config endpoints need a session", async () => {
   assert.equal((await api("POST", "/api/save-config", {}, { auth: false })).status, 401);
 });
 
-test("first run: no users yet, the first registration becomes the admin and is logged in", async () => {
+test("first run: a Jellyfin admin claims the install, then one local account can be added", async () => {
   const check = await api("GET", "/api/auth/check", undefined, { auth: false });
-  assert.deepEqual(check.json, { isAuthenticated: false, hasUsers: false });
+  assert.deepEqual(check.json, { isAuthenticated: false, hasUsers: false, jellyfinLogin: false, needsSetup: true });
+  assert.equal((await api("POST", "/api/auth/register", { username: "admin", password: "correct horse" }, { auth: false })).status, 401);
 
-  const reg = await api("POST", "/api/auth/register", { username: "admin", password: "correct horse" }, { auth: false });
-  assert.equal(reg.status, 200);
-  assert.match(reg.setCookie, /auth_token=/);
-  assert.match(reg.setCookie, /HttpOnly/i);
-  assert.match(reg.setCookie, /SameSite=Strict/i);
+  const claim = await api("POST", "/api/setup/jellyfin", { url: jellyfin.url, username: "jf-admin", password: "jf-pw" }, { auth: false });
+  assert.equal(claim.status, 200);
+  assert.match(claim.setCookie, /auth_token=/);
+  assert.match(claim.setCookie, /HttpOnly/i);
+  assert.match(claim.setCookie, /SameSite=Strict/i);
+  cookie = tokenFrom(claim.setCookie);
 
-  const second = await api("POST", "/api/auth/register", { username: "other", password: "x" }, { auth: false });
-  assert.equal(second.status, 403);
+  assert.equal((await api("POST", "/api/auth/register", { username: "admin", password: "correct horse" })).status, 200);
+  assert.equal((await api("POST", "/api/auth/register", { username: "other", password: "x" })).status, 403);
+  cookie = "";
 });
 
 test("login: wrong password is rejected, right password sets the session cookie", async () => {

@@ -497,3 +497,32 @@ export async function setGuestAutoApprove({ seerrUrl, apiKey, guestUserId, autoA
   if (next !== current) await seerrCall("put", seerrUrl, apiKey, `/user/${id}`, { permissions: next });
   return next;
 }
+
+// ----- setup -----
+
+/** Seerr version for a URL + API key (throws on a wrong key or URL). */
+export async function getSeerrVersion(seerrUrl, apiKey) {
+  const { data } = await http.get(`${normalizeApiUrl(seerrUrl)}/settings/about`, {
+    headers: { "X-Api-Key": apiKey },
+    timeout: TIMEOUTS.SEERR_API,
+  });
+  return data?.version ?? null;
+}
+
+/**
+ * Reads Seerr's API key by signing in with a Jellyfin account (Seerr admins sign in this way).
+ * The Seerr session is closed right after; the password is not kept.
+ */
+export async function getApiKeyWithJellyfinLogin(seerrUrl, username, password) {
+  const base = normalizeApiUrl(seerrUrl);
+  const login = await http.post(`${base}/auth/jellyfin`, { username, password }, { timeout: TIMEOUTS.SEERR_API });
+  const cookie = login.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+  if (!cookie) throw new Error("Seerr did not start a session");
+  try {
+    const { data } = await http.get(`${base}/settings/main`, { headers: { Cookie: cookie }, timeout: TIMEOUTS.SEERR_API });
+    if (!data?.apiKey) throw new Error("This Seerr account cannot read the API key");
+    return data.apiKey;
+  } finally {
+    await http.post(`${base}/auth/logout`, undefined, { headers: { Cookie: cookie }, timeout: TIMEOUTS.SEERR_API }).catch(() => {});
+  }
+}

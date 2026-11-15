@@ -16,6 +16,18 @@ import { loadSettings } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
 
+/** (Re)starts watching Jellyfin; new items go through the same handler the webhook plugin used to feed. */
+export function startJellyfinFeed(client = botState.discordClient) {
+  botState.jellyfinFeed?.stop();
+  botState.jellyfinFeed = null;
+  if (!client || !botState.isBotRunning) return;
+  botState.jellyfinFeed = new JellyfinFeed({
+    dispatch: (payload) =>
+      handleJellyfinWebhook({ body: payload }, null, client, pendingRequests, savePendingRequests),
+  });
+  botState.jellyfinFeed.start();
+}
+
 export async function startBot() {
   if (botState.isBotRunning && botState.discordClient) {
     logger.info("Bot is already running.");
@@ -76,13 +88,7 @@ export async function startBot() {
       logger.info(`✅ Bot logged in as ${client.user.tag}`);
       botState.isBotRunning = true;
 
-      // New Jellyfin items go through the same handler the webhook plugin used to feed
-      botState.jellyfinFeed?.stop();
-      botState.jellyfinFeed = new JellyfinFeed({
-        dispatch: (payload) =>
-          handleJellyfinWebhook({ body: payload }, null, client, pendingRequests, savePendingRequests),
-      });
-      botState.jellyfinFeed.start();
+      startJellyfinFeed(client);
 
       scheduleDailyRandomPick(client);
       startRoundupScheduler(client);

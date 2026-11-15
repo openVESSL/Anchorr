@@ -24,6 +24,7 @@ import { createBotRoutes } from "./routes/botRoutes.js";
 import discordRouter from "./routes/discordRoutes.js";
 import saveConfigRouter from "./routes/saveConfigRoutes.js";
 import testRouter from "./routes/testRoutes.js";
+import setupRouter from "./routes/setupRoutes.js";
 import { startBot } from "./bot/botManager.js";
 import { CONFIG_PATH, loadSettings } from "./utils/configFile.js";
 import { settings } from "./utils/settings.js";
@@ -147,8 +148,9 @@ function configureWebServer() {
     legacyHeaders: false,
   });
 
-  // Auth routes (before general rate limiter so authLimiter applies)
+  // Auth and setup routes (before general rate limiter so their own limiters apply)
   app.use("/api", authRouter);
+  app.use("/api", setupRouter);
 
   // Apply rate limiting to all API endpoints (except auth and webhooks)
   app.use("/api/", apiLimiter);

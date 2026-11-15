@@ -21,9 +21,13 @@ export function jellyfinAuthHeaders(apiKey) {
       "Jellyfin API key contains characters that are invalid in an Authorization header (quotes, comma, backslash or control characters)"
     );
   }
-  return {
-    Authorization: `MediaBrowser Client="Anchorr", Device="Anchorr", DeviceId="anchorr-bot", Version="${APP_VERSION}", Token="${key}"`,
-  };
+  return jellyfinClientHeaders(key);
+}
+
+/** Jellyfin client identification, with a token when there is one (login requests have none). */
+export function jellyfinClientHeaders(token = null) {
+  const client = `MediaBrowser Client="Anchorr", Device="Anchorr", DeviceId="anchorr-bot", Version="${APP_VERSION}"`;
+  return { Authorization: token ? `${client}, Token="${token}"` : client };
 }
 
 /**

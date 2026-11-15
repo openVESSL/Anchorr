@@ -20,7 +20,7 @@ export async function startFakeServer(routes) {
     const result = await handler({ url, headers: req.headers, body });
     const status = result?.status ?? 200;
     const json = result && "json" in result ? result.json : result;
-    res.writeHead(status, { "content-type": "application/json" });
+    res.writeHead(status, { "content-type": "application/json", ...(result?.headers || {}) });
     res.end(JSON.stringify(json ?? {}));
   });
 
