@@ -4,7 +4,7 @@ import {
   ButtonStyle,
   ActionRowBuilder,
 } from "discord.js";
-import * as tmdbApi from "../api/tmdb.js";
+import { getRandomMedia, isMetadataConfigured } from "../api/metadata.js";
 import { isValidUrl } from "../utils/url.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
@@ -49,12 +49,11 @@ export function scheduleDailyRandomPick(client) {
 
 export async function sendDailyRandomPick(client) {
   try {
-    const TMDB_API_KEY = settings.TMDB_API_KEY;
     const channelId = settings.DAILY_RANDOM_PICK_CHANNEL_ID;
 
-    if (!TMDB_API_KEY || !channelId) return;
+    if (!isMetadataConfigured() || !channelId) return;
 
-    const randomMedia = await tmdbApi.tmdbGetRandomMedia(TMDB_API_KEY);
+    const randomMedia = await getRandomMedia();
     if (!randomMedia) {
       logger.warn("Could not fetch random media for daily pick");
       return;

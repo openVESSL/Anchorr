@@ -11,8 +11,6 @@ const SENSITIVE_FIELDS = new Set([
   "JELLYFIN_API_KEY",
   "WEBHOOK_SECRET",
   "JWT_SECRET",
-  "TMDB_API_KEY",
-  "OMDB_API_KEY",
 ]);
 
 const B64_PREFIX = "b64:";
@@ -250,6 +248,22 @@ export function updateConfig(updates) {
   return writeConfig(updatedConfig);
 }
 
+export const CURRENT_CONFIG_VERSION = 2;
+
+// Keeps the first pre-upgrade config.json next to it; never overwrites an earlier backup.
+function backupV1Config() {
+  const backupPath = path.join(path.dirname(CONFIG_PATH), "config.v1.json");
+  try {
+    if (!fs.existsSync(backupPath) && fs.existsSync(CONFIG_PATH)) {
+      fs.copyFileSync(CONFIG_PATH, backupPath);
+      fs.chmodSync(backupPath, 0o600);
+      logger.info(`💾 Saved a copy of the v1 config to ${backupPath}`);
+    }
+  } catch (err) {
+    logger.warn(`Could not back up the v1 config: ${err.message}`);
+  }
+}
+
 /**
  * Loads config.json into the runtime settings store (utils/settings.js)
  * Includes automatic migrations for backwards compatibility
@@ -396,6 +410,20 @@ export function loadSettings() {
       logger.info("✅ Embed overview migration saved to config.json");
     } else {
       logger.error("❌ Failed to save embed overview migration");
+    }
+  }
+
+  // 6. v2 format: Seerr provides all metadata, so TMDB/OMDb keys and v1 UI leftovers go.
+  // The untouched v1 file is kept once as config.v1.json.
+  if ((Number(config.CONFIG_VERSION) || 1) < CURRENT_CONFIG_VERSION) {
+    const obsolete = ["TMDB_API_KEY", "OMDB_API_KEY", "HEADER_VISIBLE", "startBot"].filter((k) => k in config);
+    if (obsolete.length > 0) backupV1Config();
+    for (const key of obsolete) delete config[key];
+    config.CONFIG_VERSION = CURRENT_CONFIG_VERSION;
+    if (writeConfig(config)) {
+      logger.info(`✅ Config upgraded to format v${CURRENT_CONFIG_VERSION}${obsolete.length ? ` (removed: ${obsolete.join(", ")})` : ""}`);
+    } else {
+      logger.error("❌ Failed to save config format upgrade");
     }
   }
 

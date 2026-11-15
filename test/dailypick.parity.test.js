@@ -1,34 +1,40 @@
-// Parity net for the Daily Random Pick post. The random title source (TMDB in v1) is mocked;
-// v2 swaps it for Seerr discover data with the same fields.
+// Parity net for the Daily Random Pick post. Titles come from a fake Seerr; Math.random is
+// pinned so the "trending" strategy and its first title are always picked.
 import assert from "node:assert/strict";
-import test, { mock } from "node:test";
+import test, { after, before } from "node:test";
 
 import { applyConfig } from "./helpers/config.js";
 import { createFakeDiscord } from "./helpers/discord.js";
+import { startFakeServer } from "./helpers/http.js";
 
-const realTmdb = await import("../api/tmdb.js");
-let nextPick = null;
-mock.module("../api/tmdb.js", {
-  namedExports: { ...realTmdb, tmdbGetRandomMedia: async () => nextPick },
-});
 const { sendDailyRandomPick } = await import("../bot/dailyPick.js");
+const { default: cache } = await import("../utils/cache.js");
+
+let trending = [];
+let seerr;
+before(async () => {
+  seerr = await startFakeServer({
+    "GET /api/v1/discover/trending": () => ({ results: trending }),
+    "GET /api/v1/movie/603": () => ({
+      id: 603, title: "The Matrix", genres: [{ name: "Action" }, { name: "Sci-Fi" }], externalIds: { imdbId: "tt0133093" },
+    }),
+    "GET /api/v1/tv/1399": () => ({ id: 1399, name: "Game of Thrones", genres: [], externalIds: {} }),
+  });
+});
+after(() => seerr.close());
 
 function configure(t, values = {}) {
-  t.after(applyConfig({ TMDB_API_KEY: "tmdb-key", DAILY_RANDOM_PICK_CHANNEL_ID: "chan-pick", ...values }));
+  t.mock.method(Math, "random", () => 0);
+  cache.clearAll(); // trending is cached between calls
+  t.after(applyConfig({ SEERR_URL: seerr.url, SEERR_API_KEY: "seerr-key", DAILY_RANDOM_PICK_CHANNEL_ID: "chan-pick", ...values }));
 }
 
 test("movie pick: embed, rating, genres, backdrop and Letterboxd/IMDb/Request buttons", async (t) => {
   configure(t);
-  nextPick = {
-    id: 603,
-    media_type: "movie",
-    title: "The Matrix",
-    release_date: "1999-03-31",
-    overview: "Neo wakes up.",
-    vote_average: 8.217,
-    backdrop_path: "/matrix.jpg",
-    details: { genres: [{ name: "Action" }, { name: "Sci-Fi" }], external_ids: { imdb_id: "tt0133093" } },
-  };
+  trending = [{
+    id: 603, mediaType: "movie", title: "The Matrix", releaseDate: "1999-03-31",
+    overview: "Neo wakes up.", voteAverage: 8.217, backdropPath: "/matrix.jpg",
+  }];
   const discord = createFakeDiscord();
   await sendDailyRandomPick(discord.client);
 
@@ -54,7 +60,7 @@ test("movie pick: embed, rating, genres, backdrop and Letterboxd/IMDb/Request bu
 
 test("TV pick: no Letterboxd button, long overview is cut to 300 characters", async (t) => {
   configure(t);
-  nextPick = { id: 1399, media_type: "tv", name: "Game of Thrones", first_air_date: "2011-04-17", overview: "x".repeat(400) };
+  trending = [{ id: 1399, mediaType: "tv", name: "Game of Thrones", firstAirDate: "2011-04-17", overview: "x".repeat(400) }];
   const discord = createFakeDiscord();
   await sendDailyRandomPick(discord.client);
 
@@ -65,14 +71,19 @@ test("TV pick: no Letterboxd button, long overview is cut to 300 characters", as
   assert.deepEqual(post.components[0].components.map((b) => b.label), ["Request"]);
 });
 
-test("nothing is posted without a channel or when no title is found", async (t) => {
-  configure(t, { DAILY_RANDOM_PICK_CHANNEL_ID: undefined });
-  nextPick = { id: 1, media_type: "movie", title: "X" };
+test("nothing is posted without a channel, without Seerr, or when no title is found", async (t) => {
   const discord = createFakeDiscord();
+  trending = [{ id: 603, mediaType: "movie", title: "The Matrix" }];
+
+  configure(t, { DAILY_RANDOM_PICK_CHANNEL_ID: undefined });
   await sendDailyRandomPick(discord.client);
 
-  applyConfig({ DAILY_RANDOM_PICK_CHANNEL_ID: "chan-pick" });
-  nextPick = null;
+  t.after(applyConfig({ DAILY_RANDOM_PICK_CHANNEL_ID: "chan-pick", SEERR_API_KEY: undefined }));
   await sendDailyRandomPick(discord.client);
+
+  t.after(applyConfig({ SEERR_API_KEY: "seerr-key" }));
+  trending = [];
+  await sendDailyRandomPick(discord.client);
+
   assert.equal(discord.sent.length, 0);
 });

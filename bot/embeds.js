@@ -5,7 +5,7 @@ import {
   ActionRowBuilder,
   StringSelectMenuBuilder,
 } from "discord.js";
-import * as tmdbApi from "../api/tmdb.js";
+import { findBestBackdrop } from "../api/metadata.js";
 import { minutesToHhMm } from "../utils/time.js";
 import { COLORS } from "../lib/constants.js";
 import { getSeerrApiUrl, normalizeSeerrUrl } from "../utils/seerrUrl.js";
@@ -111,7 +111,7 @@ export function buildNotificationEmbed(
           : COLORS.DEFAULT
     );
 
-  const backdropPath = tmdbApi.findBestBackdrop(details);
+  const backdropPath = findBestBackdrop(details);
   const backdrop = backdropPath
     ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
     : null;

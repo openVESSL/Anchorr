@@ -1,7 +1,6 @@
 import { ActionRowBuilder, StringSelectMenuBuilder } from "discord.js";
-import * as tmdbApi from "../api/tmdb.js";
+import * as metadata from "../api/metadata.js";
 import * as seerrApi from "../api/seerr.js";
-import { fetchOMDbData } from "../api/omdb.js";
 import { buildNotificationEmbed, buildButtons } from "./embeds.js";
 import {
   getOptionStringRobust,
@@ -23,7 +22,6 @@ import { settings } from "../utils/settings.js";
 // Convenience accessors: read settings at call time so config reloads are respected
 const getSeerrUrl = () => getSeerrApiUrl(settings.SEERR_URL || "");
 const getSeerrApiKey = () => settings.SEERR_API_KEY;
-const getTmdbApiKey = () => settings.TMDB_API_KEY;
 
 // Server/quality picked in /request for a TV show, held until the user presses the
 // season Request button (customIds are too small to carry them). Keyed by user + show;
@@ -113,7 +111,7 @@ async function handleSearchOrRequest(
   if (rawInput.includes("|")) {
     [tmdbId, mediaType] = rawInput.split("|");
   } else {
-    const results = await tmdbApi.tmdbSearch(rawInput, getTmdbApiKey());
+    const results = await metadata.searchTitles(rawInput);
     const found = results.filter(
       (r) => r.media_type === "movie" || r.media_type === "tv"
     );
@@ -138,11 +136,7 @@ async function handleSearchOrRequest(
   }
 
   try {
-    const details = await tmdbApi.tmdbGetDetails(
-      tmdbId,
-      mediaType,
-      getTmdbApiKey()
-    );
+    const details = await metadata.getDetails(tmdbId, mediaType);
 
     // TV shows go through the season picker instead of requesting every season at once
     const instantRequest = mode === "request" && mediaType !== "tv";
@@ -258,13 +252,9 @@ async function handleSearchOrRequest(
       }
     }
 
-    const imdbId = await tmdbApi.tmdbGetExternalImdb(
-      tmdbId,
-      mediaType,
-      getTmdbApiKey()
-    );
+    const imdbId = await metadata.getImdbId(tmdbId, mediaType);
 
-    const omdb = imdbId ? await fetchOMDbData(imdbId) : null;
+    const omdb = await metadata.getExtras(tmdbId, mediaType);
 
     const embed = buildNotificationEmbed(
       details,
@@ -577,9 +567,7 @@ export function registerInteractions(client) {
         // Trending autocomplete
         if (interaction.commandName === "trending") {
           try {
-            const trendingResults = await tmdbApi.tmdbGetTrending(
-              getTmdbApiKey()
-            );
+            const trendingResults = await metadata.getTrending();
             const filtered = trendingResults
               .filter(
                 (r) => r.media_type === "movie" || r.media_type === "tv"
@@ -613,10 +601,7 @@ export function registerInteractions(client) {
         if (!focusedValue) return interaction.respond([]);
 
         try {
-          const results = await tmdbApi.tmdbSearch(
-            focusedValue,
-            getTmdbApiKey()
-          );
+          const results = await metadata.searchTitles(focusedValue);
           const filtered = results
             .filter(
               (r) => r.media_type === "movie" || r.media_type === "tv"
@@ -641,10 +626,10 @@ export function registerInteractions(client) {
 
       // Commands
       if (interaction.isCommand()) {
-        if (!getSeerrUrl() || !getSeerrApiKey() || !getTmdbApiKey()) {
+        if (!getSeerrUrl() || !getSeerrApiKey()) {
           return interaction.reply({
             content:
-              "⚠️ This command is disabled because Seerr or TMDB configuration is missing.",
+              "⚠️ This command is disabled because Seerr is not configured.",
             flags: 64,
           });
         }
@@ -687,11 +672,7 @@ export function registerInteractions(client) {
         await interaction.deferUpdate();
 
         try {
-          const details = await tmdbApi.tmdbGetDetails(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
+          const details = await metadata.getDetails(tmdbId, mediaType);
 
           const selectedSeasons = seasonsParam ? seasonsParam.split(",") : [];
           const selectedTagNames = tagsParam ? tagsParam.split(",") : [];
@@ -815,12 +796,8 @@ export function registerInteractions(client) {
             savePendingRequests();
           }
 
-          const imdbId = await tmdbApi.tmdbGetExternalImdb(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
-          const omdb = imdbId ? await fetchOMDbData(imdbId) : null;
+          const imdbId = await metadata.getImdbId(tmdbId, mediaType);
+          const omdb = await metadata.getExtras(tmdbId, mediaType);
 
           const embed = buildNotificationEmbed(
             details,
@@ -882,16 +859,8 @@ export function registerInteractions(client) {
             ? selectedTagsParam.split(",")
             : [];
 
-          const details = await tmdbApi.tmdbGetDetails(
-            tmdbId,
-            "tv",
-            getTmdbApiKey()
-          );
-          const imdbId = await tmdbApi.tmdbGetExternalImdb(
-            tmdbId,
-            "tv",
-            getTmdbApiKey()
-          );
+          const details = await metadata.getDetails(tmdbId, "tv");
+          const imdbId = await metadata.getImdbId(tmdbId, "tv");
 
           let allSelectedSeasons = [];
 
@@ -1136,11 +1105,7 @@ export function registerInteractions(client) {
         await interaction.deferUpdate();
 
         try {
-          const details = await tmdbApi.tmdbGetDetails(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
+          const details = await metadata.getDetails(tmdbId, mediaType);
 
           const { profileId, serverId } = parseQualityAndServerOptions(
             {},
@@ -1208,16 +1173,8 @@ export function registerInteractions(client) {
         try {
           const mediaType = selectedSeasons.length > 0 ? "tv" : "movie";
 
-          const details = await tmdbApi.tmdbGetDetails(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
-          const imdbId = await tmdbApi.tmdbGetExternalImdb(
-            tmdbId,
-            mediaType,
-            getTmdbApiKey()
-          );
+          const details = await metadata.getDetails(tmdbId, mediaType);
+          const imdbId = await metadata.getImdbId(tmdbId, mediaType);
 
           let selectedTagNames = [];
           if (selectedTagIds.length > 0) {

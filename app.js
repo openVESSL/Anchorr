@@ -772,14 +772,12 @@ function configureWebServer() {
         });
       }
 
-      // Fetch real data from TMDB/OMDB for realistic test notifications
-      const { tmdbGetDetails, tmdbGetExternalImdb } = await import("./api/tmdb.js");
-
-      const TMDB_API_KEY = settings.TMDB_API_KEY;
-      if (!TMDB_API_KEY) {
+      // Real titles from Seerr make the test notifications realistic
+      const metadata = await import("./api/metadata.js");
+      if (!metadata.isMetadataConfigured()) {
         return res.status(400).json({
           success: false,
-          message: "TMDB API key is required for test notifications. Configure it in Step 3.",
+          message: "Seerr must be configured for test notifications.",
         });
       }
 
@@ -788,8 +786,8 @@ function configureWebServer() {
       // Build realistic notification data based on type
       if (type === "movie") {
         // Interstellar TMDB ID: 157336
-        const movieDetails = await tmdbGetDetails(157336, "movie", TMDB_API_KEY);
-        const imdbId = await tmdbGetExternalImdb(157336, "movie", TMDB_API_KEY);
+        const movieDetails = await metadata.getDetails(157336, "movie");
+        const imdbId = await metadata.getImdbId(157336, "movie");
 
         notificationData = {
           ItemType: "Movie",
@@ -804,8 +802,8 @@ function configureWebServer() {
         };
       } else if (type === "series") {
         // Breaking Bad TMDB ID: 1396
-        const seriesDetails = await tmdbGetDetails(1396, "tv", TMDB_API_KEY);
-        const imdbId = await tmdbGetExternalImdb(1396, "tv", TMDB_API_KEY);
+        const seriesDetails = await metadata.getDetails(1396, "tv");
+        const imdbId = await metadata.getImdbId(1396, "tv");
 
         notificationData = {
           ItemType: "Series",
@@ -820,8 +818,8 @@ function configureWebServer() {
         };
       } else if (type === "season") {
         // Breaking Bad Season 1
-        const seriesDetails = await tmdbGetDetails(1396, "tv", TMDB_API_KEY);
-        const imdbId = await tmdbGetExternalImdb(1396, "tv", TMDB_API_KEY);
+        const seriesDetails = await metadata.getDetails(1396, "tv");
+        const imdbId = await metadata.getImdbId(1396, "tv");
 
         notificationData = {
           ItemType: "Season",
@@ -839,8 +837,8 @@ function configureWebServer() {
         };
       } else if (type === "episodes") {
         // Breaking Bad first episodes
-        const seriesDetails = await tmdbGetDetails(1396, "tv", TMDB_API_KEY);
-        const imdbId = await tmdbGetExternalImdb(1396, "tv", TMDB_API_KEY);
+        const seriesDetails = await metadata.getDetails(1396, "tv");
+        const imdbId = await metadata.getImdbId(1396, "tv");
 
         notificationData = {
           ItemType: "Episode",
@@ -859,8 +857,8 @@ function configureWebServer() {
         };
       } else if (type === "batch-seasons") {
         // The Mandalorian - Send 2 separate season notifications to test batching (TMDB ID: 82856)
-        const seriesDetails = await tmdbGetDetails(82856, "tv", TMDB_API_KEY);
-        const imdbId = await tmdbGetExternalImdb(82856, "tv", TMDB_API_KEY);
+        const seriesDetails = await metadata.getDetails(82856, "tv");
+        const imdbId = await metadata.getImdbId(82856, "tv");
 
         const { handleJellyfinWebhook } = await import("./jellyfinWebhook.js");
         const baseSeriesId = "batch-test-series-" + Date.now();
@@ -910,8 +908,8 @@ function configureWebServer() {
         });
       } else if (type === "batch-episodes") {
         // Stranger Things - Send 6 separate episode notifications to test batching (TMDB ID: 66732)
-        const seriesDetails = await tmdbGetDetails(66732, "tv", TMDB_API_KEY);
-        const imdbId = await tmdbGetExternalImdb(66732, "tv", TMDB_API_KEY);
+        const seriesDetails = await metadata.getDetails(66732, "tv");
+        const imdbId = await metadata.getImdbId(66732, "tv");
 
         const { handleJellyfinWebhook } = await import("./jellyfinWebhook.js");
         const baseSeriesId = "batch-test-series-" + Date.now();
@@ -998,11 +996,11 @@ function configureWebServer() {
         });
       }
 
-      const TMDB_API_KEY = settings.TMDB_API_KEY;
-      if (!TMDB_API_KEY) {
+      const { isMetadataConfigured } = await import("./api/metadata.js");
+      if (!isMetadataConfigured()) {
         return res.status(400).json({
           success: false,
-          message: "TMDB API key is required. Configure it in Step 3.",
+          message: "Seerr must be configured for the Daily Random Pick.",
         });
       }
 

@@ -1,50 +1,42 @@
 // Parity net for slash commands, autocomplete, buttons and select menus.
-// Seerr is a fake HTTP server (the stable boundary); TMDB is replaced at module level
-// because v1 hardcodes its URL. v2 swaps that mock for the Seerr metadata source.
+// Seerr is a fake HTTP server: it serves requests, services and, in v2, all metadata.
 import assert from "node:assert/strict";
-import test, { after, before, mock } from "node:test";
+import test, { after, before } from "node:test";
 
 import { applyConfig } from "./helpers/config.js";
 import { captureHandler, createInteraction } from "./helpers/interaction.js";
 import { startFakeServer } from "./helpers/http.js";
 
-const realTmdb = await import("../api/tmdb.js");
-
+// Seerr detail payloads (camelCase, as Seerr returns them); mediaInfo drives availability.
 const MOVIES = {
-  603: { id: 603, title: "The Matrix", release_date: "1999-03-31", overview: "Neo wakes up.", runtime: 136, genres: [{ id: 28, name: "Action" }], original_language: "en", backdrop_path: "/matrix.jpg", poster_path: "/matrix-p.jpg" },
-  604: { id: 604, title: "Already Here", release_date: "2003-05-15", overview: "x", runtime: 100, genres: [], original_language: "en" },
-  605: { id: 605, title: "Over Quota", release_date: "2003-11-05", overview: "x", runtime: 100, genres: [], original_language: "en" },
+  603: {
+    id: 603, title: "The Matrix", releaseDate: "1999-03-31", overview: "Neo wakes up.", runtime: 136,
+    genres: [{ id: 28, name: "Action" }], originalLanguage: "en", backdropPath: "/matrix.jpg", posterPath: "/matrix-p.jpg",
+    voteAverage: 8.263, externalIds: { imdbId: "tt0133093" },
+    credits: { crew: [{ job: "Director", department: "Directing", name: "Lana Wachowski" }, { job: "Director", department: "Directing", name: "Lilly Wachowski" }] },
+    mediaInfo: null,
+  },
+  604: { id: 604, title: "Already Here", releaseDate: "2003-05-15", overview: "x", runtime: 100, genres: [], originalLanguage: "en", mediaInfo: { status: 5 } },
+  605: { id: 605, title: "Over Quota", releaseDate: "2003-11-05", overview: "x", runtime: 100, genres: [], originalLanguage: "en", mediaInfo: null },
 };
 const SHOWS = {
   1399: {
-    id: 1399, name: "Game of Thrones", first_air_date: "2011-04-17", overview: "Winter is coming.",
-    episode_run_time: [60], genres: [{ id: 18, name: "Drama" }], original_language: "en",
+    id: 1399, name: "Game of Thrones", firstAirDate: "2011-04-17", overview: "Winter is coming.",
+    episodeRunTime: [60], genres: [{ id: 18, name: "Drama" }], originalLanguage: "en",
+    voteAverage: 8.456, externalIds: { imdbId: "tt0944947" }, createdBy: [{ name: "David Benioff" }, { name: "D. B. Weiss" }],
     seasons: [
-      { season_number: 0, episode_count: 5 },
-      { season_number: 1, episode_count: 10 },
-      { season_number: 2, episode_count: 10 },
+      { seasonNumber: 0, episodeCount: 5 },
+      { seasonNumber: 1, episodeCount: 10 },
+      { seasonNumber: 2, episodeCount: 10 },
     ],
+    mediaInfo: { status: 3, seasons: [] },
   },
 };
-const IMDB = { 603: "tt0133093", 1399: "tt0944947" };
-
-mock.module("../api/tmdb.js", {
-  namedExports: {
-    ...realTmdb,
-    tmdbSearch: async (query) =>
-      [
-        { id: 603, media_type: "movie", title: "The Matrix", release_date: "1999-03-31" },
-        { id: 1399, media_type: "tv", name: "Game of Thrones", first_air_date: "2011-04-17" },
-        { id: 1, media_type: "person", name: "Keanu Reeves" },
-      ].filter((r) => (r.title || r.name).toLowerCase().includes(query.toLowerCase())),
-    tmdbGetTrending: async () => [
-      { id: 550, media_type: "movie", title: "Fight Club", release_date: "1999-10-15" },
-      { id: 1396, media_type: "tv", name: "Breaking Bad", first_air_date: "2008-01-20" },
-    ],
-    tmdbGetDetails: async (id, type) => (type === "tv" ? SHOWS : MOVIES)[id],
-    tmdbGetExternalImdb: async (id) => IMDB[id] ?? null,
-  },
-});
+const SEARCHABLE = [
+  { id: 603, mediaType: "movie", title: "The Matrix", releaseDate: "1999-03-31" },
+  { id: 1399, mediaType: "tv", name: "Game of Thrones", firstAirDate: "2011-04-17" },
+  { id: 1, mediaType: "person", name: "Keanu Reeves" },
+];
 
 const { writeConfig } = await import("../utils/configFile.js");
 const { t: translate } = await import("../utils/i18n.js");
@@ -55,10 +47,18 @@ let seerr;
 let dispatch;
 before(async () => {
   seerr = await startFakeServer({
-    "GET /api/v1/movie/603": () => ({ mediaInfo: null }),
-    "GET /api/v1/movie/604": () => ({ mediaInfo: { status: 5 } }),
-    "GET /api/v1/movie/605": () => ({ mediaInfo: null }),
-    "GET /api/v1/tv/1399": () => ({ mediaInfo: { status: 3, seasons: [] } }),
+    ...Object.fromEntries(Object.entries(MOVIES).map(([id, m]) => [`GET /api/v1/movie/${id}`, () => m])),
+    ...Object.fromEntries(Object.entries(SHOWS).map(([id, s]) => [`GET /api/v1/tv/${id}`, () => s])),
+    "GET /api/v1/movie/603/ratingscombined": () => ({ imdb: { criticsScore: 8.7 }, rt: { criticsScore: 83 } }),
+    "GET /api/v1/search": ({ url }) => ({
+      results: SEARCHABLE.filter((r) => (r.title || r.name).toLowerCase().includes(url.searchParams.get("query").toLowerCase())),
+    }),
+    "GET /api/v1/discover/trending": () => ({
+      results: [
+        { id: 550, mediaType: "movie", title: "Fight Club", releaseDate: "1999-10-15" },
+        { id: 1396, mediaType: "tv", name: "Breaking Bad", firstAirDate: "2008-01-20" },
+      ],
+    }),
     "GET /api/v1/service/radarr": () => [{ id: 0, name: "Radarr", isDefault: true }],
     "GET /api/v1/service/sonarr": () => [{ id: 1, name: "Sonarr", isDefault: true }],
     "GET /api/v1/service/radarr/0": () => ({ profiles: [{ id: 4, name: "HD-1080p" }], tags: [{ id: 3, label: "kids" }] }),
@@ -71,7 +71,6 @@ before(async () => {
     GUILD_ID: "guild-1",
     SEERR_URL: seerr.url,
     SEERR_API_KEY: "seerr-key",
-    TMDB_API_KEY: "tmdb-key",
     SEERR_AUTO_APPROVE: "false",
     NOTIFY_ON_AVAILABLE: "true",
     PRIVATE_MESSAGE_MODE: "false",
@@ -115,7 +114,7 @@ test("/search movie: shows details with a Request button and a Radarr tag picker
   assert.equal(embed.image.url, "https://image.tmdb.org/t/p/w1280/matrix.jpg");
   assert.deepEqual(
     embed.fields.map((f) => [f.name, f.value]),
-    [["Summary", "Neo wakes up."], ["Genre", "Action"], ["Runtime", "2h 16m"], ["Rating", "N/A"]]
+    [["Directed by Lana Wachowski, Lilly Wachowski", "Neo wakes up."], ["Genre", "Action"], ["Runtime", "2h 16m"], ["Rating", "8.7/10"]]
   );
   assert.deepEqual(buttons(calls[1]), [
     ["Letterboxd", "https://letterboxd.com/imdb/tt0133093", undefined],
@@ -176,7 +175,15 @@ test("/request TV: requests nothing yet and opens the season picker", async () =
   assert.equal(posts().length, before);
   const reply = calls.at(-1);
   assert.equal(reply.embeds[0].author.name, "📺 TV show found:");
-  assert.equal(reply.embeds[0].fields.find((f) => f.name === "Runtime").value, "1h 0m");
+  assert.deepEqual(
+    reply.embeds[0].fields.map((f) => [f.name, f.value]),
+    [
+      ["Created by David Benioff", "Winter is coming."],
+      ["Genre", "Drama"],
+      ["Runtime", "1h 0m"],
+      ["Rating", "8.5/10"], // no IMDb score for shows in Seerr: TMDB score
+    ]
+  );
   assert.deepEqual(buttons(reply).at(-1), ["Request", "request_btn|1399|tv||", true]);
   const picker = reply.components[1].components[0];
   assert.equal(picker.custom_id, "select_seasons|1399|");
@@ -189,13 +196,13 @@ test("private mode: replies are only visible to the user", async (t) => {
   assert.equal(calls[0].flags, 64);
 });
 
-test("commands are disabled while Seerr or TMDB is not configured", async (t) => {
-  configure(t, { TMDB_API_KEY: undefined });
+test("commands are disabled while Seerr is not configured", async (t) => {
+  configure(t, { SEERR_API_KEY: undefined });
   const calls = await dispatch(command("search", { title: "603|movie" }));
   assert.deepEqual(calls, [
     {
       method: "reply",
-      content: "⚠️ This command is disabled because Seerr or TMDB configuration is missing.",
+      content: "⚠️ This command is disabled because Seerr is not configured.",
       flags: 64,
     },
   ]);

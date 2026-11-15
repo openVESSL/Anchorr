@@ -4,12 +4,10 @@ import {
   ButtonBuilder,
   ButtonStyle,
 } from "discord.js";
-import axios from "axios";
 import debounce from "lodash.debounce";
-import { minutesToHhMm } from "./utils/time.js";
+import { hhmmssToMinutes, minutesToHhMm } from "./utils/time.js";
 import logger from "./utils/logger.js";
-import { fetchOMDbData } from "./api/omdb.js";
-import { findBestBackdrop } from "./api/tmdb.js";
+import { findBestBackdrop, getDetails, getExtras, isMetadataConfigured } from "./api/metadata.js";
 import { isDiscordLinkableUrl, isValidUrl } from "./utils/url.js";
 import {
   applySeriesProviderIds,
@@ -49,10 +47,6 @@ if (staleMarkers > 0) {
 }
 const episodeMessages = new Map(); // Track Discord messages for editing: SeriesId -> { messageId, channelId }
 const creatingDebouncers = new Set(); // Prevent race condition: track SeriesIds currently creating debouncers
-
-// API response cache to reduce external API calls
-const apiCache = new Map(); // tmdbId -> { data, timestamp }
-const API_CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 // Library cache to avoid repeated API calls at webhook time
 const libraryCache = {
@@ -97,19 +91,8 @@ setInterval(() => {
     }
   }
 
-  // Clean up old API cache entries
-  let cleanedCache = 0;
-  for (const [key, cached] of apiCache.entries()) {
-    if (now - cached.timestamp > API_CACHE_DURATION_MS) {
-      apiCache.delete(key);
-      cleanedCache++;
-    }
-  }
-
-  if (cleanedDebouncers > 0 || cleanedCache > 0) {
-    logger.debug(
-      `Periodic cleanup: Removed ${cleanedDebouncers} old debouncer(s), ${cleanedCache} expired cache entries`
-    );
+  if (cleanedDebouncers > 0) {
+    logger.debug(`Periodic cleanup: Removed ${cleanedDebouncers} old debouncer(s)`);
   }
 }, CLEANUP_INTERVAL_MS);
 
@@ -254,49 +237,24 @@ async function processAndSendNotification(
       `Notification check skipped: notifyEnabled=${notifyEnabled}, tmdbId=${tmdbId}, hasPendingRequests=${!!pendingRequests}`
     );
   }
+  const metadataType = ItemType === "Movie" ? "movie" : "tv";
   let details = null;
-  if (tmdbId) {
-    // Check cache first
-    const cacheKey = `tmdb-${ItemType === "Movie" ? "movie" : "tv"}-${tmdbId}`;
-    const cached = apiCache.get(cacheKey);
-    const now = Date.now();
-
-    if (cached && now - cached.timestamp < API_CACHE_DURATION_MS) {
-      details = cached.data;
-      logger.debug(`Using cached TMDB data for ${tmdbId}`);
-    } else {
-      try {
-        const tmdbIdNum = parseInt(tmdbId, 10);
-        const res = await axios.get(
-          `https://api.themoviedb.org/3/${
-            ItemType === "Movie" ? "movie" : "tv"
-          }/${tmdbIdNum}`,
-          {
-            params: {
-              api_key: settings.TMDB_API_KEY,
-              append_to_response: "images,external_ids",
-            },
-          }
-        );
-        details = res.data;
-        // Cache the response
-        apiCache.set(cacheKey, { data: details, timestamp: now });
-        logger.debug(`Cached TMDB data for ${tmdbId}`);
-      } catch (e) {
-        logger.warn(`Could not fetch TMDB details for ${tmdbId}: ${e?.message || e}`);
-      }
+  let omdb = null; // OMDb-style extras (rating, director/creator) from Seerr
+  if (tmdbId && isMetadataConfigured()) {
+    const tmdbIdNum = parseInt(tmdbId, 10);
+    try {
+      details = await getDetails(tmdbIdNum, metadataType);
+    } catch (e) {
+      logger.warn(`Could not fetch Seerr details for ${tmdbId}: ${e?.message || e}`);
     }
+    if (details) omdb = await getExtras(tmdbIdNum, metadataType);
   }
 
-
-
-  // Prioritize IMDb ID from TMDB, fallback to webhook
+  // Prioritize IMDb ID from Seerr, fallback to webhook
   const fallbackImdbId = isSeriesChild(ItemType)
     ? data.SeriesProvider_imdb
     : imdbIdFromWebhook;
   const imdbId = details?.external_ids?.imdb_id || fallbackImdbId;
-
-  const omdb = imdbId ? await fetchOMDbData(imdbId) : null;
 
   let runtime = "Unknown";
   // Prioritize webhook runtime data for episodes
@@ -314,6 +272,10 @@ async function processAndSendNotification(
     details.episode_run_time.length > 0
   ) {
     runtime = minutesToHhMm(details.episode_run_time[0]);
+  }
+  // Metadata often has no runtime (shows especially); Jellyfin knows the file's length
+  if (runtime === "Unknown" && RunTime) {
+    runtime = minutesToHhMm(hhmmssToMinutes(RunTime));
   }
 
   const rating = omdb?.imdbRating ? `${omdb.imdbRating}/10` : "N/A";

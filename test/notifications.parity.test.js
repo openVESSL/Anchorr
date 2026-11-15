@@ -1,12 +1,13 @@
 // Parity net for Jellyfin -> Discord notifications. Input is the webhook-shaped item payload
 // (v2 builds the same shape from the Jellyfin API), output is what Discord would receive.
-// Runtime/rating/director come from external metadata, which is blocked here: those fields
-// show their fallback values on purpose.
+// Runtime/rating/director come from Seerr metadata. Most tests run without Seerr, so those
+// fields show their fallback values; the "with Seerr" tests use a fake Seerr.
 import assert from "node:assert/strict";
 import test, { mock } from "node:test";
 
 import { applyConfig } from "./helpers/config.js";
 import { createFakeDiscord } from "./helpers/discord.js";
+import { startFakeServer } from "./helpers/http.js";
 
 // Fake timers before the module loads: its import-time intervals must not keep the process alive.
 mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"], now: 1_700_000_000_000 });
@@ -27,6 +28,8 @@ const BASE = {
   JELLYFIN_NOTIFY_EPISODES: undefined,
   JELLYFIN_EPISODE_CHANNEL_ID: undefined,
   NOTIFY_ON_AVAILABLE: undefined,
+  SEERR_URL: undefined,
+  SEERR_API_KEY: undefined,
 };
 
 function configure(t, values = {}) {
@@ -221,4 +224,69 @@ test("an unreachable channel does not throw out of the handler", async (t) => {
   const discord = createFakeDiscord({ missingChannels: ["chan-gone"] });
   await send(movie("movie-gone"), discord);
   assert.equal(discord.sent.length, 0);
+});
+
+test("with Seerr: movie shows runtime, IMDb rating and director like v1 with TMDB/OMDb keys", async (t) => {
+  const seerr = await startFakeServer({
+    "GET /api/v1/movie/9001": () => ({
+      id: 9001, title: "The Matrix", runtime: 136, genres: [{ name: "Action" }], voteAverage: 8.2,
+      externalIds: { imdbId: "tt0133093" },
+      credits: { crew: [{ job: "Director", department: "Directing", name: "Lana Wachowski" }] },
+    }),
+    "GET /api/v1/movie/9001/ratingscombined": () => ({ imdb: { criticsScore: 8.7 } }),
+  });
+  t.after(() => seerr.close());
+  configure(t, { SEERR_URL: seerr.url, SEERR_API_KEY: "seerr-key" });
+
+  const discord = createFakeDiscord();
+  await send(movie("movie-seerr", { Provider_tmdb: "9001" }), discord);
+
+  assert.deepEqual(
+    discord.sent[0].embeds[0].fields.map((f) => [f.name, f.value]),
+    [
+      ["Directed by Lana Wachowski", "A hacker learns the truth."],
+      ["Genre", "Action, Sci-Fi"],
+      ["Runtime", "2h 16m"],
+      ["Rating", "8.7/10"],
+    ]
+  );
+});
+
+test("with Seerr: a new show gets its creator, the TMDB score as rating and Jellyfin's runtime", async (t) => {
+  const seerr = await startFakeServer({
+    "GET /api/v1/tv/9002": () => ({
+      id: 9002, name: "Severance", episodeRunTime: [], // Seerr often has no runtime for shows
+      genres: [{ name: "Drama" }], voteAverage: 8.37, externalIds: { imdbId: "tt11280740" },
+      createdBy: [{ name: "Dan Erickson" }],
+    }),
+  });
+  t.after(() => seerr.close());
+  configure(t, { SEERR_URL: seerr.url, SEERR_API_KEY: "seerr-key" });
+
+  const discord = createFakeDiscord();
+  await send(
+    { ItemType: "Series", ItemId: "series-seerr", ServerId: "srv1", Name: "Severance", Year: 2022, Overview: "Work and life, split.", Provider_tmdb: "9002", RunTime: "00:55:00" },
+    discord
+  );
+  mock.timers.tick(70_000);
+  await flush();
+
+  assert.equal(discord.sent.length, 1);
+  assert.equal(discord.sent[0].embeds[0].author.name, "📺 New TV show added!");
+  assert.deepEqual(
+    discord.sent[0].embeds[0].fields.map((f) => [f.name, f.value]),
+    [
+      ["Created by Dan Erickson", "Work and life, split."],
+      ["Genre", "Drama"],
+      ["Runtime", "55m"],
+      ["Rating", "8.4/10"],
+    ]
+  );
+});
+
+test("without Seerr, a movie still shows Jellyfin's runtime", async (t) => {
+  configure(t);
+  const discord = createFakeDiscord();
+  await send(movie("movie-runtime", { RunTime: "02:16:00" }), discord);
+  assert.equal(discord.sent[0].embeds[0].fields.find((f) => f.name === "Runtime").value, "2h 16m");
 });

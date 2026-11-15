@@ -2,6 +2,7 @@
 // These are the inputs the v2 automatic migration must accept.
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 import { CONFIG_PATH, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
@@ -80,4 +81,35 @@ test("schema accepts both library formats and rejects a malformed URL", () => {
   assert.equal(ok({ JELLYFIN_NOTIFICATION_LIBRARIES: { lib: { channel: "c", isAnime: true } } }), true);
   assert.equal(ok({ JELLYFIN_NOTIFICATION_LIBRARIES: { lib: "c" } }), true);
   assert.equal(ok({ SEERR_URL: "not a url" }), false);
+});
+
+test("v1 config upgrades to format v2: TMDB/OMDb keys removed, original kept as config.v1.json", () => {
+  const backup = path.join(path.dirname(CONFIG_PATH), "config.v1.json");
+  fs.rmSync(backup, { force: true });
+  writeConfig({ SEERR_URL: "http://seerr.local", TMDB_API_KEY: "tmdb-secret", OMDB_API_KEY: "", HEADER_VISIBLE: "true", startBot: true });
+
+  assert.equal(loadSettings(), true);
+  const upgraded = readConfig();
+  assert.equal(upgraded.CONFIG_VERSION, 2);
+  for (const key of ["TMDB_API_KEY", "OMDB_API_KEY", "HEADER_VISIBLE", "startBot"]) {
+    assert.equal(key in upgraded, false, `${key} removed`);
+  }
+  assert.equal(upgraded.SEERR_URL, "http://seerr.local");
+  assert.equal(JSON.parse(fs.readFileSync(backup, "utf8")).TMDB_API_KEY, "tmdb-secret", "v1 file kept as is");
+
+  // already upgraded: no second backup, nothing removed
+  writeConfig({ ...upgraded, LANGUAGE: "de" });
+  fs.rmSync(backup);
+  assert.equal(loadSettings(), true);
+  assert.equal(fs.existsSync(backup), false);
+  assert.equal(readConfig().LANGUAGE, "de");
+});
+
+test("a fresh v2 config gets its version without a pointless backup", () => {
+  const backup = path.join(path.dirname(CONFIG_PATH), "config.v1.json");
+  fs.rmSync(backup, { force: true });
+  writeConfig({ SEERR_URL: "http://seerr.local" });
+  assert.equal(loadSettings(), true);
+  assert.equal(readConfig().CONFIG_VERSION, 2);
+  assert.equal(fs.existsSync(backup), false);
 });

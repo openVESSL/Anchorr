@@ -6,7 +6,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "create-translation": "node scripts/create-translation.js",
-    "test": "node --experimental-test-module-mocks --import ./test/setup.js --test \"test/**/*.test.js\""
+    "test": "node --import ./test/setup.js --test \"test/**/*.test.js\""
   },
   "type": "module",
   "keywords": [],
