@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react"
 import { toast } from "sonner"
 
 import { Field, PageHeader, SaveBar, Section, SwitchRow, useSettingsForm } from "@/components/settings"
-import { ThemePicker } from "@/components/theme-picker"
+import { AppearanceSettings } from "@/components/theme-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,7 +22,7 @@ export function SystemPage() {
       <PageHeader title={t("Settings")} description={t("Dashboard look, languages and sign-in.")} />
 
       <Section title={t("Dashboard")} description={t("Saved in this browser.")}>
-        <ThemePicker />
+        <AppearanceSettings />
         <Field id="ui-language" label={t("Dashboard language")}>
           <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
             <SelectTrigger id="ui-language" className="w-56">

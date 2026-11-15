@@ -326,5 +326,12 @@
   "Available": "Verfügbar",
   "Partially available": "Teilweise verfügbar",
   "Processing": "In Bearbeitung",
-  "Open {name}": "{name} öffnen"
+  "Open {name}": "{name} öffnen",
+  "Light": "Hell",
+  "Dark": "Dunkel",
+  "Preview": "Vorschau",
+  "Save": "Speichern",
+  "New": "Neu",
+  "A link": "Ein Link",
+  "Change connection": "Verbindung ändern"
 }

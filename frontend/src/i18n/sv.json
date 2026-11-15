@@ -326,5 +326,12 @@
   "Available": "Tillgänglig",
   "Partially available": "Delvis tillgänglig",
   "Processing": "Bearbetas",
-  "Open {name}": "Öppna {name}"
+  "Open {name}": "Öppna {name}",
+  "Light": "Ljust",
+  "Dark": "Mörkt",
+  "Preview": "Förhandsvisning",
+  "Save": "Spara",
+  "New": "Ny",
+  "A link": "En länk",
+  "Change connection": "Ändra anslutning"
 }

@@ -75,15 +75,16 @@ export type SettingsForm = ReturnType<typeof useSettingsForm>
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
   const Icon = PAGE_ICONS[useLocation().pathname]
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div>
+    <div className="mb-6">
+      {/* Actions share the title's row so they line up with the h1, not with the description */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex items-center gap-2">
           {Icon && <Icon className="text-primary size-6 shrink-0" />}
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         </div>
-        {description && <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{description}</p>}
+        {actions}
       </div>
-      {actions}
+      {description && <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{description}</p>}
     </div>
   )
 }
