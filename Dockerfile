@@ -5,6 +5,14 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
+# build the dashboard (React) on the build host; only its static output ships
+FROM --platform=$BUILDPLATFORM node:22-alpine AS dashboard
+WORKDIR /build
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 # use a stable node LTS
 FROM node:22-alpine
 
@@ -18,6 +26,7 @@ RUN apk add --no-cache su-exec
 
 # copy source
 COPY . .
+COPY --from=dashboard /build/dist ./frontend/dist
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

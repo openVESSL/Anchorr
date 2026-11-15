@@ -105,12 +105,31 @@ if (process.env.TRUST_PROXY === "true") {
 }
 
 function configureWebServer() {
-  // Security headers
-  app.use((_req, res, next) => {
+  // Security headers. The dashboard (frontend/) loads nothing from other origins and runs no
+  // inline script; the old dashboard under /legacy still needs its CDN scripts and fonts.
+  const DASHBOARD_CSP = [
+    "default-src 'self'",
+    "script-src 'self'",
+    // Radix and the toast library set inline styles at runtime
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
+    // Discord, Seerr and TMDB images come from those services
+    "img-src 'self' https: http: data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+  ].join("; ");
+  app.use((req, res, next) => {
     res.setHeader("X-Frame-Options", "SAMEORIGIN");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-XSS-Protection", "1; mode=block");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (!req.path.startsWith("/legacy")) {
+      res.setHeader("Content-Security-Policy", DASHBOARD_CSP);
+      return next();
+    }
     res.setHeader(
       "Content-Security-Policy",
       [
@@ -180,11 +199,25 @@ function configureWebServer() {
 
   app.use("/assets", express.static(path.join(__dirname, "assets")));
   app.use("/locales", express.static(path.join(__dirname, "locales")));
-  app.use(express.static(path.join(__dirname, "web")));
 
-  app.get("/", (_req, res) => {
-    res.sendFile(path.join(__dirname, "web", "index.html"));
-  });
+  // The v1 dashboard stays reachable while the new one reaches feature parity
+  app.use("/legacy", express.static(path.join(__dirname, "web")));
+
+  // The dashboard (frontend/, built into frontend/dist). Without a build, the old one is served.
+  const dashboardDir = path.join(__dirname, "frontend", "dist");
+  if (fs.existsSync(path.join(dashboardDir, "index.html"))) {
+    app.use(express.static(dashboardDir, { index: false }));
+    // Client-side routes (/notifications, /setup, ...) all load the same page
+    app.get(/^\/(?!api\/|legacy\/|assets\/|locales\/).*/, (_req, res) => {
+      res.sendFile(path.join(dashboardDir, "index.html"));
+    });
+  } else {
+    logger.warn("frontend/dist not found: serving the old dashboard. Run \"npm run build\" to build the new one.");
+    app.use(express.static(path.join(__dirname, "web")));
+    app.get("/", (_req, res) => {
+      res.sendFile(path.join(__dirname, "web", "index.html"));
+    });
+  }
 
   // Rate limiter for the webhook endpoint - prevents notification flooding / DoS
   const webhookLimiter = rateLimit({

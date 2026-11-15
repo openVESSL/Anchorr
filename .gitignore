@@ -1,5 +1,9 @@
 # Dependencies
 /node_modules
+frontend/node_modules
+
+# Dashboard build output
+frontend/dist
 
 # Environment variables
 .env

@@ -6,7 +6,9 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "create-translation": "node scripts/create-translation.js",
-    "test": "node --import ./test/setup.js --test \"test/**/*.test.js\""
+    "test": "node --import ./test/setup.js --test \"test/**/*.test.js\"",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "dev:dashboard": "npm --prefix frontend run dev"
   },
   "type": "module",
   "keywords": [],
