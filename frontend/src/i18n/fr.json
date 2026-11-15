@@ -290,5 +290,12 @@
   "Could not reach Discord": "Discord est injoignable",
   "Add the bot token first": "Ajoutez d'abord le token du bot",
   "The bot is not in that server yet. Invite it first.": "Le bot n'est pas encore sur ce serveur. Invitez-le d'abord.",
-  "Server saved, but the bot did not start. Check the token and intents.": "Serveur enregistré, mais le bot n'a pas démarré. Vérifiez le token et les intents."
+  "Server saved, but the bot did not start. Check the token and intents.": "Serveur enregistré, mais le bot n'a pas démarré. Vérifiez le token et les intents.",
+  "Starting the bot...": "Démarrage du bot...",
+  "Current server": "Serveur actuel",
+  "Use a different bot token": "Utiliser un autre token de bot",
+  "The bot already works in this server": "Le bot fonctionne déjà sur ce serveur",
+  "Discord server saved, the bot restarted": "Serveur Discord enregistré, le bot a redémarré",
+  "Discord is rate limiting requests. Wait a few seconds and try again.": "Discord limite les requêtes. Patientez quelques secondes et réessayez.",
+  "Too many failed sign-ins from this address. Try again in a few minutes.": "Trop de connexions échouées depuis cette adresse. Réessayez dans quelques minutes."
 }

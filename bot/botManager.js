@@ -28,7 +28,7 @@ export function startJellyfinFeed(client = botState.discordClient) {
   botState.jellyfinFeed.start();
 }
 
-export async function startBot() {
+async function startBotNow() {
   if (botState.isBotRunning && botState.discordClient) {
     logger.info("Bot is already running.");
     return { success: true, message: "Bot is already running." };
@@ -76,6 +76,7 @@ export async function startBot() {
       `[REGISTER COMMANDS] Failed to register Discord commands:`,
       err
     );
+    botState.discordClient = null;
     throw new Error(`Failed to register Discord commands: ${err.message}`);
   }
 
@@ -109,23 +110,38 @@ export async function startBot() {
       }
       botState.isBotRunning = false;
       botState.discordClient = null;
+      client.destroy().catch(() => {});
       reject(err);
     });
   });
 }
 
 /** Disconnects the bot and stops its schedulers and the Jellyfin feed. */
-export async function stopBot() {
+async function stopBotNow() {
   stopRoundupScheduler();
   botState.jellyfinFeed?.stop();
   botState.jellyfinFeed = null;
-  if (botState.discordClient) await botState.discordClient.destroy();
+  const client = botState.discordClient;
   botState.isBotRunning = false;
   botState.discordClient = null;
+  if (client) await client.destroy();
 }
 
-/** Starts the bot, or restarts it so new Discord settings take effect. */
-export async function restartBot() {
-  if (botState.isBotRunning) await stopBot();
-  return startBot();
+// Start, stop and restart run one at a time: two overlapping starts would leave a second,
+// unreachable bot connected (double replies and double announcements).
+let lifecycle = Promise.resolve();
+function oneAtATime(task) {
+  const run = lifecycle.then(task, task);
+  lifecycle = run.catch(() => {});
+  return run;
 }
+
+export const startBot = () => oneAtATime(startBotNow);
+export const stopBot = () => oneAtATime(stopBotNow);
+
+/** Starts the bot, or restarts it so new Discord settings take effect. */
+export const restartBot = () =>
+  oneAtATime(async () => {
+    if (botState.isBotRunning || botState.discordClient) await stopBotNow();
+    return startBotNow();
+  });

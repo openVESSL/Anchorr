@@ -29,8 +29,9 @@ export const useSetupState = () => useQuery({ queryKey: keys.setup, queryFn: () 
 export const useStatus = () =>
   useQuery({ queryKey: keys.status, queryFn: () => api.get<Status>("/status"), refetchInterval: 15_000 })
 export const useConfig = () => useQuery({ queryKey: keys.config, queryFn: () => api.get<Config>("/config") })
+// Discord rate-limits these lookups; the server caches them for 30 s as well
 export const useDiscordSetup = () =>
-  useQuery({ queryKey: keys.discord, queryFn: () => api.get<DiscordSetup & { success: boolean }>("/setup/discord") })
+  useQuery({ queryKey: keys.discord, staleTime: 30_000, queryFn: () => api.get<DiscordSetup & { success: boolean }>("/setup/discord") })
 
 /** Text channels and threads the bot can post in (needs the bot to be online). */
 export function useChannels(guildId: string | undefined) {

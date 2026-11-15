@@ -158,7 +158,9 @@ function configureWebServer() {
   // Rate limiting middleware - DoS protection
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    // The dashboard polls status and loads several lists per page, so this is a flood
+    // guard, not a tight budget
+    max: 1000,
     message: {
       success: false,
       error: "Too many requests, please try again later.",

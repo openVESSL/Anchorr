@@ -2,9 +2,8 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { setGuestAutoApprove } from "../api/seerr.js";
-import { startBot } from "../bot/botManager.js";
+import { restartBot, startBot } from "../bot/botManager.js";
 import { botState } from "../bot/botState.js";
-import { stop as stopRoundupScheduler } from "../bot/roundupScheduler.js";
 import { authenticateToken } from "../utils/auth.js";
 import { loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { SENSITIVE_FIELDS, isMaskedValue } from "../utils/configSanitize.js";
@@ -132,14 +131,8 @@ router.post(
         "Critical Discord settings changed. Restarting bot logic..."
       );
 
-      stopRoundupScheduler();
-      botState.jellyfinFeed?.stop();
-      botState.jellyfinFeed = null;
-      await botState.discordClient.destroy();
-      botState.isBotRunning = false;
-      botState.discordClient = null;
       try {
-        await startBot();
+        await restartBot();
         res
           .status(200)
           .json({ message: "Configuration saved. Bot restarted." });

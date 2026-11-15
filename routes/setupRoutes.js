@@ -21,6 +21,7 @@ const router = Router();
 const setupLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
+  skipSuccessfulRequests: true, // only failed attempts count
   message: { success: false, message: "Too many attempts, please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -157,9 +158,25 @@ router.post("/setup/seerr", setupLimiter, authenticateToken, async (req, res) =>
 
 // ----- Discord -----
 
-async function discordStatus(token) {
+// Discord rate-limits these lookups; the dashboard asks often (page loads, refocus)
+const DISCORD_CACHE_MS = 30_000;
+let discordCache = null;
+
+async function discordStatus(token, { fresh = false } = {}) {
+  if (!fresh && discordCache?.token === token && Date.now() - discordCache.at < DISCORD_CACHE_MS) return discordCache.status;
   const bot = await verifyBotToken(token);
-  return { bot, guilds: await listBotGuilds(token) };
+  const status = { bot, guilds: await listBotGuilds(token) };
+  discordCache = { token, at: Date.now(), status };
+  return status;
+}
+
+/** Logs the real reason and answers with something the user can act on. */
+function discordFailure(res, err, action) {
+  const status = statusOf(err);
+  logger.warn(`Setup: Discord ${action} failed: ${status ? `HTTP ${status}` : err.code || err.message}`);
+  if (status === 401) return res.status(401).json({ success: false, message: "Discord did not accept this bot token" });
+  if (status === 429) return res.status(429).json({ success: false, message: "Discord is rate limiting requests. Wait a few seconds and try again." });
+  return res.status(502).json({ success: false, message: "Could not reach Discord" });
 }
 
 router.post("/setup/discord", setupLimiter, authenticateToken, async (req, res) => {
@@ -169,10 +186,9 @@ router.post("/setup/discord", setupLimiter, authenticateToken, async (req, res) 
 
   let status;
   try {
-    status = await discordStatus(token);
+    status = await discordStatus(token, { fresh: true });
   } catch (err) {
-    if (statusOf(err) === 401) return res.status(401).json({ success: false, message: "Discord did not accept this bot token" });
-    return res.status(502).json({ success: false, message: "Could not reach Discord" });
+    return discordFailure(res, err, "token check");
   }
   if (!updateConfig({ DISCORD_TOKEN: token, BOT_ID: status.bot.id })) {
     return res.status(500).json({ success: false, message: "Could not save the configuration. Check the config volume permissions." });
@@ -189,7 +205,7 @@ router.post("/setup/discord", setupLimiter, authenticateToken, async (req, res) 
 router.get("/setup/discord", authenticateToken, async (req, res) => {
   if (!settings.DISCORD_TOKEN) return res.json({ success: true, configured: false });
   try {
-    const status = await discordStatus(settings.DISCORD_TOKEN);
+    const status = await discordStatus(settings.DISCORD_TOKEN, { fresh: req.query.refresh === "1" });
     res.json({
       success: true,
       configured: true,
@@ -201,22 +217,26 @@ router.get("/setup/discord", authenticateToken, async (req, res) => {
       botRunning: botState.isBotRunning,
     });
   } catch (err) {
-    res.status(502).json({ success: false, message: "Could not reach Discord" });
+    discordFailure(res, err, "status");
   }
 });
 
-// Picks the server and (re)starts the bot so commands register there
+// Picks the server and (re)starts the bot so commands register there. Picking the server
+// the running bot already uses changes nothing.
 router.post("/setup/discord/server", setupLimiter, authenticateToken, async (req, res) => {
   const guildId = String(req.body?.guildId || "");
   if (!settings.DISCORD_TOKEN) return res.status(400).json({ success: false, message: "Add the bot token first" });
   let guilds;
   try {
-    guilds = await listBotGuilds(settings.DISCORD_TOKEN);
-  } catch {
-    return res.status(502).json({ success: false, message: "Could not reach Discord" });
+    guilds = (await discordStatus(settings.DISCORD_TOKEN)).guilds;
+  } catch (err) {
+    return discordFailure(res, err, "server list");
   }
   const guild = guilds.find((g) => g.id === guildId);
   if (!guild) return res.status(400).json({ success: false, message: "The bot is not in that server yet. Invite it first." });
+  if (guildId === settings.GUILD_ID && botState.isBotRunning) {
+    return res.json({ success: true, guild, botRunning: true, unchanged: true });
+  }
   if (!updateConfig({ GUILD_ID: guildId })) {
     return res.status(500).json({ success: false, message: "Could not save the configuration. Check the config volume permissions." });
   }

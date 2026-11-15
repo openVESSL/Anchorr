@@ -28,8 +28,8 @@ export function DiscordPage() {
         <DiscordStep
           key={data?.configured ? "configured" : "new"}
           initial={data?.configured ? data : null}
-          onDone={() => {
-            toast.success(t("Discord server saved"))
+          onDone={(result) => {
+            toast.success(result.unchanged ? t("The bot already works in this server") : t("Discord server saved, the bot restarted"))
             for (const key of [keys.discord, keys.setup, keys.status, keys.config]) client.invalidateQueries({ queryKey: key })
           }}
         />

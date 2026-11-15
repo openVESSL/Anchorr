@@ -284,10 +284,11 @@ function Choice({ checked, onChange, label }: { checked: boolean; onChange: () =
   )
 }
 
-export function DiscordStep({ onBack, onDone, initial = null }: { onBack?: () => void; onDone: () => void; initial?: DiscordSetup | null }) {
+export function DiscordStep({ onBack, onDone, initial = null }: { onBack?: () => void; onDone: (result: { unchanged?: boolean }) => void; initial?: DiscordSetup | null }) {
   const { t } = useT()
   const [token, setToken] = useState("")
   const [bot, setBot] = useState<DiscordSetup | null>(initial)
+  const [picking, setPicking] = useState<string | null>(null)
   const { busy, error, run } = useSubmit()
 
   async function submitToken(e: FormEvent) {
@@ -296,12 +297,17 @@ export function DiscordStep({ onBack, onDone, initial = null }: { onBack?: () =>
     if (result) setBot({ ...result, configured: true })
   }
   async function refreshServers() {
-    const result = await run(() => api.get<DiscordSetup>("/setup/discord"))
+    const result = await run(() => api.get<DiscordSetup>("/setup/discord?refresh=1"))
     if (result) setBot(result)
   }
   async function pickServer(guildId: string) {
-    const result = await run(() => api.post("/setup/discord/server", { guildId }))
-    if (result) onDone()
+    setPicking(guildId)
+    const result = await run(() => api.post<{ unchanged?: boolean }>("/setup/discord/server", { guildId }))
+    setPicking(null)
+    if (result) {
+      setBot((current) => (current ? { ...current, guildId, botRunning: true } : current))
+      onDone(result)
+    }
   }
 
   if (!bot) {
@@ -364,25 +370,43 @@ export function DiscordStep({ onBack, onDone, initial = null }: { onBack?: () =>
           </div>
           {bot.guilds?.length ? (
             <div className="space-y-2">
-              {bot.guilds.map((guild) => (
-                <button
-                  key={guild.id}
-                  disabled={busy}
-                  onClick={() => pickServer(guild.id)}
-                  className="hover:border-primary flex w-full items-center justify-between rounded-md border px-3 py-2.5 text-left text-sm transition-colors"
-                >
-                  {guild.name}
-                  <span className="text-muted-foreground text-xs">{t("Use this server")}</span>
-                </button>
-              ))}
+              {bot.guilds.map((guild) => {
+                const current = guild.id === bot.guildId
+                return (
+                  <button
+                    key={guild.id}
+                    disabled={busy}
+                    onClick={() => pickServer(guild.id)}
+                    aria-current={current || undefined}
+                    className={cn(
+                      "hover:border-primary flex w-full items-center justify-between rounded-md border px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60",
+                      current && "border-primary bg-primary/5"
+                    )}
+                  >
+                    {guild.name}
+                    <span className="text-muted-foreground text-xs">
+                      {picking === guild.id ? t("Starting the bot...") : current ? t("Current server") : t("Use this server")}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">{t("No servers yet. Invite the bot, then select Refresh.")}</p>
           )}
         </div>
-        <Button variant="ghost" onClick={() => setBot(null)}>
-          {t("Back")}
-        </Button>
+        <div className="flex justify-between gap-2">
+          {onBack ? (
+            <Button variant="ghost" onClick={onBack}>
+              {t("Back")}
+            </Button>
+          ) : (
+            <span />
+          )}
+          <Button variant="ghost" onClick={() => setBot(null)} disabled={busy}>
+            {t("Use a different bot token")}
+          </Button>
+        </div>
       </div>
     </StepCard>
   )

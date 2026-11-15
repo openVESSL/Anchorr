@@ -62,6 +62,12 @@ test("first run: a Jellyfin admin claims the install, then one local account can
   cookie = "";
 });
 
+test("page loads (session checks) never use up the sign-in attempts", async () => {
+  for (let i = 0; i < 30; i++) assert.equal((await api("GET", "/api/auth/check", undefined, { auth: false })).status, 200);
+  const res = await api("POST", "/api/auth/login", { username: "admin", password: "correct horse" }, { auth: false });
+  assert.equal(res.status, 200);
+});
+
 test("login: wrong password is rejected, right password sets the session cookie", async () => {
   const bad = await api("POST", "/api/auth/login", { username: "admin", password: "nope" }, { auth: false });
   assert.equal(bad.status, 401);
