@@ -3,36 +3,15 @@ services:
     image: nairdah/anchorr:latest
     container_name: anchorr
     restart: unless-stopped
-    environment:
-      - WEBHOOK_PORT=8282
-      - NODE_ENV=production
-      - BIND_HOST=0.0.0.0
     ports:
-      - "8282:8282"
+      - "8282:8282" # change the first number to use another port on the host
     volumes:
-      # Bind mount ensures config.json persists in a visible location
-      # The directory ./anchorr-data will be created automatically by Docker
-      # Change "./anchorr-data" to your preferred path
+      # Configuration and state. Change ./anchorr-data to keep them elsewhere.
       - ./anchorr-data:/usr/src/app/config
-    # The container starts as root, fixes ownership on the config volume, then drops to a non-root user.
-    labels:
-      - "com.example.description=Discord bot for Jellyfin media requests via Seerr"
-      - "com.example.version=1.4.9"
-      - "org.opencontainers.image.title=Anchorr"
-      - "org.opencontainers.image.description=Discord bot for requesting media and Jellyfin notifications"
-      - "org.unraid.icon=https://raw.githubusercontent.com/nairdahh/anchorr/main/assets/logo.png"
-      - "webui.port=8282"
-      - "webui.protocol=http"
+    # environment:
+    #   - TRUST_PROXY=true   # behind a reverse proxy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://127.0.0.1:8282/api/health",
-        ]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8282/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

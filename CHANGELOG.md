@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - Unreleased
+
+Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Jellyfin and Seerr. The bot's commands and messages work as before. Your configuration is upgraded automatically and the original file is kept as `config.v1.json`.
+
+### Upgrade notes
+
+- **Remove the Jellyfin Webhook plugin destination.** Anchorr now watches Jellyfin directly. Calls from the plugin are acknowledged and ignored, and the dashboard reminds you while they keep arriving.
+- **TMDB and OMDb keys are no longer used.** Search, details, ratings and the daily pick come from Seerr. The keys are removed from the configuration.
+- **Requests never run as the Seerr administrator.** Members without a linked account now request as the Seerr user "Discord (Anchorr)", created automatically. Set its quota and permissions in Seerr.
+- **The auto-approve switch only applies to that guest account.** Linked members follow their own Seerr permissions. If you relied on the switch to approve everyone, give those users the Auto-Approve permission in Seerr.
+- **Rotate your Jellyfin and Seerr API keys if you ever shared 1.x log files.** Failed requests could write them into the logs (see Security).
+- The previous dashboard is still available at `/legacy` during the 2.0 series.
+
+### Added
+
+- **Guided setup.** Connect Jellyfin, Seerr and Discord in three steps by signing in with a Jellyfin administrator account. Anchorr creates its own Jellyfin API key and reads Seerr's key for you. Pasting keys still works.
+- **Sign in with Jellyfin.** Jellyfin administrators can sign in to the dashboard with their Jellyfin account. The local account stays available.
+- **New dashboard** with a sidebar, a status bar, all four Catppuccin flavors plus an accent color, and English, German, French and Swedish.
+- **Discord setup checks the token**, fills in the bot id, builds the invite link with the right permissions and warns when Server Members Intent is off.
+- **No plugin needed for notifications.** New items arrive over Jellyfin's WebSocket, and a catch-up check finds anything added while Anchorr was offline. Like the plugin, items wait until Jellyfin has identified them.
+- **Guest account for unlinked members**, so everyone in your server can request out of the box within limits you control in Seerr.
+- Notifications use Jellyfin's runtime when Seerr has none, which is common for shows.
+- `/api/status` reports the bot and Jellyfin connection, an old plugin still calling, and a reverse proxy without `TRUST_PROXY`.
+
+### Changed
+
+- Metadata comes from Seerr: movies keep their IMDb rating, shows (which have no IMDb score in Seerr) show the TMDB score.
+- The configuration lives in memory instead of process environment variables, and saving from the dashboard only accepts known settings.
+- Smaller install: axios, lodash.debounce and node-cache were replaced by built-in Node.js features.
+- The Docker image listens on all interfaces by default and builds the dashboard in its own stage.
+
+### Security
+
+- Requests from Discord no longer bypass Seerr approvals, quotas or permission checks, and members can no longer pick a 4K server or quality profile Seerr would not allow them.
+- A fresh install can only be claimed by proving Jellyfin administrator access. The local account can only be added from a signed-in session.
+- Failed HTTP requests no longer write API keys (`X-Api-Key`, `Authorization`) into the log files.
+- Settings saved from the dashboard can no longer set arbitrary environment variables such as `NODE_TLS_REJECT_UNAUTHORIZED`.
+- Failed sign-ins lock per address and username, so nobody can lock the administrator out from elsewhere.
+- Signing out is remembered across restarts.
+- The public health check no longer reveals the version or bot name.
+- The Jellyfin API key is sent in a header instead of the WebSocket URL.
+- The dashboard loads nothing from other origins and allows no inline scripts.
+- In the Docker image the application files are read-only for the app user; the config directory is created with private permissions on native installs.
+
+### Removed
+
+- TMDB and OMDb integration, the Jellyfin library seed and daily prune scans, and the `/api/seed/reset` endpoint.
+
+---
+
 ## [1.6.5] - 2026-11-15
 
 > **⚠️ Behaviour change for role lists:** If you use a role allowlist or blocklist, the bot can no longer be used via DM, since roles only exist on your server. Without role lists, nothing changes.

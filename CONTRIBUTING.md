@@ -1,196 +1,95 @@
-<h1 align="center">🤝 Contributing to Anchorr</h1>
+# Contributing to Anchorr
 
-<p align="center">
-  Thank you for considering contributing to Anchorr! We appreciate all kinds of contributions, from bug reports to new features.
-</p>
+Thanks for helping. Bug reports, translations, documentation and code are all welcome.
 
-## 🎯 Ways to Contribute
+## Reporting bugs
 
-### 🐛 Report Bugs
+[Open an issue](https://github.com/openVESSL/Anchorr/issues/new?labels=bug) with:
 
-Found a bug? Please help us fix it!
+- What you did, what you expected and what happened instead
+- Your Anchorr version (shown on the dashboard's Overview page) and how you run it (Docker, Unraid, Node.js)
+- Your Jellyfin and Seerr versions
+- The relevant lines from **Logs** in the dashboard. Log entries never include API keys from 2.0 on, but check for anything else private before posting.
 
-**When reporting, include:**
+For security issues, follow [SECURITY.md](./SECURITY.md) instead of opening a public issue.
 
-- Clear, descriptive title
-- Steps to reproduce the issue
-- Expected vs. actual behavior
-- Console logs/error messages
-- Your environment (Node.js version, OS, etc.)
-- Screenshots if applicable
+## Suggesting features
 
-[Open a bug report](https://github.com/nairdahh/anchorr/issues/new?labels=bug&template=bug_report.md)
+Check the [existing issues](https://github.com/openVESSL/Anchorr/issues) first, then open one describing the problem you want solved and how you would use the feature. Ideas are also discussed on the [Discord server](https://discord.gg/S5JrsZe9mB).
 
-### 💡 Suggest Features
+## Development setup
 
-Have an idea to improve Anchorr?
-
-**Before submitting:**
-
-- Check existing issues to avoid duplicates
-- Provide a clear use case
-- Explain the expected behavior
-- Discuss the implementation approach
-
-[Suggest a feature](https://github.com/nairdahh/anchorr/issues/new?labels=enhancement&template=feature_request.md)
-
-### 📝 Improve Documentation
-
-Help us improve README, guides, or inline code comments!
-
-### 🌐 Add Translations
-
-Anchorr supports multiple languages! Help make it accessible to more users by contributing translations. The translation system is fully automated!
-
-**Currently supported languages:**
-- English (en) - Base language
-- German (de) - Fully translated
-- Swedish (sv) - Available
-- French (fr) - Fully translated
-
-#### How to Add a New Language
-
-1. Copy `locales/template.json` to `locales/<language_code>.json` (e.g., `locales/fr.json` for French)
-2. Update the `_meta` section with your language information:
-```json
-{
-  "_meta": {
-    "language_name": "Français",
-    "language_code": "fr",
-    "contributors": ["Your Name"],
-    "completion": "0%",
-    "last_updated": "2025-12-16",
-    "notes": "Initial translation"
-  }
-}
-```
-3. Translate all text values (keep the keys unchanged)
-4. Your translation will automatically appear in the language dropdown — no code changes needed!
-
-#### Translation Guidelines
-
-**Important Rules:**
-- **Never change JSON keys** - only translate the values
-- **Keep HTML tags intact** - e.g., `<strong>Discord</strong>` stays as `<strong>Discord</strong>`
-- **Preserve placeholders** - e.g., `{{count}}` should remain `{{count}}`
-- **Maintain link structure** - Keep `<a href="..." target="_blank">` tags
-- **Test frequently** - Start the server and check your translation in the UI
-
-**Language Codes (ISO 639-1):**
-- `en` - English, `de` - German, `sv` - Swedish, `fr` - French, `es` - Spanish
-- `es` - Spanish, `pt` - Portuguese, `pt-br` - Portuguese (Brazil)
-- `zh` - Chinese, `ja` - Japanese, `ko` - Korean, `ru` - Russian, `ar` - Arabic
-
-**Example Translation Structure:**
-```json
-{
-  "_meta": {
-    "language_name": "Français",
-    "language_code": "fr",
-    "contributors": ["John Doe"],
-    "completion": "45%",
-    "last_updated": "2025-12-16",
-    "notes": "Work in progress"
-  },
-  "common": {
-    "yes": "Oui",
-    "no": "Non",
-    "save": "Enregistrer",
-    "cancel": "Annuler"
-  },
-  "config": {
-    "title": "Configuration",
-    "discord_instructions_1": "Allez à <strong>\"Bot\"</strong> dans la barre latérale et cliquez sur <strong>\"Add Bot\"</strong>"
-  }
-}
-```
-
-#### Testing Your Translation
-
-1. Start the Anchorr server: `node app.js`
-2. Open the web interface
-3. Look for your language in the language dropdown
-4. Select it and verify the translations appear correctly
-5. Check all pages and sections
-
-#### Submitting Your Translation
-
-1. Fork the repository on GitHub
-2. Create a branch: `git checkout -b feat/add-<language_code>-translation`
-3. Add your locale file and commit:
-
-   ```bash
-   git add locales/<language_code>.json
-   git commit -m "feat: add <Language Name> translation"
-   ```
-
-4. Push and [open a Pull Request](https://github.com/nairdahh/anchorr/compare) against the `main` branch
-
-#### Common Placeholders
-
-- `{{count}}` - Number of items
-- `{{query}}` - Search query text
-- `{{title}}` - Movie/show title
-- `<strong>text</strong>` - Bold text
-- `<code>text</code>` - Code formatting
-- `<a href="...">text</a>` - Links
-
-**Automatic Detection:**
-The system automatically scans the `locales/` directory, reads the `_meta` section, populates the language dropdown, loads translations when selected, and falls back to English if translation is missing.
-
-### 🔧 Submit Code Changes
-
-We love pull requests! Here's how to submit one:
-
-#### Step 1: Fork & Setup
+Requirements: Node.js 22.12 or later, and a Jellyfin, Seerr and Discord bot to test against.
 
 ```bash
-# Fork the repo on GitHub, then:
-git clone https://github.com/YOUR-USERNAME/anchorr.git
-cd anchorr
+git clone https://github.com/openVESSL/Anchorr.git
+cd Anchorr
 npm install
+npm run build      # builds the dashboard into frontend/dist
+npm start          # http://127.0.0.1:8282
 ```
 
-#### Step 2: Create a Feature Branch
+While working on the dashboard, run Anchorr with `npm start` and the dashboard dev server with `npm run dev:dashboard` (http://127.0.0.1:5173, which forwards `/api` to Anchorr).
+
+### Project layout
+
+| Path | Contents |
+| --- | --- |
+| `app.js` | Web server setup and startup |
+| `routes/` | Dashboard API (auth, setup, configuration, tests, logs) |
+| `bot/` | Discord bot: commands, buttons, embeds, daily pick, weekly roundup, guest account |
+| `jellyfin/` | Jellyfin feed (WebSocket and catch-up poll), library routing, notification metadata |
+| `jellyfinWebhook.js` | Turning a new Jellyfin item into a Discord announcement (dedup, episode grouping) |
+| `api/` | Clients for Seerr, Jellyfin, Discord and Seerr metadata |
+| `utils/` | Settings, config file, logging, HTTP client, auth, validation |
+| `frontend/` | Dashboard (React, Vite, Tailwind, shadcn/ui) |
+| `locales/` | Bot message translations |
+| `test/` | Automated tests |
+
+### Tests
 
 ```bash
-git checkout -b feature/your-feature-name
-# or for bugfixes:
-git checkout -b fix/bug-description
+npm test
 ```
 
-#### Step 3: Make Changes & Commit
+The tests run without internet access: Jellyfin, Seerr and Discord are replaced by small local fakes, and the data directory is a temporary folder, so your own `config/` and `logs/` are never touched. Please add or update tests for behavior you change.
 
-```bash
-git add .
-git commit -m "feat: add awesome feature"
-# Use conventional commits:
-# feat: new feature
-# fix: bug fix
-# docs: documentation
-# style: formatting changes
-# refactor: code refactoring
-# test: adding tests
+To type-check the dashboard: `npm --prefix frontend run lint`.
+
+### Pull requests
+
+1. Fork the repository and create a branch from `dev`, for example `fix/season-picker-tags`.
+2. Keep changes focused. Separate refactors from behavior changes.
+3. Use [Conventional Commits](https://www.conventionalcommits.org/) for messages: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
+4. Make sure `npm test` passes and the dashboard builds.
+5. Describe what changed and why in the pull request, and link the issue it addresses.
+
+## Translations
+
+Anchorr has two sets of texts: the bot's messages in Discord and the dashboard.
+
+**Bot messages** live in `locales/<code>.json`.
+
+1. Copy `locales/template.json` to `locales/<code>.json`, using an [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) code such as `es` or `pt-br`.
+2. Fill in the `_meta` section (language name, code, your name).
+3. Translate the values. Keep the keys, any `{placeholders}` and HTML tags unchanged.
+
+The language then appears in the dashboard under **Settings > Bot language**. Missing keys fall back to English.
+
+**Dashboard texts** live in `frontend/src/i18n/<code>.json`. Each entry maps the English text to its translation:
+
+```json
+{
+  "Save changes": "Änderungen speichern",
+  "Working in {server}.": "Arbeitet auf {server}."
+}
 ```
 
-#### Step 4: Push & Create Pull Request
+1. Copy an existing file, for example `de.json`, and translate the values. Keep `{placeholders}` as they are.
+2. Add the language to `LANGUAGES` in `frontend/src/lib/i18n.tsx` and import the file there.
 
-```bash
-git push origin feature/your-feature-name
-```
+Anything left out shows in English.
 
-Then [open a PR](https://github.com/nairdahh/anchorr/compare) against the `main` branch.
+## Code of conduct
 
-#### PR Guidelines
-
-- ✅ Keep PRs focused on a single feature/fix
-- ✅ Write clear commit messages
-- ✅ Update README if adding new features
-- ✅ Test locally before submitting
-- ✅ Link related issues
-
-## 💬 Communication
-
-- **Questions?** Open an issue with the `question` label
-- **Discussion?** Start a GitHub Discussion
-- **Need help?** Check existing documentation or issues first
+Be kind and constructive. Disagreement is fine, disrespect is not.

@@ -6,9 +6,9 @@ Anchorr is developed on the `main` branch, and security fixes are only guarantee
 
 | Version | Supported          |
 | ------- | ------------------ |
-| Latest release | ✅ |
-| `main` branch | ✅ |
-| Older releases | ❌ |
+| Latest release | Yes |
+| `main` branch | Yes |
+| Older releases | No |
 
 If you are running an older version, please update before reporting a security issue unless the issue prevents safe updating.
 
@@ -41,7 +41,7 @@ Useful context may include whether the issue affects:
 - Authentication or session handling
 - Stored configuration or secrets
 - Discord bot commands or permissions
-- Jellyfin webhook ingestion
+- The Jellyfin connection and the legacy webhook endpoint
 - Seerr request handling
 - Docker deployment defaults
 
@@ -76,7 +76,8 @@ When self-hosting Anchorr:
 - Restrict who can access the dashboard
 - Keep Anchorr and all dependencies up to date
 - Review Discord bot permissions and only grant what is necessary
-- Avoid using overly broad role mappings or request permissions
+- Avoid overly broad role lists, and give the Seerr guest account "Discord (Anchorr)" only the permissions and quota you want every unlinked member to have
+- Behind a reverse proxy, set `TRUST_PROXY=true` so sign-in cookies are marked secure
 
 ## Scope
 
@@ -86,7 +87,7 @@ This policy applies to vulnerabilities that could affect the confidentiality, in
 - Authentication bypass
 - Authorization flaws
 - Secret leakage
-- Webhook abuse
+- Abuse of the setup or webhook endpoints
 - Injection vulnerabilities
 - Dependency vulnerabilities with real impact
 - Sensitive information exposure
