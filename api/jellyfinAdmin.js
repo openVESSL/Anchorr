@@ -55,12 +55,16 @@ async function listApiKeys(baseUrl, token) {
   return data?.Items || [];
 }
 
-/** The "Anchorr" API key, created on first setup and reused afterwards. Needs an admin session. */
-export async function getOrCreateApiKey(baseUrl, adminToken) {
+/**
+ * The "Anchorr" API key, created on first setup and reused afterwards. Needs an admin session.
+ * `currentKey` (the key already in config) wins when Jellyfin still lists it.
+ */
+export async function getOrCreateApiKey(baseUrl, adminToken, currentKey = null) {
+  // Jellyfin reports IsActive: false for every API key, so it says nothing about validity.
   const ours = (keys) =>
     keys
-      .filter((k) => k.AppName === API_KEY_APP_NAME && k.IsActive !== false && !k.DateRevoked)
-      .sort((a, b) => String(b.DateCreated).localeCompare(String(a.DateCreated)))[0];
+      .filter((k) => k.AppName === API_KEY_APP_NAME && k.AccessToken && !k.DateRevoked)
+      .sort((a, b) => (b.AccessToken === currentKey) - (a.AccessToken === currentKey) || String(b.DateCreated).localeCompare(String(a.DateCreated)))[0];
 
   const existing = ours(await listApiKeys(baseUrl, adminToken));
   if (existing) return { apiKey: existing.AccessToken, created: false };

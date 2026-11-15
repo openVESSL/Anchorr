@@ -35,7 +35,8 @@ before(async () => {
     },
     "POST /Auth/Keys": ({ url, headers }) => {
       if (!ADMIN_TOKENS.has(tokenOf(headers))) return { status: 403, json: {} };
-      keys.push({ AppName: url.searchParams.get("app"), AccessToken: `jf-key-${keys.length + 1}`, IsActive: true, DateCreated: new Date().toISOString() });
+      // Real Jellyfin lists every API key with IsActive: false
+      keys.push({ AppName: url.searchParams.get("app"), AccessToken: `jf-key-${keys.length + 1}`, IsActive: false, DateCreated: new Date().toISOString() });
       return { status: 204 };
     },
     "POST /Sessions/Logout": () => ({ status: 204 }),
@@ -112,6 +113,12 @@ test("after setup the Jellyfin step needs a session, and re-linking reuses the k
   assert.equal(again.status, 200);
   assert.equal(again.json.signedIn, false);
   assert.equal(keys.length, 1, "no second Anchorr key");
+
+  // A newer Anchorr key (for example a leftover) must not replace the one in config
+  keys.push({ AppName: "Anchorr", AccessToken: "jf-key-newer", IsActive: false, DateCreated: new Date(Date.now() + 60_000).toISOString() });
+  assert.equal((await post("/api/setup/jellyfin", { url: jellyfin.url, username: "admin", password: "admin-pw" })).status, 200);
+  assert.equal((await get("/api/config")).json.JELLYFIN_API_KEY, "••••••••ey-1", "config keeps its key");
+  keys.pop();
 });
 
 test("Seerr step: the Jellyfin admin account reads Seerr's key, then the guest account is created", async () => {

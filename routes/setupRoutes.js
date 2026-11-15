@@ -99,7 +99,7 @@ router.post("/setup/jellyfin", setupLimiter, firstRunOrSignedIn, async (req, res
       if (!session.isAdmin) {
         return res.status(403).json({ success: false, message: "Sign in with a Jellyfin administrator account" });
       }
-      key = (await getOrCreateApiKey(baseUrl, session.token)).apiKey;
+      key = (await getOrCreateApiKey(baseUrl, session.token, settings.JELLYFIN_API_KEY)).apiKey;
       admin = { id: `jellyfin:${session.userId}`, username: session.username };
     } catch (err) {
       logger.error(`Setup: could not create the Jellyfin API key: ${err.message}`);
