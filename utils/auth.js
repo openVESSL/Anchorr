@@ -4,6 +4,7 @@ import crypto from "crypto";
 import logger from "./logger.js";
 import { readConfig, updateConfig } from "./configFile.js";
 import { getUsers, saveUser as saveUserToConfig } from "./userStore.js";
+import { PersistentMap } from "./persistentMap.js";
 
 const AUTH_TOKEN_EXPIRATION = "7d";
 const AUTH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -14,7 +15,8 @@ const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 min lockout
 const BASE_DELAY_MS = 300;              // progressive delay per failure: attempt * 300ms
 const MAX_DELAY_MS = 4000;             // cap at 4s
 
-// username → { count: number, lockedUntil: number, timerId: NodeJS.Timeout|null }
+// "ip|username" → { count, lockedUntil, timerId }. Keyed by client too, so failures from
+// one address cannot lock the admin out everywhere.
 const failedAttempts = new Map();
 
 function getAttemptEntry(username) {
@@ -97,10 +99,12 @@ function getOrGenerateJwtSecret() {
 // Initialize JWT_SECRET once at module load (CRITICAL: must be constant for token verification)
 const JWT_SECRET = getOrGenerateJwtSecret();
 
-// In-memory set of revoked token JTIs (cleared on restart, which also invalidates all tokens if secret rotates)
-const revokedTokens = new Set();
-// Maximum time (in ms) to keep a revoked token JTI in memory, to avoid unbounded TTLs
-const MAX_REVOKE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+// Revoked token JTIs, kept on disk until the token would have expired anyway,
+// so a logged-out session stays logged out after a restart
+const MAX_REVOKE_TTL_MS = AUTH_TOKEN_MAX_AGE_MS;
+const revokedTokens = new PersistentMap("revoked-sessions", MAX_REVOKE_TTL_MS, {
+  validateValue: (v) => v === true,
+});
 
 function revokeToken(token) {
   try {
@@ -119,13 +123,8 @@ function revokeToken(token) {
     if (ttlFromExpMs <= 0) {
       return;
     }
-    const ttl = Math.min(ttlFromExpMs, MAX_REVOKE_TTL_MS);
-    revokedTokens.add(decoded.jti);
-    // Auto-cleanup: remove JTI after bounded TTL (.unref so timers don't block process exit)
-    const timeout = setTimeout(() => revokedTokens.delete(decoded.jti), ttl);
-    if (typeof timeout.unref === "function") {
-      timeout.unref();
-    }
+    revokedTokens.set(decoded.jti, true, Math.min(ttlFromExpMs, MAX_REVOKE_TTL_MS));
+    revokedTokens.flush();
   } catch (_) {
     // Ignore invalid or unverifiable tokens; they cannot be revoked
   }
@@ -152,8 +151,8 @@ export const authenticateToken = (req, res, next) => {
     if (!user || typeof user !== "object") {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
-    // Legacy tokens without JTI remain valid until expiry; JTI tokens enforce revocation
-    if (user.jti && isTokenRevoked(user.jti)) {
+    // Every session token carries a jti so it can be revoked
+    if (!user.jti || isTokenRevoked(user.jti)) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     req.user = user;
@@ -170,8 +169,10 @@ export const login = async (req, res) => {
       .json({ success: false, message: "Username and password are required" });
   }
 
+  const attemptKey = `${req.ip}|${username}`;
+
   // Check lockout before doing anything else
-  const secondsRemaining = checkLockout(username);
+  const secondsRemaining = checkLockout(attemptKey);
   if (secondsRemaining > 0) {
     logger.warn(`🔒 Login blocked for "${username}" — account locked (${secondsRemaining}s remaining, from ${req.ip})`);
     return res.status(429).json({
@@ -190,8 +191,8 @@ export const login = async (req, res) => {
     : await bcrypt.compare(password, dummyHash).then(() => false);
 
   if (!user || !validPassword) {
-    await progressiveDelay(username);
-    const { count } = recordFailure(username);
+    await progressiveDelay(attemptKey);
+    const { count } = recordFailure(attemptKey);
     const attemptsLeft = MAX_FAILED_ATTEMPTS - count;
     if (attemptsLeft <= 0) {
       logger.warn(`🔒 Account "${username}" locked after ${MAX_FAILED_ATTEMPTS} failed attempts (from ${req.ip})`);
@@ -206,7 +207,7 @@ export const login = async (req, res) => {
       .json({ success: false, message: "Invalid credentials" });
   }
 
-  clearFailures(username);
+  clearFailures(attemptKey);
 
   const token = jwt.sign({ id: user.id, username: user.username, jti: crypto.randomUUID() }, JWT_SECRET, {
     expiresIn: AUTH_TOKEN_EXPIRATION,
@@ -307,8 +308,7 @@ export const checkAuth = (req, res) => {
       const users = getUsers();
       return res.json({ isAuthenticated: false, hasUsers: users.length > 0 });
     }
-    // Legacy tokens without JTI remain valid until expiry; JTI tokens enforce revocation
-    if (user.jti && isTokenRevoked(user.jti)) {
+    if (!user.jti || isTokenRevoked(user.jti)) {
       const users = getUsers();
       return res.json({ isAuthenticated: false, hasUsers: users.length > 0 });
     }

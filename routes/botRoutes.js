@@ -41,6 +41,9 @@ router.get("/status", authenticateToken, (req, res) => {
     jellyfinConnected: Boolean(botState.jellyfinFeed?.ws && botState.jellyfinFeed.ws.readyState === 1),
     // Set when the old Jellyfin Webhook plugin still calls Anchorr (it can be removed)
     legacyWebhookLastSeen: botState.legacyWebhookLastSeen ?? null,
+    // Behind a reverse proxy without TRUST_PROXY, cookies are not marked Secure and
+    // rate limits see every visitor as the proxy's address (audit S13)
+    proxyWithoutTrust: Boolean(req.headers["x-forwarded-for"]) && process.env.TRUST_PROXY !== "true",
     cache: cache.getStats(),
     memory: {
       used: `${Math.round(memory.heapUsed / 1024 / 1024)} MB`,
