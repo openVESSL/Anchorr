@@ -77,11 +77,11 @@ async function handleSearchOrRequest(
   const isPrivateMode = process.env.PRIVATE_MESSAGE_MODE === "true";
 
   try {
-    await interaction.deferReply({ ephemeral: isPrivateMode });
+    await interaction.deferReply({ flags: isPrivateMode ? 64 : undefined });
   } catch (err) {
     logger.error(`Failed to defer reply for "${interaction.commandName}": ${err.message}`);
     try {
-      await interaction.reply({ content: "⚠️ Something went wrong. Please try again.", ephemeral: true });
+      await interaction.reply({ content: "⚠️ Something went wrong. Please try again.", flags: 64 });
     } catch (_) {
       // Interaction token already invalid
     }
