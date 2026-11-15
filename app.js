@@ -208,9 +208,20 @@ function configureWebServer() {
   // The dashboard (frontend/, built into frontend/dist). Without a build, the old one is served.
   const dashboardDir = path.join(__dirname, "frontend", "dist");
   if (fs.existsSync(path.join(dashboardDir, "index.html"))) {
-    app.use(express.static(dashboardDir, { index: false }));
-    // Client-side routes (/notifications, /setup, ...) all load the same page
-    app.get(/^\/(?!api\/|legacy\/|assets\/|locales\/).*/, (_req, res) => {
+    // Built files carry a content hash: cache them for good. index.html must never be
+    // cached, or a browser keeps asking for the previous build's files after an update.
+    app.use(
+      express.static(dashboardDir, {
+        index: false,
+        setHeaders: (res, filePath) => {
+          res.setHeader("Cache-Control", filePath.includes(`${path.sep}app${path.sep}`) ? "public, max-age=31536000, immutable" : "no-cache");
+        },
+      })
+    );
+    // Client-side routes (/notifications, /setup, ...) all load the same page. Paths that
+    // look like files are not routes: a missing file is a 404, not the page.
+    app.get(/^\/(?!api\/|legacy\/|assets\/|locales\/|app\/)[^.]*$/, (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache");
       res.sendFile(path.join(dashboardDir, "index.html"));
     });
   } else {
