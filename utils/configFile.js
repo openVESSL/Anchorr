@@ -416,7 +416,9 @@ export function loadSettings() {
   // 6. v2 format: Seerr provides all metadata, so TMDB/OMDb keys and v1 UI leftovers go.
   // The untouched v1 file is kept once as config.v1.json.
   if ((Number(config.CONFIG_VERSION) || 1) < CURRENT_CONFIG_VERSION) {
-    const obsolete = ["TMDB_API_KEY", "OMDB_API_KEY", "HEADER_VISIBLE", "startBot"].filter((k) => k in config);
+    const obsolete = ["TMDB_API_KEY", "OMDB_API_KEY", "HEADER_VISIBLE", "startBot", "LIBRARY_SEEDED"].filter((k) => k in config);
+    // v1 library seed store, read only by the removed poller
+    fs.rmSync(path.join(path.dirname(CONFIG_PATH), "dedup-seen-items.json"), { force: true });
     if (obsolete.length > 0) backupV1Config();
     for (const key of obsolete) delete config[key];
     config.CONFIG_VERSION = CURRENT_CONFIG_VERSION;

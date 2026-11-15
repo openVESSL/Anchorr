@@ -86,12 +86,12 @@ test("schema accepts both library formats and rejects a malformed URL", () => {
 test("v1 config upgrades to format v2: TMDB/OMDb keys removed, original kept as config.v1.json", () => {
   const backup = path.join(path.dirname(CONFIG_PATH), "config.v1.json");
   fs.rmSync(backup, { force: true });
-  writeConfig({ SEERR_URL: "http://seerr.local", TMDB_API_KEY: "tmdb-secret", OMDB_API_KEY: "", HEADER_VISIBLE: "true", startBot: true });
+  writeConfig({ SEERR_URL: "http://seerr.local", TMDB_API_KEY: "tmdb-secret", OMDB_API_KEY: "", HEADER_VISIBLE: "true", startBot: true, LIBRARY_SEEDED: "true" });
 
   assert.equal(loadSettings(), true);
   const upgraded = readConfig();
   assert.equal(upgraded.CONFIG_VERSION, 2);
-  for (const key of ["TMDB_API_KEY", "OMDB_API_KEY", "HEADER_VISIBLE", "startBot"]) {
+  for (const key of ["TMDB_API_KEY", "OMDB_API_KEY", "HEADER_VISIBLE", "startBot", "LIBRARY_SEEDED"]) {
     assert.equal(key in upgraded, false, `${key} removed`);
   }
   assert.equal(upgraded.SEERR_URL, "http://seerr.local");

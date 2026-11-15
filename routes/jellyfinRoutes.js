@@ -6,42 +6,9 @@ import { TIMEOUTS } from "../lib/constants.js";
 import { libraryCache } from "../jellyfinWebhook.js";
 import { jellyfinAuthHeaders } from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
-import { seedLibrary, checkSeedPreconditions } from "../jellyfin/librarySeeder.js";
-import { updateConfig } from "../utils/configFile.js";
 import { settings } from "../utils/settings.js";
 
 const router = Router();
-
-// Resets the LIBRARY_SEEDED flag and re-runs the full library seed scan.
-// Fire-and-forget: the scan can take a while for large libraries, so this
-// responds immediately and the scan continues in the background.
-router.post("/seed/reset", authenticateToken, (_req, res) => {
-  // Checked before touching config so a rejected request reports the real
-  // reason instead of confirming a scan that never starts.
-  const pre = checkSeedPreconditions();
-  if (!pre.ok) {
-    return res.status(409).json({
-      success: false,
-      message: `Cannot start re-seed: ${pre.reason}.`,
-    });
-  }
-
-  if (!updateConfig({ LIBRARY_SEEDED: "false" })) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update config.json.",
-    });
-  }
-
-  seedLibrary().catch((err) =>
-    logger.error(`librarySeeder: unexpected rejection from re-seed (${err?.message || err})`)
-  );
-
-  res.json({
-    success: true,
-    message: "Library re-seed started in the background. Check the logs for progress.",
-  });
-});
 
 function isAllowedUrl(url) {
   try {

@@ -9,8 +9,6 @@ import { configTemplate } from "./lib/config.js";
 import { sendDailyRandomPick } from "./bot/dailyPick.js";
 import { sendWeeklyRoundupTest } from "./bot/weeklyRoundup.js";
 import { stop as stopRoundupScheduler } from "./bot/roundupScheduler.js";
-import { seedLibrary } from "./jellyfin/librarySeeder.js";
-import { pruneLibrary } from "./jellyfin/libraryPruner.js";
 
 // ESM __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -1048,8 +1046,6 @@ logger.info("Web server configured successfully");
 // --- START THE SERVER ---
 // This single `app.listen` call handles both modes.
 let server;
-let libraryPruneTimer;
-let libraryPruneInitialTimer;
 
 function startServer() {
   // Check volume configuration early
@@ -1124,35 +1120,7 @@ function startServer() {
       logger.error("Error during auto-start check:", e?.message || e);
     }
 
-    // One-time library seed: pre-populate the dedup store with everything
-    // that already exists in Jellyfin so pre-existing content never
-    // triggers a "new item" Discord notification. Runs async — webhook/
-    // poller/websocket are already listening and handle items normally
-    // while this is in progress.
-    if (settings.LIBRARY_SEEDED !== "true") {
-      seedLibrary().catch((err) =>
-        logger.error(`librarySeeder: unexpected rejection on boot (${err?.message || err})`)
-      );
-    }
   });
-
-  const LIBRARY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
-  const LIBRARY_PRUNE_INITIAL_DELAY_MS = 5 * 60 * 1000;
-  // setInterval alone only fires after a full 24h of uptime — a container
-  // that restarts more often than that (e.g. on every config save) would
-  // otherwise never run a prune cycle at all. Run one shortly after boot too
-  // so seeded/pruned keys get re-asserted regardless of restart frequency.
-  libraryPruneInitialTimer = setTimeout(() => {
-    pruneLibrary().catch((err) =>
-      logger.error(`libraryPruner: unexpected rejection in initial prune (${err?.message || err})`)
-    );
-  }, LIBRARY_PRUNE_INITIAL_DELAY_MS);
-
-  libraryPruneTimer = setInterval(() => {
-    pruneLibrary().catch((err) =>
-      logger.error(`libraryPruner: unexpected rejection in prune cycle (${err?.message || err})`)
-    );
-  }, LIBRARY_PRUNE_INTERVAL_MS);
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
@@ -1172,8 +1140,6 @@ function startServer() {
 
 // Keep the process alive
 process.on("SIGTERM", () => {
-  clearInterval(libraryPruneTimer);
-  clearTimeout(libraryPruneInitialTimer);
   logger.info("SIGTERM signal received: closing HTTP server");
   server.close(() => {
     logger.info("HTTP server closed");
@@ -1182,8 +1148,6 @@ process.on("SIGTERM", () => {
 });
 
 process.on("SIGINT", () => {
-  clearInterval(libraryPruneTimer);
-  clearTimeout(libraryPruneInitialTimer);
   logger.info("SIGINT signal received: closing HTTP server");
   server.close(() => {
     logger.info("HTTP server closed");

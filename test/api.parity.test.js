@@ -24,7 +24,7 @@ before(async () => {
   base = `http://127.0.0.1:${port}`;
   child = spawn(process.execPath, ["--import", "./test/setup.js", "app.js"], {
     cwd: ROOT,
-    env: { ...process.env, WEBHOOK_PORT: String(port), BIND_HOST: "127.0.0.1", AUTO_START_BOT: "false", LIBRARY_SEEDED: "true" },
+    env: { ...process.env, WEBHOOK_PORT: String(port), BIND_HOST: "127.0.0.1", AUTO_START_BOT: "false" },
     stdio: "ignore",
   });
   for (let i = 0; i < 100; i++) {
