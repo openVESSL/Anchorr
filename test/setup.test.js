@@ -17,6 +17,7 @@ const tokenOf = (headers) => /Token="([^"]+)"/.exec(headers.authorization || "")
 
 let jellyfin;
 let seerr;
+let discord;
 let app;
 
 before(async () => {
@@ -52,12 +53,18 @@ before(async () => {
     "POST /api/v1/user": () => ({ status: 201, json: { id: 900 } }),
     "GET /api/v1/user/900": () => ({ id: 900, permissions: 32 }),
   });
-  app = await startApp();
+  discord = await startFakeServer({
+    "GET /users/@me": ({ headers }) => (headers.authorization === "Bot good-token" ? { id: "bot-1", username: "Anchorr" } : { status: 401, json: {} }),
+    "GET /applications/@me": () => ({ flags: 1 << 15 }),
+    "GET /users/@me/guilds": () => [{ id: "g1", name: "Home" }],
+  });
+  app = await startApp({ DISCORD_API_URL: discord.url });
 });
 after(async () => {
   app?.stop();
   await jellyfin?.close();
   await seerr?.close();
+  await discord?.close();
 });
 
 const post = (url, body, opts) => app.call("POST", url, body, opts);
@@ -65,7 +72,7 @@ const get = (url, opts) => app.call("GET", url, undefined, opts);
 const posts = (server, path) => server.requests.filter((r) => r.method === "POST" && r.path === path).length;
 
 test("fresh install: setup needed, nothing can be claimed without Jellyfin", async () => {
-  assert.deepEqual((await get("/api/setup/state")).json, { needsSetup: true, jellyfin: false, seerr: false, discord: false, localAccount: false });
+  assert.deepEqual((await get("/api/setup/state")).json, { needsSetup: true, jellyfin: false, seerr: false, discord: false, discordServer: false, localAccount: false });
   const check = (await get("/api/auth/check")).json;
   assert.equal(check.needsSetup, true);
   assert.equal(check.jellyfinLogin, false);
@@ -142,4 +149,32 @@ test("a local account can be added from a signed-in session, once", async () => 
 test("a pasted Jellyfin key is accepted only if it is an administrator key", async () => {
   assert.equal(await isAdminApiKey(jellyfin.url, "jf-key-1"), true);
   assert.equal(await isAdminApiKey(jellyfin.url, "random-key"), false);
+});
+
+test("Discord step: the token is checked with Discord, the bot id and invite link come from it", async () => {
+  assert.equal((await post("/api/setup/discord", { token: "bad-token" })).status, 401);
+
+  const res = await post("/api/setup/discord", { token: " good-token " });
+  assert.equal(res.status, 200);
+  assert.equal(res.json.botName, "Anchorr");
+  assert.equal(res.json.membersIntent, true);
+  assert.deepEqual(res.json.guilds, [{ id: "g1", name: "Home" }]);
+  assert.equal(
+    res.json.inviteUrl,
+    "https://discord.com/oauth2/authorize?client_id=bot-1&scope=bot%20applications.commands&permissions=274877926400"
+  );
+
+  const config = (await get("/api/config")).json;
+  assert.equal(config.BOT_ID, "bot-1");
+  assert.equal(config.DISCORD_TOKEN, "••••••••oken");
+  assert.equal((await post("/api/setup/discord", { token: config.DISCORD_TOKEN })).status, 200, "the masked token means: keep the saved one");
+});
+
+test("Discord step: only a server the bot has joined can be picked", async () => {
+  assert.equal((await post("/api/setup/discord/server", { guildId: "other" })).status, 400);
+  const res = await post("/api/setup/discord/server", { guildId: "g1" });
+  // the bot cannot really connect in tests; the choice is saved either way
+  assert.ok([200, 502].includes(res.status));
+  assert.equal((await get("/api/config")).json.GUILD_ID, "g1");
+  assert.equal((await get("/api/setup/state")).json.discordServer, true);
 });

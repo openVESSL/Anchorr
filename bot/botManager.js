@@ -11,7 +11,7 @@ import { handleJellyfinWebhook } from "../jellyfinWebhook.js";
 import { registerInteractions } from "./interactions.js";
 import { prepareGuestUser } from "./guestUser.js";
 import { scheduleDailyRandomPick } from "./dailyPick.js";
-import { start as startRoundupScheduler } from "./roundupScheduler.js";
+import { start as startRoundupScheduler, stop as stopRoundupScheduler } from "./roundupScheduler.js";
 import { loadSettings } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
@@ -112,4 +112,20 @@ export async function startBot() {
       reject(err);
     });
   });
+}
+
+/** Disconnects the bot and stops its schedulers and the Jellyfin feed. */
+export async function stopBot() {
+  stopRoundupScheduler();
+  botState.jellyfinFeed?.stop();
+  botState.jellyfinFeed = null;
+  if (botState.discordClient) await botState.discordClient.destroy();
+  botState.isBotRunning = false;
+  botState.discordClient = null;
+}
+
+/** Starts the bot, or restarts it so new Discord settings take effect. */
+export async function restartBot() {
+  if (botState.isBotRunning) await stopBot();
+  return startBot();
 }

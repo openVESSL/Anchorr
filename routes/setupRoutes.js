@@ -5,7 +5,10 @@ import rateLimit from "express-rate-limit";
 import { getOrCreateApiKey, getPublicServerInfo, isAdminApiKey, signIn, signOut } from "../api/jellyfinAdmin.js";
 import { getApiKeyWithJellyfinLogin, getSeerrVersion } from "../api/seerr.js";
 import { prepareGuestUser } from "../bot/guestUser.js";
-import { startJellyfinFeed } from "../bot/botManager.js";
+import { restartBot, startJellyfinFeed } from "../bot/botManager.js";
+import { botState } from "../bot/botState.js";
+import { inviteUrl, listBotGuilds, verifyBotToken } from "../api/discord.js";
+import { isMaskedValue } from "../utils/configSanitize.js";
 import { authenticateToken, issueSession } from "../utils/auth.js";
 import { updateConfig } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
@@ -50,6 +53,7 @@ router.get("/setup/state", (req, res) => {
     jellyfin: Boolean(settings.JELLYFIN_BASE_URL && settings.JELLYFIN_API_KEY),
     seerr: Boolean(settings.SEERR_URL && settings.SEERR_API_KEY),
     discord: Boolean(settings.DISCORD_TOKEN && settings.BOT_ID),
+    discordServer: Boolean(settings.GUILD_ID),
     localAccount: getUsers().length > 0,
   });
 });
@@ -149,6 +153,80 @@ router.post("/setup/seerr", setupLimiter, authenticateToken, async (req, res) =>
   const guestUserId = await prepareGuestUser();
   logger.info(`Setup: linked Seerr ${version ?? ""}`.trim());
   res.json({ success: true, version, guestAccount: guestUserId !== null });
+});
+
+// ----- Discord -----
+
+async function discordStatus(token) {
+  const bot = await verifyBotToken(token);
+  return { bot, guilds: await listBotGuilds(token) };
+}
+
+router.post("/setup/discord", setupLimiter, authenticateToken, async (req, res) => {
+  const submitted = String(req.body?.token || "").trim();
+  const token = isMaskedValue(submitted) ? settings.DISCORD_TOKEN : submitted;
+  if (!token) return res.status(400).json({ success: false, message: "Paste the bot token from the Discord Developer Portal" });
+
+  let status;
+  try {
+    status = await discordStatus(token);
+  } catch (err) {
+    if (statusOf(err) === 401) return res.status(401).json({ success: false, message: "Discord did not accept this bot token" });
+    return res.status(502).json({ success: false, message: "Could not reach Discord" });
+  }
+  if (!updateConfig({ DISCORD_TOKEN: token, BOT_ID: status.bot.id })) {
+    return res.status(500).json({ success: false, message: "Could not save the configuration. Check the config volume permissions." });
+  }
+  res.json({
+    success: true,
+    botName: status.bot.username,
+    membersIntent: status.bot.membersIntent,
+    inviteUrl: inviteUrl(status.bot.id),
+    guilds: status.guilds,
+  });
+});
+
+router.get("/setup/discord", authenticateToken, async (req, res) => {
+  if (!settings.DISCORD_TOKEN) return res.json({ success: true, configured: false });
+  try {
+    const status = await discordStatus(settings.DISCORD_TOKEN);
+    res.json({
+      success: true,
+      configured: true,
+      botName: status.bot.username,
+      membersIntent: status.bot.membersIntent,
+      inviteUrl: inviteUrl(status.bot.id),
+      guilds: status.guilds,
+      guildId: settings.GUILD_ID || null,
+      botRunning: botState.isBotRunning,
+    });
+  } catch (err) {
+    res.status(502).json({ success: false, message: "Could not reach Discord" });
+  }
+});
+
+// Picks the server and (re)starts the bot so commands register there
+router.post("/setup/discord/server", setupLimiter, authenticateToken, async (req, res) => {
+  const guildId = String(req.body?.guildId || "");
+  if (!settings.DISCORD_TOKEN) return res.status(400).json({ success: false, message: "Add the bot token first" });
+  let guilds;
+  try {
+    guilds = await listBotGuilds(settings.DISCORD_TOKEN);
+  } catch {
+    return res.status(502).json({ success: false, message: "Could not reach Discord" });
+  }
+  const guild = guilds.find((g) => g.id === guildId);
+  if (!guild) return res.status(400).json({ success: false, message: "The bot is not in that server yet. Invite it first." });
+  if (!updateConfig({ GUILD_ID: guildId })) {
+    return res.status(500).json({ success: false, message: "Could not save the configuration. Check the config volume permissions." });
+  }
+  try {
+    await restartBot();
+    res.json({ success: true, guild, botRunning: botState.isBotRunning });
+  } catch (err) {
+    logger.error(`Setup: the bot did not start: ${err.message}`);
+    res.status(502).json({ success: false, message: "Server saved, but the bot did not start. Check the token and intents." });
+  }
 });
 
 export default router;
