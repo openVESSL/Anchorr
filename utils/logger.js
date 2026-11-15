@@ -95,6 +95,7 @@ const logger = winston.createLogger({
   levels,
   format,
   transports,
+  silent: process.env.NODE_ENV === "test",
   exitOnError: false,
 });
 

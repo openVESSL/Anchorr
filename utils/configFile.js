@@ -48,7 +48,12 @@ function decodeConfig(config) {
 const LEGACY_CONFIG_PATH = path.join(process.cwd(), "lib", "config.json");
 
 const getNewConfigPath = () => {
-  // First priority: Check if /config exists and is writable (user-mounted volume)
+  // Explicit data directory (native installs, tests) wins over auto-detection
+  if (process.env.ANCHORR_CONFIG_DIR) {
+    return path.join(process.env.ANCHORR_CONFIG_DIR, "config.json");
+  }
+
+  // Check if /config exists and is writable (user-mounted volume)
   if (fs.existsSync("/config")) {
     try {
       const testFile = path.join("/config", ".write-test");
