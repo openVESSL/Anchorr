@@ -41,6 +41,22 @@ function getPendingOptions(userId, mediaType, tmdbId) {
   return entry.options;
 }
 
+// The free-text /request tag ends up in button labels and customIds, so only Seerr's own labels pass
+async function getKnownSonarrTags(tagLabels) {
+  if (tagLabels.length === 0) return [];
+  const allTags = await seerrApi.fetchTags(getSeerrUrl(), getSeerrApiKey());
+  const sonarrLabels = new Set(
+    (Array.isArray(allTags) ? allTags : [])
+      .filter((t) => t.type === "sonarr")
+      .map((t) => t.label || t.name)
+  );
+  const unknown = tagLabels.filter((label) => !sonarrLabels.has(label));
+  if (unknown.length > 0) {
+    logger.warn(`Ignoring unknown Sonarr tag(s) in /request: ${JSON.stringify(unknown)}`);
+  }
+  return tagLabels.filter((label) => sonarrLabels.has(label));
+}
+
 // Returns a user-facing error message for a failed Seerr request.
 function getSeerrErrorMessage(err) {
   if (err.response) {
@@ -280,7 +296,7 @@ async function handleSearchOrRequest(
       [],
       [],
       [],
-      mediaType === "tv" && mode === "request" ? tags : []
+      await getKnownSonarrTags(mediaType === "tv" && mode === "request" ? tags : [])
     );
 
     if (mediaType === "movie" && mode === "search") {
