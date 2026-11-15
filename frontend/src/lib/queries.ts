@@ -22,6 +22,8 @@ export const keys = {
   roles: ["roles"] as const,
   libraries: ["libraries"] as const,
   seerrOptions: ["seerr-options"] as const,
+  overview: ["overview"] as const,
+  recentRequests: ["requests-recent"] as const,
 }
 
 export const useAuth = () => useQuery({ queryKey: keys.auth, queryFn: () => api.get<AuthCheck>("/auth/check") })
