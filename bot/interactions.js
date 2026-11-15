@@ -30,12 +30,13 @@ const getTmdbApiKey = () => process.env.TMDB_API_KEY;
 const PENDING_OPTIONS_TTL_MS = 60 * 60 * 1000;
 const pendingRequestOptions = new Map();
 
-function pendingOptionsKey(userId, tmdbId) {
-  return `${userId}|${tmdbId}`;
+// TMDB movie and TV IDs overlap, so the media type is part of the key
+function pendingOptionsKey(userId, mediaType, tmdbId) {
+  return `${userId}|${mediaType}|${tmdbId}`;
 }
 
-function getPendingOptions(userId, tmdbId) {
-  const entry = pendingRequestOptions.get(pendingOptionsKey(userId, tmdbId));
+function getPendingOptions(userId, mediaType, tmdbId) {
+  const entry = pendingRequestOptions.get(pendingOptionsKey(userId, mediaType, tmdbId));
   if (!entry || Date.now() - entry.timestamp > PENDING_OPTIONS_TTL_MS) return {};
   return entry.options;
 }
@@ -255,7 +256,7 @@ async function handleSearchOrRequest(
 
     // The latest /search or /request for a show decides which options its Request button uses
     if (mediaType === "tv") {
-      const key = pendingOptionsKey(interaction.user.id, tmdbId);
+      const key = pendingOptionsKey(interaction.user.id, mediaType, tmdbId);
       if (mode === "request" && (options.server || options.quality)) {
         const now = Date.now();
         for (const [k, v] of pendingRequestOptions) {
@@ -760,7 +761,7 @@ export function registerInteractions(client) {
           if (isAnime) logger.info(`[REQUEST BTN] Detected anime content: ${tmdbId}`);
 
           const { profileId, serverId } = parseQualityAndServerOptions(
-            getPendingOptions(interaction.user.id, tmdbId),
+            getPendingOptions(interaction.user.id, mediaType, tmdbId),
             mediaType,
             isAnime
           );
@@ -779,7 +780,7 @@ export function registerInteractions(client) {
             userMappings: getUserMappings(),
             isAutoApproved: getSeerrAutoApprove(),
           });
-          pendingRequestOptions.delete(pendingOptionsKey(interaction.user.id, tmdbId));
+          pendingRequestOptions.delete(pendingOptionsKey(interaction.user.id, mediaType, tmdbId));
           logger.info(
             `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
           );
