@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.5] - 2026-11-15
+
+> **⚠️ Behaviour change for role lists:** If you use a role allowlist or blocklist, the bot can no longer be used via DM, since roles only exist on your server. Without role lists, nothing changes.
+
+### ✨ Added
+
+- **Season picker for `/request`** ([#138](https://github.com/openVESSL/Anchorr/pull/138)): Requesting a TV show now lets you pick seasons instead of requesting all of them at once. A chosen server or quality profile carries over. Thanks to @kylepitcock.
+
+### 🔒 Security
+
+- **Role lists now apply everywhere** ([#141](https://github.com/openVESSL/Anchorr/pull/141)): Buttons, select menus, autocomplete, DMs and other servers could bypass the role allowlist and blocklist. They are now checked for every interaction.
+- **Invalid role lists block instead of allowing everyone** ([#142](https://github.com/openVESSL/Anchorr/pull/142)): A broken role list in `config.json` now denies role-restricted commands and logs the problem once.
+
+### 🐛 Fixed
+
+- **Permission denied replies are now translated** and say when a command has to be used on the server instead of in a DM.
+- **Private mode replies are ready for future discord.js versions**, and the `ephemeral` deprecation warning is gone from the logs.
+
+---
+
 ## [1.6.4] - 2026-11-14
 
 ### 🔒 Security

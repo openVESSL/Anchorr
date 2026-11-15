@@ -24,6 +24,43 @@ const getSeerrUrl = () => getSeerrApiUrl(process.env.SEERR_URL || "");
 const getSeerrApiKey = () => process.env.SEERR_API_KEY;
 const getTmdbApiKey = () => process.env.TMDB_API_KEY;
 
+// Server/quality picked in /request for a TV show, held until the user presses the
+// season Request button (customIds are too small to carry them). Keyed by user + show;
+// lost on restart, in which case the defaults apply.
+const PENDING_OPTIONS_TTL_MS = 60 * 60 * 1000;
+const pendingRequestOptions = new Map();
+
+// TMDB movie and TV IDs overlap, so the media type is part of the key
+function pendingOptionsKey(userId, mediaType, tmdbId) {
+  return `${userId}|${mediaType}|${tmdbId}`;
+}
+
+function getPendingOptions(userId, mediaType, tmdbId) {
+  const entry = pendingRequestOptions.get(pendingOptionsKey(userId, mediaType, tmdbId));
+  if (!entry) return {};
+  if (Date.now() - entry.timestamp > PENDING_OPTIONS_TTL_MS) {
+    logger.info(`[REQUEST BTN] Server/quality choice for ${mediaType} ${tmdbId} expired, using defaults`);
+    return {};
+  }
+  return entry.options;
+}
+
+// The free-text /request tag ends up in button labels and customIds, so only Seerr's own labels pass
+async function getKnownSonarrTags(tagLabels) {
+  if (tagLabels.length === 0) return [];
+  const allTags = await seerrApi.fetchTags(getSeerrUrl(), getSeerrApiKey());
+  const sonarrLabels = new Set(
+    (Array.isArray(allTags) ? allTags : [])
+      .filter((t) => t.type === "sonarr")
+      .map((t) => t.label || t.name)
+  );
+  const unknown = tagLabels.filter((label) => !sonarrLabels.has(label));
+  if (unknown.length > 0) {
+    logger.warn(`Ignoring unknown Sonarr tag(s) in /request: ${JSON.stringify(unknown)}`);
+  }
+  return tagLabels.filter((label) => sonarrLabels.has(label));
+}
+
 // Returns a user-facing error message for a failed Seerr request.
 function getSeerrErrorMessage(err) {
   if (err.response) {
@@ -59,11 +96,11 @@ async function handleSearchOrRequest(
   const isPrivateMode = process.env.PRIVATE_MESSAGE_MODE === "true";
 
   try {
-    await interaction.deferReply({ ephemeral: isPrivateMode });
+    await interaction.deferReply({ flags: isPrivateMode ? 64 : undefined });
   } catch (err) {
     logger.error(`Failed to defer reply for "${interaction.commandName}": ${err.message}`);
     try {
-      await interaction.reply({ content: "⚠️ Something went wrong. Please try again.", ephemeral: true });
+      await interaction.reply({ content: "⚠️ Something went wrong. Please try again.", flags: 64 });
     } catch (_) {
       // Interaction token already invalid
     }
@@ -106,7 +143,10 @@ async function handleSearchOrRequest(
       getTmdbApiKey()
     );
 
-    if (mode === "request") {
+    // TV shows go through the season picker instead of requesting every season at once
+    const instantRequest = mode === "request" && mediaType !== "tv";
+
+    if (instantRequest) {
       const status = await seerrApi.checkMediaStatus(
         tmdbId,
         mediaType,
@@ -229,17 +269,38 @@ async function handleSearchOrRequest(
       details,
       mediaType,
       imdbId,
-      mode === "request" ? "success" : "search",
+      instantRequest ? "success" : "search",
       omdb,
       tmdbId
     );
 
+    // The latest /search or /request for a show decides which options its Request button uses
+    if (mediaType === "tv") {
+      const key = pendingOptionsKey(interaction.user.id, mediaType, tmdbId);
+      if (mode === "request" && (options.server || options.quality)) {
+        const now = Date.now();
+        for (const [k, v] of pendingRequestOptions) {
+          if (now - v.timestamp > PENDING_OPTIONS_TTL_MS) pendingRequestOptions.delete(k);
+        }
+        pendingRequestOptions.set(key, {
+          options: { server: options.server, quality: options.quality },
+          timestamp: now,
+        });
+      } else {
+        pendingRequestOptions.delete(key);
+      }
+    }
+
     const components = buildButtons(
       tmdbId,
       imdbId,
-      mode === "request",
+      instantRequest,
       mediaType,
-      details
+      details,
+      [],
+      [],
+      [],
+      await getKnownSonarrTags(mediaType === "tv" && mode === "request" ? tags : [])
     );
 
     if (mediaType === "movie" && mode === "search") {
@@ -317,16 +378,24 @@ async function handleSearchOrRequest(
 export function registerInteractions(client) {
   client.on("interactionCreate", async (interaction) => {
     try {
-      // Check role permissions for all commands
+      // Check role permissions for all commands, buttons, select menus, and autocomplete
       if (
         interaction.isCommand() ||
-        (interaction.isStringSelectMenu() &&
-          !interaction.customId.startsWith("request_seasons|") &&
-          !interaction.customId.startsWith("request_with_tags|"))
+        interaction.isButton() ||
+        interaction.isStringSelectMenu() ||
+        interaction.isAutocomplete()
       ) {
-        if (!checkRolePermission(interaction.member)) {
-          return interaction.reply({
-            content: "❌ You don't have permission to use this command.",
+        if (!checkRolePermission(interaction.member, interaction.guildId)) {
+          if (interaction.isAutocomplete()) return await interaction.respond([]);
+          logger.info(
+            `[PERMISSION] Denied interaction from user ${interaction.user.id} (${interaction.guildId ? `guild ${interaction.guildId}` : "DM"})`
+          );
+          return await interaction.reply({
+            content: t(
+              interaction.guildId
+                ? "permission_errors.denied"
+                : "permission_errors.dm_denied"
+            ),
             flags: 64,
           });
         }
@@ -712,7 +781,7 @@ export function registerInteractions(client) {
           if (isAnime) logger.info(`[REQUEST BTN] Detected anime content: ${tmdbId}`);
 
           const { profileId, serverId } = parseQualityAndServerOptions(
-            {},
+            getPendingOptions(interaction.user.id, mediaType, tmdbId),
             mediaType,
             isAnime
           );
@@ -731,6 +800,7 @@ export function registerInteractions(client) {
             userMappings: getUserMappings(),
             isAutoApproved: getSeerrAutoApprove(),
           });
+          pendingRequestOptions.delete(pendingOptionsKey(interaction.user.id, mediaType, tmdbId));
           logger.info(
             `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}. Auto-Approve: ${getSeerrAutoApprove()}${isAnime ? " [anime]" : ""}`
           );

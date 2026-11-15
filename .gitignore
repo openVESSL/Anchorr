@@ -33,3 +33,7 @@ docs/
 config/dedup-*.json
 .worktrees/
 PRODUCT.md
+
+# Local editor tooling
+.agents/
+skills-lock.json

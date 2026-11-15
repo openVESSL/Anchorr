@@ -492,5 +492,9 @@
     "generic": "⚠️ Seerr-Fehler: {msg}",
     "unreachable": "⚠️ Seerr konnte nicht erreicht werden. Prüfe, ob die Seerr-URL korrekt und erreichbar ist.",
     "unknown": "⚠️ Ein Fehler ist aufgetreten: {msg}"
+  },
+  "permission_errors": {
+    "denied": "❌ Du hast keine Berechtigung, diesen Befehl zu verwenden.",
+    "dm_denied": "❌ Dieser Bot ist auf Server-Rollen beschränkt. Bitte nutze den Befehl im Server."
   }
 }
