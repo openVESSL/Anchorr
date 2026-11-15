@@ -1,3 +1,4 @@
+import { recordActivity } from "../utils/activity.js";
 import { EmbedBuilder } from "discord.js";
 import * as jellyfinApi from "../api/jellyfin.js";
 import { getLibraryChannels } from "../jellyfin/libraryResolver.js";
@@ -501,6 +502,7 @@ export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
       sendOptions.allowedMentions = { parse: ["roles"] };
     }
     await channel.send(sendOptions);
+    if (!isTest) recordActivity("roundup", { detail: String(grouped.totalCount) });
     logger.info(
       `${logPrefix} posted: ${grouped.totalCount} items across ${grouped.perLibrary.size} libraries`
     );

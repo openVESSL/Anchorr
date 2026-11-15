@@ -1,3 +1,4 @@
+import { recordActivity } from "./utils/activity.js";
 import {
   EmbedBuilder,
   ActionRowBuilder,
@@ -686,6 +687,12 @@ async function processAndSendNotification(
         }
 
         sentMessage = await channel.send(messageOptions);
+        if (!isTestNotif) {
+          recordActivity("notification", {
+            title: ItemType === "Movie" ? Name : SeriesName || Name,
+            detail: ItemType,
+          });
+        }
       } catch (error) {
         logger.error(`Failed to send Discord message:`, error);
         throw new Error(`Failed to send Discord notification: ${error.message}`);

@@ -1,3 +1,4 @@
+import { recordActivity } from "../utils/activity.js";
 import {
   EmbedBuilder,
   ButtonBuilder,
@@ -150,6 +151,7 @@ export async function sendDailyRandomPick(client) {
     const button = new ActionRowBuilder().addComponents(buttonComponents);
 
     await channel.send({ embeds: [embed], components: [button] });
+    recordActivity("daily-pick", { title, detail: mediaType });
 
     logger.info(`Sent daily random pick: ${title} (${randomMedia.id} - ${mediaType})`);
   } catch (error) {

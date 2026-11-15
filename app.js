@@ -25,6 +25,7 @@ import discordRouter from "./routes/discordRoutes.js";
 import saveConfigRouter from "./routes/saveConfigRoutes.js";
 import testRouter from "./routes/testRoutes.js";
 import setupRouter from "./routes/setupRoutes.js";
+import overviewRouter from "./routes/overviewRoutes.js";
 import { startBot } from "./bot/botManager.js";
 import { CONFIG_PATH, loadSettings } from "./utils/configFile.js";
 import { settings } from "./utils/settings.js";
@@ -198,6 +199,7 @@ function configureWebServer() {
   app.use("/api", discordRouter);
   app.use("/api", saveConfigRouter);
   app.use("/api", testRouter);
+  app.use("/api", overviewRouter);
 
   app.use("/assets", express.static(path.join(__dirname, "assets")));
   app.use("/locales", express.static(path.join(__dirname, "locales")));

@@ -46,6 +46,7 @@ Anchorr connects three things you already run: **Jellyfin**, **Seerr** and a **D
 **Dashboard**
 
 - Guided setup: Jellyfin, Seerr and Discord in three steps
+- Overview with your servers, Seerr request counts, the latest requests (approve or decline them) and recent bot activity
 - Sign in with your Jellyfin administrator account, or an optional local account
 - All four [Catppuccin](https://catppuccin.com) flavors with a choice of accent color (Macchiato by default)
 - English, German, French and Swedish (the bot and the dashboard)
@@ -197,7 +198,7 @@ Almost everything is set in the dashboard and saved in `config.json`. A few sett
 | `WEBHOOK_PORT` | `8282` | Port of the dashboard inside the container or process. |
 | `BIND_HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise | Address to listen on. |
 | `TRUST_PROXY` | off | Set to `true` behind a reverse proxy, so sign-in cookies are marked secure and rate limits see real client addresses. |
-| `ANCHORR_CONFIG_DIR` | `/usr/src/app/config` in Docker, `./config` otherwise | Where the configuration and state files are kept. |
+| `ANCHORR_CONFIG_DIR` | `/usr/src/app/config` in Docker, `./config` otherwise | Where the configuration and state files (`config.json`, `pending-requests.json`, `activity.json`) are kept. |
 | `JELLYFIN_POLLING_INTERVAL` | `900000` (15 min) | How often to double-check Jellyfin for new items, in milliseconds. |
 
 ## Security

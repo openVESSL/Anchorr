@@ -1,3 +1,4 @@
+import { recordActivity } from "../utils/activity.js";
 import { ActionRowBuilder, StringSelectMenuBuilder } from "discord.js";
 import * as metadata from "../api/metadata.js";
 import * as seerrApi from "../api/seerr.js";
@@ -241,6 +242,7 @@ async function handleSearchOrRequest(
         userMappings: getUserMappings(),
         guestUserId: getGuestUserId,
       });
+      recordActivity("request", { title: details?.title || details?.name, detail: mediaType, user: interaction.user.username });
       logger.info(
         `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}${isAnime ? " [anime]" : ""}`
       );
@@ -785,6 +787,7 @@ export function registerInteractions(client) {
             userMappings: getUserMappings(),
             guestUserId: getGuestUserId,
           });
+          recordActivity("request", { title: details?.title || details?.name, detail: mediaType, user: interaction.user.username });
           pendingRequestOptions.delete(pendingOptionsKey(interaction.user.id, mediaType, tmdbId));
           logger.info(
             `[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}${isAnime ? " [anime]" : ""}`
@@ -1127,6 +1130,7 @@ export function registerInteractions(client) {
             userMappings: getUserMappings(),
             guestUserId: getGuestUserId,
           });
+          recordActivity("request", { title: details?.title || details?.name, detail: mediaType, user: interaction.user.username });
 
           if (settings.NOTIFY_ON_AVAILABLE === "true") {
             const requestKey = `${tmdbId}-${mediaType}`;
