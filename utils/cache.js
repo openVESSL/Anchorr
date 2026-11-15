@@ -1,186 +1,71 @@
 /**
- * Centralized API Response Caching
- * Uses node-cache for in-memory caching with TTL support
+ * In-memory cache for Seerr metadata (search, trending, details), 5 minutes per entry.
  */
-
-import NodeCache from "node-cache";
 import { CACHE_TTL } from "../lib/constants.js";
 import logger from "./logger.js";
 
-class APICache {
-  constructor() {
-    // TMDB cache - 5 minutes TTL
-    this.tmdbCache = new NodeCache({
-      stdTTL: CACHE_TTL.TMDB_SEARCH / 1000, // Convert ms to seconds
-      checkperiod: 120, // Check for expired keys every 2 minutes
-      useClones: false, // Don't clone objects (better performance)
-    });
+const SWEEP_ABOVE = 500; // drop expired entries once the cache grows past this
 
-    // Seerr cache - 1 minute TTL
-    this.seerrCache = new NodeCache({
-      stdTTL: CACHE_TTL.SEERR_STATUS / 1000,
-      checkperiod: 30,
-      useClones: false,
-    });
-
-    // Statistics
-    this.stats = {
-      tmdbHits: 0,
-      tmdbMisses: 0,
-      seerrHits: 0,
-      seerrMisses: 0,
-    };
+class MetadataCache {
+  constructor(ttlMs) {
+    this.ttlMs = ttlMs;
+    this.entries = new Map();
+    this.hits = 0;
+    this.misses = 0;
   }
 
-  // TMDB Search Cache
-  tmdbSearch(query, results) {
+  read(key) {
+    const entry = this.entries.get(key);
+    if (entry && entry.expiresAt > Date.now()) {
+      this.hits++;
+      return entry.value;
+    }
+    if (entry) this.entries.delete(key);
+    this.misses++;
+    return null;
+  }
+
+  write(key, value) {
+    if (this.entries.size >= SWEEP_ABOVE) this.sweep();
+    this.entries.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    return value;
+  }
+
+  sweep() {
+    const now = Date.now();
+    for (const [key, entry] of this.entries) if (entry.expiresAt <= now) this.entries.delete(key);
+  }
+
+  // Called with one argument less to read, with the value to store.
+  search(query, results) {
     const key = `search:${query.toLowerCase().trim()}`;
-
-    if (results === undefined) {
-      // GET
-      const cached = this.tmdbCache.get(key);
-      if (cached) {
-        this.stats.tmdbHits++;
-        return cached;
-      }
-      this.stats.tmdbMisses++;
-      return null;
-    } else {
-      // SET
-      this.tmdbCache.set(key, results);
-      return results;
-    }
+    return results === undefined ? this.read(key) : this.write(key, results);
   }
 
-  // TMDB Details Cache
-  tmdbDetails(id, mediaType, details) {
+  details(id, mediaType, details) {
     const key = `details:${mediaType}:${id}`;
-
-    if (details === undefined) {
-      // GET
-      const cached = this.tmdbCache.get(key);
-      if (cached) {
-        this.stats.tmdbHits++;
-        return cached;
-      }
-      this.stats.tmdbMisses++;
-      return null;
-    } else {
-      // SET
-      this.tmdbCache.set(key, details);
-      return details;
-    }
+    return details === undefined ? this.read(key) : this.write(key, details);
   }
 
-  // TMDB External IDs Cache
-  tmdbExternalIds(id, mediaType, externalIds) {
-    const key = `external:${mediaType}:${id}`;
-
-    if (externalIds === undefined) {
-      // GET
-      const cached = this.tmdbCache.get(key);
-      if (cached) {
-        this.stats.tmdbHits++;
-        return cached;
-      }
-      this.stats.tmdbMisses++;
-      return null;
-    } else {
-      // SET
-      this.tmdbCache.set(key, externalIds);
-      return externalIds;
-    }
+  trending(results) {
+    return results === undefined ? this.read("trending") : this.write("trending", results);
   }
 
-  // TMDB Trending Cache
-  tmdbTrending(results) {
-    const key = "trending:weekly";
-
-    if (results === undefined) {
-      // GET
-      const cached = this.tmdbCache.get(key);
-      if (cached) {
-        this.stats.tmdbHits++;
-        return cached;
-      }
-      this.stats.tmdbMisses++;
-      return null;
-    } else {
-      // SET
-      this.tmdbCache.set(key, results);
-      return results;
-    }
-  }
-
-  // Seerr Request Status Cache
-  seerrStatus(tmdbId, mediaType, status) {
-    const key = `status:${mediaType}:${tmdbId}`;
-
-    if (status === undefined) {
-      // GET
-      const cached = this.seerrCache.get(key);
-      if (cached) {
-        this.stats.seerrHits++;
-        return cached;
-      }
-      this.stats.seerrMisses++;
-      return null;
-    } else {
-      // SET
-      this.seerrCache.set(key, status);
-      return status;
-    }
-  }
-
-  // Clear specific cache
-  clearTMDB() {
-    this.tmdbCache.flushAll();
-    logger.info("TMDB cache cleared");
-  }
-
-  clearSeerr() {
-    this.seerrCache.flushAll();
-    logger.info("Seerr cache cleared");
-  }
-
-  // Clear all caches
   clearAll() {
-    this.tmdbCache.flushAll();
-    this.seerrCache.flushAll();
-    logger.info("All caches cleared");
+    this.entries.clear();
+    logger.info("Metadata cache cleared");
   }
 
-  // Get cache statistics
   getStats() {
-    const tmdbKeys = this.tmdbCache.keys().length;
-    const seerrKeys = this.seerrCache.keys().length;
-    const tmdbTotal = this.stats.tmdbHits + this.stats.tmdbMisses;
-    const seerrTotal =
-      this.stats.seerrHits + this.stats.seerrMisses;
-
+    this.sweep();
+    const total = this.hits + this.misses;
     return {
-      tmdb: {
-        keys: tmdbKeys,
-        hits: this.stats.tmdbHits,
-        misses: this.stats.tmdbMisses,
-        hitRate:
-          tmdbTotal > 0
-            ? ((this.stats.tmdbHits / tmdbTotal) * 100).toFixed(2) + "%"
-            : "0%",
-      },
-      seerr: {
-        keys: seerrKeys,
-        hits: this.stats.seerrHits,
-        misses: this.stats.seerrMisses,
-        hitRate:
-          seerrTotal > 0
-            ? ((this.stats.seerrHits / seerrTotal) * 100).toFixed(2) +
-              "%"
-            : "0%",
-      },
+      keys: this.entries.size,
+      hits: this.hits,
+      misses: this.misses,
+      hitRate: total > 0 ? `${((this.hits / total) * 100).toFixed(2)}%` : "0%",
     };
   }
 }
 
-// Export singleton instance
-export default new APICache();
+export default new MetadataCache(CACHE_TTL.METADATA);

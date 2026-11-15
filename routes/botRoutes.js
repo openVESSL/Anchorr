@@ -20,56 +20,32 @@ const botControlLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Public liveness probe for Docker/uptime checks: no version or bot details (audit S9)
 router.get("/health", (req, res) => {
-  const uptime = process.uptime();
-  const cacheStats = cache.getStats();
-  const totalHits = cacheStats.tmdb.hits + cacheStats.seerr.hits;
-  const totalMisses = cacheStats.tmdb.misses + cacheStats.seerr.misses;
-  const totalKeys = cacheStats.tmdb.keys + cacheStats.seerr.keys;
-
-  res.json({
-    status: "healthy",
-    version: APP_VERSION,
-    uptime: Math.floor(uptime),
-    uptimeFormatted: `${Math.floor(uptime / 3600)}h ${Math.floor(
-      (uptime % 3600) / 60
-    )}m ${Math.floor(uptime % 60)}s`,
-    bot: {
-      running: botState.isBotRunning,
-      username:
-        botState.isBotRunning && botState.discordClient?.user
-          ? botState.discordClient.user.tag
-          : null,
-      connected: botState.discordClient?.ws?.status === 0,
-    },
-    cache: {
-      hits: totalHits,
-      misses: totalMisses,
-      keys: totalKeys,
-      hitRate:
-        totalHits + totalMisses > 0
-          ? ((totalHits / (totalHits + totalMisses)) * 100).toFixed(2) + "%"
-          : "0%",
-      tmdb: cacheStats.tmdb,
-      seerr: cacheStats.seerr,
-    },
-    memory: {
-      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",
-      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + " MB",
-    },
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ status: "healthy" });
 });
 
 router.get("/status", authenticateToken, (req, res) => {
+  const uptime = Math.floor(process.uptime());
+  const memory = process.memoryUsage();
   res.json({
+    version: APP_VERSION,
+    uptime,
+    uptimeFormatted: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${uptime % 60}s`,
     isBotRunning: botState.isBotRunning,
     botUsername:
       botState.isBotRunning && botState.discordClient?.user
         ? botState.discordClient.user.tag
         : null,
+    botConnected: botState.discordClient?.ws?.status === 0,
+    jellyfinConnected: Boolean(botState.jellyfinFeed?.ws && botState.jellyfinFeed.ws.readyState === 1),
     // Set when the old Jellyfin Webhook plugin still calls Anchorr (it can be removed)
     legacyWebhookLastSeen: botState.legacyWebhookLastSeen ?? null,
+    cache: cache.getStats(),
+    memory: {
+      used: `${Math.round(memory.heapUsed / 1024 / 1024)} MB`,
+      total: `${Math.round(memory.heapTotal / 1024 / 1024)} MB`,
+    },
   });
 });
 

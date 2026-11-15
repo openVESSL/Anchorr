@@ -4,7 +4,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
 } from "discord.js";
-import debounce from "lodash.debounce";
+import { debounce } from "./utils/debounce.js";
 import { hhmmssToMinutes, minutesToHhMm } from "./utils/time.js";
 import logger from "./utils/logger.js";
 import { findBestBackdrop, getDetails, getExtras, isMetadataConfigured } from "./api/metadata.js";
@@ -1414,12 +1414,6 @@ export async function handleJellyfinWebhook(req, res, client, pendingRequests, o
           debouncer.sender.flush?.();
           logger.debug(
             `Rate limiting: Firing debouncer immediately for ${debouncer.episodeCount} episodes`
-          );
-        } else if (debouncer.episodeCount > 10) {
-          // If 10-30 episodes, reduce remaining wait time
-          debouncer.sender.reset?.();
-          logger.debug(
-            `Rate limiting: Resetting debouncer timeout for ${debouncer.episodeCount} episodes (will fire in reduced time)`
           );
         }
       }

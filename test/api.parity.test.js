@@ -60,7 +60,7 @@ const tokenFrom = (setCookie) => setCookie?.match(/auth_token=[^;]+/)?.[0];
 test("health is public", async () => {
   const res = await api("GET", "/api/health", undefined, { auth: false });
   assert.equal(res.status, 200);
-  assert.equal(res.json.status, "healthy");
+  assert.deepEqual(res.json, { status: "healthy" }, "no version or bot details without login (audit S9)");
 });
 
 test("config endpoints need a session", async () => {
@@ -91,6 +91,9 @@ test("login: wrong password is rejected, right password sets the session cookie"
   cookie = tokenFrom(good.setCookie);
   assert.ok(cookie);
   assert.equal((await api("GET", "/api/auth/check")).json.isAuthenticated, true);
+  const status = (await api("GET", "/api/status")).json;
+  assert.match(status.version, /^[0-9]+.[0-9]+.[0-9]+/);
+  assert.equal(status.isBotRunning, false);
 });
 
 test("saved secrets come back masked; resending the mask keeps them, an empty string clears them", async () => {

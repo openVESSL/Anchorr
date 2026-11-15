@@ -71,12 +71,12 @@ function toTmdbDetails(d, mediaType) {
 }
 
 export async function searchTitles(query) {
-  const cached = cache.tmdbSearch(query);
+  const cached = cache.search(query);
   if (cached) return cached;
   try {
     const data = await seerrGet("/search", { query, page: 1 });
     const results = (data.results || []).map((r) => toTmdbItem(r));
-    cache.tmdbSearch(query, results);
+    cache.search(query, results);
     return results;
   } catch (err) {
     logger.error(`Seerr search failed for query "${query}": ${err.message}`);
@@ -85,12 +85,12 @@ export async function searchTitles(query) {
 }
 
 export async function getTrending() {
-  const cached = cache.tmdbTrending();
+  const cached = cache.trending();
   if (cached) return cached;
   try {
     const data = await seerrGet("/discover/trending", { page: 1 });
     const results = (data.results || []).map((r) => toTmdbItem(r));
-    cache.tmdbTrending(results);
+    cache.trending(results);
     return results;
   } catch (err) {
     logger.error(`Seerr trending fetch failed: ${err.message}`);
@@ -99,12 +99,12 @@ export async function getTrending() {
 }
 
 export async function getDetails(id, mediaType) {
-  const cached = cache.tmdbDetails(id, mediaType);
+  const cached = cache.details(id, mediaType);
   if (cached) return cached;
   try {
     const data = await seerrGet(`/${mediaType === "movie" ? "movie" : "tv"}/${id}`);
     const details = toTmdbDetails(data, mediaType === "movie" ? "movie" : "tv");
-    cache.tmdbDetails(id, mediaType, details);
+    cache.details(id, mediaType, details);
     return details;
   } catch (err) {
     logger.error(`Seerr details fetch failed for ${mediaType} ${id}: ${err.message}`);
@@ -123,7 +123,7 @@ export async function getImdbId(id, mediaType) {
  */
 export async function getExtras(id, mediaType) {
   const cacheType = `${mediaType}-extras`;
-  const cached = cache.tmdbDetails(id, cacheType);
+  const cached = cache.details(id, cacheType);
   if (cached) return cached;
   try {
     const details = await getDetails(id, mediaType);
@@ -148,7 +148,7 @@ export async function getExtras(id, mediaType) {
       Genre: details.genres.map((g) => g.name).join(", ") || null,
       Plot: details.overview || null,
     };
-    cache.tmdbDetails(id, cacheType, extras);
+    cache.details(id, cacheType, extras);
     return extras;
   } catch (err) {
     logger.warn(`Could not load extra metadata for ${mediaType} ${id}: ${err.message}`);
