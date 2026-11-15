@@ -37,7 +37,11 @@ function pendingOptionsKey(userId, mediaType, tmdbId) {
 
 function getPendingOptions(userId, mediaType, tmdbId) {
   const entry = pendingRequestOptions.get(pendingOptionsKey(userId, mediaType, tmdbId));
-  if (!entry || Date.now() - entry.timestamp > PENDING_OPTIONS_TTL_MS) return {};
+  if (!entry) return {};
+  if (Date.now() - entry.timestamp > PENDING_OPTIONS_TTL_MS) {
+    logger.info(`[REQUEST BTN] Server/quality choice for ${mediaType} ${tmdbId} expired, using defaults`);
+    return {};
+  }
   return entry.options;
 }
 
