@@ -54,7 +54,7 @@ router.get(
       guild.channels.cache
         .filter(
           (channel) =>
-            channel.type === 0 && // GUILD_TEXT
+            (channel.type === 0 || channel.type === 5) && // GUILD_TEXT, GUILD_ANNOUNCEMENT
             channel.permissionsFor(botState.discordClient.user).has("SendMessages")
         )
         .forEach((channel) => {
