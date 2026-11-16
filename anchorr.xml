@@ -8,14 +8,27 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/openVESSL/Anchorr/issues</Support>
   <Project>https://github.com/openVESSL/Anchorr</Project>
+  <ReadMe>https://github.com/openVESSL/Anchorr#readme</ReadMe>
+  <License>https://github.com/openVESSL/Anchorr/blob/main/LICENSE</License>
   <Overview>Discord bot for requesting movies and TV shows via Seerr and posting notifications when new content arrives in your Jellyfin library. After the first start, open the WebUI and connect Jellyfin, Seerr and Discord by signing in. No Jellyfin plugin, TMDB or OMDb key is needed.</Overview>
   <Category>MediaServer:Other</Category>
+  <ExtraSearchTerms>discord bot jellyfin jellyseerr overseerr seerr requests notifications</ExtraSearchTerms>
   <WebUI>http://[IP]:[PORT:8282]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/openVESSL/Anchorr/main/anchorr.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/openVESSL/Anchorr/main/assets/logo.png</Icon>
-  <Changes>Release notes: https://github.com/openVESSL/Anchorr/blob/main/CHANGELOG.md</Changes>
+  <Changes>
+### 2.0.0
+- New dashboard with guided setup: sign in to Jellyfin and Seerr, paste the Discord bot token
+- No Jellyfin Webhook plugin, TMDB or OMDb key needed any more
+- Members without a linked Seerr account request through a guest account with its own limits
+- Configuration backup and restore in Settings
+- Existing configurations are upgraded automatically; the original is kept as config.v1.json
+
+Full release notes: https://github.com/openVESSL/Anchorr/blob/main/CHANGELOG.md
+  </Changes>
   <Requires>A running Jellyfin server and Seerr instance, plus a Discord bot token.</Requires>
   <Config Name="WebUI Port" Target="8282" Default="8282" Mode="tcp" Description="Port for the web dashboard." Type="Port" Display="always" Required="true" Mask="false">8282</Config>
   <Config Name="Config" Target="/usr/src/app/config" Default="/mnt/user/appdata/anchorr" Mode="rw" Description="Stores the configuration and notification state. Required, or settings are lost on container updates." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/anchorr</Config>
   <Config Name="Bind Host" Target="BIND_HOST" Default="0.0.0.0" Mode="" Description="Address the dashboard listens on inside the container. Keep 0.0.0.0, otherwise the WebUI is unreachable." Type="Variable" Display="advanced" Required="true" Mask="false">0.0.0.0</Config>
+  <Config Name="Trust Proxy" Target="TRUST_PROXY" Default="false" Mode="" Description="Set to true when Anchorr runs behind a reverse proxy with HTTPS (SWAG, Nginx Proxy Manager, Traefik), so sign-in cookies are marked secure and rate limits see each visitor." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
 </Container>

@@ -73,7 +73,7 @@ curl -O https://raw.githubusercontent.com/openVESSL/Anchorr/main/docker-compose.
 docker compose up -d
 ```
 
-Open `http://<server-ip>:8282`. Settings are stored in `./anchorr-data` next to the compose file. This works the same way in Portainer stacks, TrueNAS and Synology Container Manager.
+Open `http://<server-ip>:8282`. Settings are stored in `./anchorr-data` next to the compose file. Set `TZ` in the compose file to your time zone. This works the same way in Portainer stacks, TrueNAS and Synology Container Manager.
 
 ### Docker run
 
@@ -82,11 +82,12 @@ docker run -d \
   --name anchorr \
   --restart unless-stopped \
   -p 8282:8282 \
+  -e TZ=Europe/Berlin \
   -v ./anchorr-data:/usr/src/app/config \
   nairdah/anchorr:latest
 ```
 
-To use another port on the host, change the first number, for example `-p 9000:8282`.
+To use another port on the host, change the first number, for example `-p 9000:8282`. Set `TZ` to your time zone: the weekly roundup hour and the log times follow it.
 
 ### Unraid
 
