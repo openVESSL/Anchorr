@@ -75,7 +75,7 @@ router.post("/config/restore", authenticateToken, async (req, res) => {
     logger.error("Restored config.json, but loading it failed:", err);
     return res.status(500).json({
       success: false,
-      error: `The backup was saved but only partly applied: ${err.message}. Restart Anchorr, or put back config.before-restore.json from the config folder to return to the previous configuration.`,
+      error: `The backup was saved but only partly applied: ${err.message}. To return to the previous configuration, put back config.before-restore.json from the config folder and restart Anchorr.`,
     });
   }
   logger.info("✅ Configuration restored from a backup");

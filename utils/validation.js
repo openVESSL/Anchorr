@@ -116,7 +116,11 @@ export const DASHBOARD_PROTECTED_KEYS = [
 ];
 
 // save-config body: every known config key plus the one-shot startBot flag; unknown keys are dropped.
-export const saveConfigSchema = configSchema.keys({ startBot: Joi.boolean().optional() });
+// The upgrade keys are server-managed: dropped whatever their shape, so a damaged record
+// can never block saving settings.
+export const saveConfigSchema = configSchema
+  .keys({ startBot: Joi.boolean().optional() })
+  .fork(["UPGRADE_FROM_V1", "UPGRADE_DISMISSED_AT"], () => Joi.any().strip());
 
 // --- USER MAPPING VALIDATION ---
 export const userMappingSchema = Joi.object({

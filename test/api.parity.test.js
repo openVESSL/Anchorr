@@ -211,7 +211,8 @@ test("upgrade checklist: only for installs migrated from 1.x, dismissable, sessi
   assert.equal((await api("POST", "/api/config/restore", { ...broken, UPGRADE_FROM_V1: { at: "x" } })).status, 400);
 
   // the dashboard cannot bring it back or fake it
-  await api("POST", "/api/save-config", { UPGRADE_DISMISSED_AT: "", UPGRADE_FROM_V1: { at: "x" } });
+  const saved = await api("POST", "/api/save-config", { UPGRADE_DISMISSED_AT: "", UPGRADE_FROM_V1: { at: "x" } });
+  assert.equal(saved.status, 200, "a damaged record never blocks saving settings");
   assert.deepEqual((await api("GET", "/api/upgrade")).json, { show: false, items: [] });
 });
 
