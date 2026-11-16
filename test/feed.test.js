@@ -7,6 +7,7 @@ import { WebSocketServer } from "ws";
 import { applyConfig } from "./helpers/config.js";
 import { startFakeServer } from "./helpers/http.js";
 import { JellyfinFeed, hasMetadata, ticksToHhMmSs, toWebhookPayload } from "../jellyfin/feed.js";
+import logger from "../utils/logger.js";
 
 const MOVIE = {
   Id: "m1", Type: "Movie", ServerId: "srv", Name: "The Matrix", ProductionYear: 1999, Overview: "Neo.",
@@ -165,6 +166,17 @@ test("a LibraryChanged message with unreadable data is ignored", async (t) => {
   sockets.at(-1).socket.send(JSON.stringify({ MessageType: "LibraryChanged", Data: "{not json" }));
   await new Promise((resolve) => setTimeout(resolve, 50));
   assert.equal(feed.pending.size, 0);
+});
+
+test("a Jellyfin URL without an API key is reported as an error, not started", (t) => {
+  t.after(applyConfig({ JELLYFIN_API_KEY: undefined }));
+  const errors = t.mock.method(logger, "error", () => {});
+  const feed = new JellyfinFeed({ dispatch: async () => {}, state: memoryState() });
+
+  feed.start();
+  assert.equal(feed.running, false);
+  assert.equal(errors.mock.callCount(), 1);
+  assert.match(errors.mock.calls[0].arguments[0], /no API key/);
 });
 
 test("stop closes the connection and does not reconnect", async (t) => {

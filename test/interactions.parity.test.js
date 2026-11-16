@@ -43,6 +43,8 @@ const { writeConfig } = await import("../utils/configFile.js");
 const { t: translate } = await import("../utils/i18n.js");
 const { registerInteractions } = await import("../bot/interactions.js");
 const { pendingRequests } = await import("../bot/botState.js");
+const { getSeerrErrorMessage } = await import("../bot/interactions/shared.js");
+const { default: logger } = await import("../utils/logger.js");
 
 let seerr;
 let dispatch;
@@ -52,9 +54,10 @@ before(async () => {
     ...Object.fromEntries(Object.entries(MOVIES).map(([id, m]) => [`GET /api/v1/movie/${id}`, () => m])),
     ...Object.fromEntries(Object.entries(SHOWS).map(([id, s]) => [`GET /api/v1/tv/${id}`, () => s])),
     "GET /api/v1/movie/603/ratingscombined": () => ({ imdb: { criticsScore: 8.7 }, rt: { criticsScore: 83 } }),
-    "GET /api/v1/search": ({ url }) => ({
-      results: SEARCHABLE.filter((r) => (r.title || r.name).toLowerCase().includes(url.searchParams.get("query").toLowerCase())),
-    }),
+    "GET /api/v1/search": ({ url }) =>
+      url.searchParams.get("query") === "seerr is down"
+        ? { status: 500, json: { message: "Internal Server Error" } }
+        : { results: SEARCHABLE.filter((r) => (r.title || r.name).toLowerCase().includes(url.searchParams.get("query").toLowerCase())) },
     "GET /api/v1/discover/trending": () => ({
       results: [
         { id: 550, mediaType: "movie", title: "Fight Club", releaseDate: "1999-10-15" },
@@ -170,6 +173,97 @@ test("/request over quota shows Seerr's reason privately", async () => {
     content: translate("seerr_request_errors.quota", { msg: "Movie Quota exceeded" }),
     flags: 64,
   });
+});
+
+test("/search by typed text while Seerr fails: the member gets an error instead of a stuck reply", async () => {
+  const calls = await dispatch(command("search", { title: "seerr is down" }));
+  assert.deepEqual(calls.at(-1), {
+    method: "followUp",
+    content: translate("seerr_request_errors.server_error"),
+    flags: 64,
+  });
+});
+
+test("a refused Seerr redirect is reported as unreachable, without Seerr's address", () => {
+  const err = Object.assign(new Error("Refused a redirect from http://seerr.lan:5055 to http://elsewhere"), { code: "EREDIRECT" });
+  assert.equal(getSeerrErrorMessage(err), translate("seerr_request_errors.unreachable"));
+});
+
+test("a failing Discord delete is logged, and the private answer still goes out", async (t) => {
+  const warnings = t.mock.method(logger, "warn", () => {});
+  const interaction = command("search", { title: "seerr is down" });
+  interaction.deleteReply = async () => {
+    throw Object.assign(new Error("Service Unavailable"), { code: 0 });
+  };
+  const calls = await dispatch(interaction);
+  assert.equal(calls.at(-1).method, "followUp");
+  assert.ok(warnings.mock.calls.some((c) => /thinking reply/.test(c.arguments[0])));
+});
+
+test("an already deleted thinking reply is not logged as a problem", async (t) => {
+  const warnings = t.mock.method(logger, "warn", () => {});
+  const interaction = command("search", { title: "seerr is down" });
+  interaction.deleteReply = async () => {
+    throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+  };
+  await dispatch(interaction);
+  assert.equal(warnings.mock.calls.some((c) => /thinking reply/.test(c.arguments[0])), false);
+});
+
+test("when Discord refuses the private answer, it is logged instead of shown as a Seerr error", async (t) => {
+  const errors = t.mock.method(logger, "error", () => {});
+  const interaction = command("request", { title: "604|movie" });
+  const sent = [];
+  interaction.followUp = async (payload) => {
+    sent.push(payload);
+    throw new Error("Missing Access");
+  };
+  await dispatch(interaction);
+  assert.equal(sent.length, 1, "no second, misleading error reply");
+  assert.ok(errors.mock.calls.some((c) => /private reply/.test(c.arguments[0])));
+});
+
+test("/request movie: if showing the result fails after the request went through, the member is told it was requested", async (t) => {
+  t.mock.method(logger, "error", () => {});
+  const before = posts().length;
+  const interaction = command("request", { title: "603|movie" });
+  interaction.editReply = async () => {
+    throw new Error("Invalid Form Body");
+  };
+  const calls = await dispatch(interaction);
+  assert.equal(posts().length, before + 1);
+  assert.deepEqual(calls.at(-1), {
+    method: "followUp",
+    content: translate("replies.pick_requested", { title: "The Matrix" }),
+    flags: 64,
+  });
+});
+
+test("/request movie in private mode: a failed result display still confirms the request", async (t) => {
+  configure(t, { PRIVATE_MESSAGE_MODE: "true" });
+  t.mock.method(logger, "error", () => {});
+  const interaction = command("request", { title: "603|movie" });
+  const edits = [];
+  interaction.editReply = async (payload) => {
+    edits.push(payload);
+    if (payload.embeds) throw new Error("Invalid Form Body");
+  };
+  await dispatch(interaction);
+  assert.equal(edits.at(-1).content, translate("replies.pick_requested", { title: "The Matrix" }));
+});
+
+test("/search: when Discord refuses the result, the member gets a generic error, not a Seerr error", async (t) => {
+  const errors = t.mock.method(logger, "error", () => {});
+  const interaction = command("search", { title: "603|movie" });
+  interaction.editReply = async () => {
+    throw new Error("Invalid Form Body");
+  };
+  const calls = await dispatch(interaction);
+  assert.deepEqual(calls.at(-1), { method: "followUp", content: translate("replies.unexpected"), flags: 64 });
+  const logged = errors.mock.calls.find((c) => /could not show the result/i.test(String(c.arguments[0])));
+  assert.ok(logged);
+  assert.doesNotMatch(logged.arguments[0], /Matrix/, "the title is an argument, never part of the format string");
+  assert.ok(logged.arguments.every((a) => typeof a === "string"), "only the error message is logged, not the error object");
 });
 
 test("/request TV: requests nothing yet and opens the season picker", async () => {

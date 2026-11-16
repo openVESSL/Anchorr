@@ -36,15 +36,26 @@ export async function handleCommand(interaction) {
   }
 }
 
-/** In public mode the thinking reply is replaced by a private message. */
+/**
+ * In public mode the thinking reply is replaced by a private message. Logs instead of
+ * throwing when Discord refuses it, so a Discord error is never shown as a Seerr error.
+ */
 async function replyPrivately(interaction, content) {
-  if (isPrivateMode()) return interaction.editReply({ content, components: [], embeds: [] });
   try {
-    await interaction.deleteReply();
-  } catch {
-    // already deleted
+    if (isPrivateMode()) {
+      await interaction.editReply({ content, components: [], embeds: [] });
+      return;
+    }
+    try {
+      await interaction.deleteReply();
+    } catch (err) {
+      // 10008 Unknown Message: already deleted
+      if (err.code !== 10008) logger.warn(`Could not delete the thinking reply: ${err.message}`);
+    }
+    await interaction.followUp({ content, flags: 64 });
+  } catch (err) {
+    logger.error(`Could not send a private reply to user ${interaction.user.id}: ${err.message}`);
   }
-  return interaction.followUp({ content, flags: 64 });
 }
 
 async function findTitle(rawInput) {
@@ -67,11 +78,18 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
     return;
   }
 
-  const [tmdbId, mediaType] = await findTitle(rawInput);
-  if (!tmdbId || !mediaType) return replyPrivately(interaction, t("replies.invalid_title"));
-
+  let requested = false; // Seerr accepted the request
+  let showingResult = false; // Seerr calls are done, only Discord is left
+  let title = null;
   try {
+    const [tmdbId, mediaType] = await findTitle(rawInput);
+    if (!tmdbId || !mediaType) {
+      await replyPrivately(interaction, t("replies.invalid_title"));
+      return;
+    }
+
     const details = await metadata.getDetails(tmdbId, mediaType);
+    title = details.title || details.name || null;
 
     // TV shows go through the season picker instead of requesting every season at once
     const instantRequest = mode === "request" && mediaType !== "tv";
@@ -90,6 +108,7 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
         tagIds: await tagIdsFor(tags, mediaType),
         options,
       });
+      requested = true;
     }
 
     const imdbId = await metadata.getImdbId(tmdbId, mediaType);
@@ -118,8 +137,22 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
       if (tagRow) components.push(tagRow);
     }
 
+    showingResult = true;
     await interaction.editReply({ embeds: [embed], components });
   } catch (err) {
+    if (requested) {
+      // Reporting a failed request here would invite a duplicate
+      // Title and error stay arguments: a "%o" in a title must not expand the error object
+      // The stack, not the error object: a Discord error keeps the interaction token in err.url
+      logger.error("Requested %s, but could not show the result: %s", JSON.stringify(title), err?.stack ?? String(err));
+      await replyPrivately(interaction, t("replies.pick_requested", { title: title ?? rawInput }));
+      return;
+    }
+    if (showingResult) {
+      logger.error("Could not show the result for %s: %s", JSON.stringify(title), err?.stack ?? String(err));
+      await replyPrivately(interaction, t("replies.unexpected"));
+      return;
+    }
     logger.error("Error in handleSearchOrRequest:", err);
     await replyPrivately(interaction, getSeerrErrorMessage(err));
   }

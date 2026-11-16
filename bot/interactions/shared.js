@@ -165,7 +165,8 @@ export function getSeerrErrorMessage(err) {
     if (status >= 500) return t("seerr_request_errors.server_error");
     if (msg) return t("seerr_request_errors.generic", { msg });
   }
-  if (err.code === "ECONNREFUSED" || err.code === "ETIMEDOUT" || err.code === "ENOTFOUND") {
+  // EREDIRECT: Seerr redirected elsewhere; its message names Seerr's address
+  if (["ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EREDIRECT"].includes(err.code)) {
     return t("seerr_request_errors.unreachable");
   }
   return t("seerr_request_errors.unknown", { msg: err.message || "unknown error" });
