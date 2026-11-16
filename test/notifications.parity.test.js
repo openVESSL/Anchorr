@@ -12,6 +12,7 @@ import { startFakeServer } from "./helpers/http.js";
 // Fake timers before the module loads: its import-time intervals must not keep the process alive.
 mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"], now: 1_700_000_000_000 });
 const { handleJellyfinItem } = await import("../jellyfin/itemHandler.js");
+const { sentNotifications } = await import("../jellyfin/dedup.js");
 
 const MAUVE = 0xcba6f7;
 const BLUE = 0x89b4fa;
@@ -233,6 +234,15 @@ test("a new show is one post: its episodes join it and are not announced later",
   mock.timers.tick(130_000);
   await flush();
   assert.equal(discord.sent.length, 1);
+});
+
+test("a test movie is posted every time and never remembered", async (t) => {
+  configure(t);
+  const discord = createFakeDiscord();
+  await send(movie("test-1"), discord);
+  await send(movie("test-1"), discord);
+  assert.equal(discord.sent.length, 2);
+  assert.equal(sentNotifications.has("test:test-1"), false);
 });
 
 test("a large import posts once when the batch flushes early, with no repeat afterwards", async (t) => {

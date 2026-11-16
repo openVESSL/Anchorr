@@ -74,13 +74,13 @@ export async function handleJellyfinItem(data, client, pendingRequests, onPendin
 }
 
 async function handleMovie(data, send) {
-  const isTest = data.ItemId.startsWith("test-");
-  const key = isTest ? `test:${data.ItemId}` : buildIdentityKey(data) || `id:${data.ItemId}`;
+  if (data.ItemId.startsWith("test-")) return send(data, { isTest: true });
+  const key = buildIdentityKey(data) || `id:${data.ItemId}`;
   if (sentNotifications.has(key)) {
     logger.info(`[DEDUP] Duplicate movie notification suppressed for "${data.Name}" (key: ${key})`);
     return;
   }
-  await send(data, { isTest });
+  await send(data, { isTest: false });
   sentNotifications.set(key, { level: 0 });
 }
 
