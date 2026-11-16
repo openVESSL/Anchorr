@@ -1,7 +1,7 @@
 // Dashboard test buttons: sample notifications, Daily Random Pick and Weekly Roundup.
 import { Router } from "express";
 import * as metadata from "../api/metadata.js";
-import { handleJellyfinWebhook } from "../jellyfinWebhook.js";
+import { handleJellyfinItem } from "../jellyfin/itemHandler.js";
 import { sendDailyRandomPick } from "../bot/dailyPick.js";
 import { botState, pendingRequests, savePendingRequests } from "../bot/botState.js";
 import { sendWeeklyRoundupTest } from "../bot/weeklyRoundup.js";
@@ -162,11 +162,8 @@ router.post("/test-notification", authenticateToken, async (req, res) => {
       };
 
       // Send both seasons (they should be batched together by debouncing logic)
-      const fakeReq1 = { body: season1Data };
-      const fakeReq2 = { body: season2Data };
-
-      await handleJellyfinWebhook(fakeReq1, null, botState.discordClient, pendingRequests, savePendingRequests);
-      await handleJellyfinWebhook(fakeReq2, null, botState.discordClient, pendingRequests, savePendingRequests);
+      await handleJellyfinItem(season1Data, botState.discordClient, pendingRequests, savePendingRequests);
+      await handleJellyfinItem(season2Data, botState.discordClient, pendingRequests, savePendingRequests);
 
       return res.json({
         success: true,
@@ -205,8 +202,7 @@ router.post("/test-notification", authenticateToken, async (req, res) => {
           ItemId: "batch-episode-" + ep.num + "-" + Date.now(),
         };
 
-        const fakeReq = { body: episodeData };
-        await handleJellyfinWebhook(fakeReq, null, botState.discordClient, pendingRequests, savePendingRequests);
+        await handleJellyfinItem(episodeData, botState.discordClient, pendingRequests, savePendingRequests);
         // Small delay between episodes to simulate realistic webhook timing
         await new Promise(resolve => setTimeout(resolve, 50));
       }
@@ -217,15 +213,7 @@ router.post("/test-notification", authenticateToken, async (req, res) => {
       });
     }
 
-    // Import webhook handler
-
-    // Create a fake request object with the test data
-    const fakeReq = {
-      body: notificationData
-    };
-
-    // Send the test notification (pass null for res since we don't need response handling)
-    await handleJellyfinWebhook(fakeReq, null, botState.discordClient, pendingRequests, savePendingRequests);
+    await handleJellyfinItem(notificationData, botState.discordClient, pendingRequests, savePendingRequests);
 
     res.json({
       success: true,

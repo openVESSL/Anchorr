@@ -7,7 +7,7 @@ import {
 import { registerCommands } from "../discord/commands.js";
 import { botState, loadPendingRequests, pendingRequests, savePendingRequests } from "./botState.js";
 import { JellyfinFeed } from "../jellyfin/feed.js";
-import { handleJellyfinWebhook } from "../jellyfinWebhook.js";
+import { handleJellyfinItem } from "../jellyfin/itemHandler.js";
 import { registerInteractions } from "./interactions.js";
 import { prepareGuestUser } from "./guestUser.js";
 import { scheduleDailyRandomPick } from "./dailyPick.js";
@@ -16,14 +16,13 @@ import { loadSettings } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
 
-/** (Re)starts watching Jellyfin; new items go through the same handler the webhook plugin used to feed. */
+/** (Re)starts watching Jellyfin; each new item goes to the notification handler. */
 export function startJellyfinFeed(client = botState.discordClient) {
   botState.jellyfinFeed?.stop();
   botState.jellyfinFeed = null;
   if (!client || !botState.isBotRunning) return;
   botState.jellyfinFeed = new JellyfinFeed({
-    dispatch: (payload) =>
-      handleJellyfinWebhook({ body: payload }, null, client, pendingRequests, savePendingRequests),
+    dispatch: (payload) => handleJellyfinItem(payload, client, pendingRequests, savePendingRequests),
   });
   botState.jellyfinFeed.start();
 }

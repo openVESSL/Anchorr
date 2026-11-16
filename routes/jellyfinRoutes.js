@@ -3,7 +3,7 @@ import http from "../utils/http.js";
 import { authenticateToken } from "../utils/auth.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
-import { libraryCache } from "../jellyfinWebhook.js";
+import { libraryCache } from "../jellyfin/libraryDetection.js";
 import { jellyfinAuthHeaders } from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";

@@ -11,7 +11,7 @@ import { startFakeServer } from "./helpers/http.js";
 
 // Fake timers before the module loads: its import-time intervals must not keep the process alive.
 mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"], now: 1_700_000_000_000 });
-const { handleJellyfinWebhook } = await import("../jellyfinWebhook.js");
+const { handleJellyfinItem } = await import("../jellyfin/itemHandler.js");
 
 const MAUVE = 0xcba6f7;
 const BLUE = 0x89b4fa;
@@ -37,7 +37,7 @@ function configure(t, values = {}) {
 }
 
 const send = (body, discord, pending = new Map(), onChange = () => {}) =>
-  handleJellyfinWebhook({ body }, null, discord.client, pending, onChange);
+  handleJellyfinItem(body, discord.client, pending, onChange);
 
 async function flush() {
   for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
@@ -195,6 +195,93 @@ test("episodes of one series are batched into a single post after the debounce",
   assert.equal(runtime.value, "00:42:00");
   const list = embed.fields.find((f) => f.name === "Episodes Added");
   assert.equal(list.value, "**S01E01**: Ep 1\n**S01E02**: Ep 2\n**S01E03**: Ep 3");
+});
+
+const show = (series, extra = {}) => ({
+  ItemType: "Series",
+  ItemId: series,
+  Name: "Show",
+  Year: 2021,
+  Provider_tmdb: `tmdb-${series}`,
+  ...extra,
+});
+const season = (series, n, extra = {}) => ({
+  ItemType: "Season",
+  ItemId: `${series}-s${n}`,
+  SeriesId: series,
+  SeriesName: "Show",
+  Name: `Season ${n}`,
+  SeasonNumber: n,
+  IndexNumber: n,
+  SeriesProvider_tmdb: `tmdb-${series}`,
+  ...extra,
+});
+
+test("a new show is one post: its episodes join it and are not announced later", async (t) => {
+  configure(t, { JELLYFIN_NOTIFY_EPISODES: "true" });
+  const discord = createFakeDiscord();
+  await send(episode("show-a", 1), discord);
+  await send(show("show-a"), discord);
+  await send(episode("show-a", 2), discord);
+  mock.timers.tick(130_000);
+  await flush();
+  assert.equal(discord.sent.length, 1);
+  assert.equal(discord.sent[0].embeds[0].author.name, "📺 New TV show added!");
+
+  await send(episode("show-a", 3), discord); // covered by the show post
+  await send(episode("show-a", 1), discord); // already announced
+  mock.timers.tick(130_000);
+  await flush();
+  assert.equal(discord.sent.length, 1);
+});
+
+test("a season right after its show's post is skipped, a later one is announced", async (t) => {
+  configure(t, { JELLYFIN_NOTIFY_SEASONS: "true" });
+  const discord = createFakeDiscord();
+  await send(show("show-b"), discord);
+  mock.timers.tick(70_000);
+  await flush();
+  assert.equal(discord.sent.length, 1);
+
+  await send(season("show-b", 1), discord);
+  mock.timers.tick(70_000);
+  await flush();
+  assert.equal(discord.sent.length, 1, "within 3 minutes of the show post");
+
+  mock.timers.tick(3 * 60_000);
+  await send(season("show-b", 2), discord);
+  mock.timers.tick(70_000);
+  await flush();
+  assert.equal(discord.sent.length, 2);
+  assert.equal(discord.sent[1].embeds[0].author.name, "📺 New season added!");
+  assert.equal(discord.sent[1].embeds[0].title, "Show - Season 2");
+});
+
+test("the same episode twice in one batch counts once", async (t) => {
+  configure(t, { JELLYFIN_NOTIFY_EPISODES: "true" });
+  const discord = createFakeDiscord();
+  await send(episode("show-c", 4), discord);
+  await send(episode("show-c", 4), discord);
+  mock.timers.tick(130_000);
+  await flush();
+  assert.equal(discord.sent.length, 1);
+  assert.equal(discord.sent[0].embeds[0].author.name, "📺 New episode added!");
+});
+
+test("a failed batch post does not block the series afterwards", async (t) => {
+  configure(t, { JELLYFIN_NOTIFY_EPISODES: "true", JELLYFIN_EPISODE_CHANNEL_ID: "chan-gone" });
+  const discord = createFakeDiscord({ missingChannels: ["chan-gone"] });
+  await send(episode("show-d", 1), discord);
+  mock.timers.tick(130_000);
+  await flush();
+  assert.equal(discord.sent.length, 0);
+
+  t.after(applyConfig({ JELLYFIN_EPISODE_CHANNEL_ID: "chan-ep" }));
+  await send(episode("show-d", 1), discord);
+  mock.timers.tick(130_000);
+  await flush();
+  assert.equal(discord.sent.length, 1);
+  assert.equal(discord.sent[0].channelId, "chan-ep");
 });
 
 test("episodes are not announced when episode notifications are off", async (t) => {
