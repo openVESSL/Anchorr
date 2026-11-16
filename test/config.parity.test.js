@@ -214,7 +214,9 @@ test("Anchorr does not start when the 1.x folder cannot be backed up", SKIP_AS_R
   fs.writeFileSync(unreadable, "{}");
   fs.chmodSync(unreadable, 0o000); // the copy fails halfway through the folder
   try {
-    const run = spawnSync(process.execPath, ["app.js"], {
+    // cwd is the temp folder, so the logs it writes stay out of the repo
+    const run = spawnSync(process.execPath, [path.resolve("app.js")], {
+      cwd: dir,
       env: { ...process.env, ANCHORR_CONFIG_DIR: dir, NODE_ENV: "production", AUTO_START_BOT: "false", WEBHOOK_PORT: "0" },
       encoding: "utf8",
       timeout: 20_000,

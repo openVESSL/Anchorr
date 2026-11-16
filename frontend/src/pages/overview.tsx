@@ -89,7 +89,7 @@ export function OverviewPage() {
         </Alert>
       )}
       {upgrade?.show && <UpgradeCard upgrade={upgrade} />}
-      {upgradeQuery.isError && (
+      {upgradeQuery.isError && !upgrade && (
         <Alert className="mb-4">
           <AlertTriangle />
           <AlertTitle>{t("Could not load the upgrade checklist")}</AlertTitle>
