@@ -107,8 +107,15 @@ export class JellyfinFeed {
 
   start() {
     if (this.running) return;
-    if (!settings.JELLYFIN_BASE_URL || !settings.JELLYFIN_API_KEY) {
-      logger.warn("Jellyfin feed not started: Jellyfin URL or API key is missing");
+    if (!settings.JELLYFIN_BASE_URL) {
+      logger.warn("Jellyfin feed not started: Jellyfin is not set up");
+      return;
+    }
+    // Typical after an upgrade from 1.x installs that only used the Webhook plugin
+    if (!settings.JELLYFIN_API_KEY) {
+      logger.error(
+        "❌ New Jellyfin items are not announced: Jellyfin has a URL but no API key. Link Jellyfin on the Jellyfin page of the dashboard; the Webhook plugin is no longer used."
+      );
       return;
     }
     this.running = true;
