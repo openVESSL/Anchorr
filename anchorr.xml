@@ -7,6 +7,9 @@
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Support>https://github.com/openVESSL/Anchorr/issues</Support>
+  <Discord>https://discord.gg/S5JrsZe9mB</Discord>
+  <DonateLink>https://ko-fi.com/nairdah</DonateLink>
+  <DonateText>Support Anchorr on Ko-fi</DonateText>
   <Project>https://github.com/openVESSL/Anchorr</Project>
   <ReadMe>https://github.com/openVESSL/Anchorr#readme</ReadMe>
   <License>https://github.com/openVESSL/Anchorr/blob/main/LICENSE</License>

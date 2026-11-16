@@ -19,7 +19,7 @@ Check the [existing issues](https://github.com/openVESSL/Anchorr/issues) first, 
 
 ## Development setup
 
-Requirements: Node.js 22.12 or later, and a Jellyfin, Seerr and Discord bot to test against.
+Requirements: Node.js 22.23.4, 24.22.1, 26.12.1 or later, and a Jellyfin, Seerr and Discord bot to test against.
 
 ```bash
 git clone https://github.com/openVESSL/Anchorr.git

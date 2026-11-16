@@ -180,16 +180,20 @@ Who may use the commands is set under **Requests > Roles**. Whether a request is
 
 ## Upgrading from 1.x
 
-Your existing configuration is upgraded automatically on the first start. The original file is kept as `config.v1.json` in the config folder. A few things work differently:
+Your existing configuration is upgraded automatically on the first start, and the original file is kept as `config.v1.json` in the config folder. Your local account, linked members, channels and other settings stay as they are.
 
-- **The Jellyfin Webhook plugin is no longer needed.** Anchorr watches Jellyfin directly and catches up on anything added while it was offline. Calls from the plugin are acknowledged and ignored, and the dashboard reminds you to remove Anchorr from the plugin's destinations.
-- **TMDB and OMDb keys are gone.** Search, details, ratings and the daily pick come from Seerr.
-- **Requests never run as the Seerr administrator any more.** In 1.x, members without a linked account requested with the API key's owner, which skipped approvals and quotas. In 2.0 they request as the guest user "Discord (Anchorr)". Set its quota and permissions in Seerr.
-- **"Auto-approve" applies to that guest account only.** Linked members follow their own Seerr permissions. If you relied on Anchorr's switch to approve everyone, give those users the Auto-Approve permission in Seerr.
-- **Signing in.** Your local account keeps working. You can also sign in with a Jellyfin administrator account.
-- **Log files.** Versions before 2.0 could write API keys into the log files when a request to Seerr or Jellyfin failed. If you shared logs from 1.x, rotate the Jellyfin and Seerr API keys.
+1. **Back up the config folder** before you update. The automatic copy covers `config.json`, but a full copy of the folder is the easiest way back.
+2. **Update Anchorr** as described in [Updating](#updating). Without Docker, use Node.js 22.23.4, 24.22.1, 26.12.1 or newer and run `npm run build` after `npm install`.
+3. **Remove what is no longer used:**
+   - The Anchorr destination in the Jellyfin Webhook plugin. Anchorr now watches Jellyfin directly and catches up on anything added while it was offline. Calls from the plugin are ignored, and the dashboard reminds you while they keep arriving. Uninstall the plugin if nothing else uses it.
+   - Your TMDB and OMDb keys. Search, details, ratings and the daily pick come from Seerr, and the keys are removed from the configuration automatically.
+   - The `JELLYFIN_POLLING_ENABLED` variable, if you set it. Watching Jellyfin is always on.
+4. **Check the Seerr user "Discord (Anchorr)".** In 1.x, members without a linked account requested as the API key's owner, which skipped approvals and quotas. In 2.0 they request as this guest user, created automatically. Set its quota and permissions in Seerr.
+5. **Check auto-approve.** Anchorr's switch now applies to the guest account only; linked members follow their own Seerr permissions. If you relied on the switch to approve everyone, give those users the Auto-Approve permission in Seerr.
+6. **Set the time zone** on Docker with `TZ`, for example `TZ=Europe/Berlin`, so the weekly roundup posts at the hour you pick. Unraid sets it for containers created from the template.
+7. **Rotate API keys if you shared logs.** Versions before 2.0 could write the Jellyfin and Seerr API keys into the log files when a request failed.
 
-The previous dashboard is still available at `/legacy` during the 2.0 series.
+You can also sign in with a Jellyfin administrator account now. The previous dashboard is still available at `/legacy` during the 2.0 series.
 
 ## Configuration reference
 
@@ -209,7 +213,7 @@ Anchorr is meant for your home network. The dashboard holds your Discord token a
 
 - For remote access, prefer a VPN. If you use a reverse proxy, put it behind HTTPS and set `TRUST_PROXY=true`.
 - Only Jellyfin administrators, or the local account, can sign in. Failed sign-ins are slowed down and locked per address.
-- Secrets in `config.json` are encoded, not encrypted. Keep the config folder private.
+- Secrets in `config.json` are encoded, not encrypted. Keep the config folder and any backup downloaded from Settings private.
 
 See [SECURITY.md](./SECURITY.md) to report a vulnerability.
 
@@ -236,7 +240,7 @@ The bot's messages live in `locales/`, the dashboard's in `frontend/src/i18n/`. 
 
 Questions, ideas and known issues are discussed on the [Anchorr Discord server](https://discord.gg/S5JrsZe9mB). There is also a channel on the [r/JellyfinCommunity](https://discord.gg/awFC5m4xkr) server.
 
-Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md).
+Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md). If Anchorr is useful to you, you can support it on [Ko-fi](https://ko-fi.com/nairdah).
 
 ### Contributors
 
