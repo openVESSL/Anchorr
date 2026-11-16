@@ -70,6 +70,13 @@ export const configSchema = Joi.object({
     .optional(),
   // Seerr account used for Discord users without a mapping (created automatically)
   SEERR_GUEST_USER_ID: Joi.alternatives(Joi.string().pattern(/^\d*$/), Joi.number().integer().min(1)).optional(),
+  // Written by the 1.x upgrade and the checklist's Done button
+  UPGRADE_FROM_V1: Joi.object({
+    at: Joi.string().isoDate().required(),
+    autoApprove: Joi.boolean().required(),
+    mappings: Joi.number().integer().min(0).allow(null).required(),
+  }).optional(),
+  UPGRADE_DISMISSED_AT: Joi.string().isoDate().optional(),
   DAILY_RANDOM_PICK_ENABLED: Joi.string().valid("true", "false").optional(),
   DAILY_RANDOM_PICK_CHANNEL_ID: Joi.string().allow("").optional(),
   DAILY_RANDOM_PICK_INTERVAL: Joi.alternatives(Joi.string().allow(""), Joi.number().integer().min(1)).optional(),

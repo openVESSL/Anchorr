@@ -70,12 +70,12 @@ router.post("/config/restore", authenticateToken, async (req, res) => {
   try {
     // Runs the v1 migrations when the backup is an older format. No 1.x folder backup here:
     // the current folder is not a 1.x one, and the uploaded file is its own copy.
-    loadSettings({ backupV1: false });
+    if (!loadSettings({ backupV1: false })) throw new Error("the restored file could not be loaded");
   } catch (err) {
     logger.error("Restored config.json, but loading it failed:", err);
     return res.status(500).json({
       success: false,
-      error: `The backup was saved but could not be applied: ${err.message}. The previous configuration is kept as config.before-restore.json in the config folder.`,
+      error: `The backup was saved but only partly applied: ${err.message}. Restart Anchorr, or put back config.before-restore.json from the config folder to return to the previous configuration.`,
     });
   }
   logger.info("✅ Configuration restored from a backup");

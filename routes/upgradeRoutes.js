@@ -54,6 +54,7 @@ router.get("/upgrade", authenticateToken, (_req, res) => {
   let record;
   try {
     record = JSON.parse(settings.UPGRADE_FROM_V1);
+    if (!record || typeof record !== "object") throw new Error("not an object");
   } catch (err) {
     logger.error(`UPGRADE_FROM_V1 in config.json is not readable: ${err.message}`);
     return res.status(500).json({ success: false, error: "The upgrade record in config.json is not readable." });
