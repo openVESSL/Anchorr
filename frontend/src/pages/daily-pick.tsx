@@ -1,4 +1,5 @@
 import { Send } from "lucide-react"
+import { useState } from "react"
 import { toast } from "sonner"
 
 import { ChannelSelect, Field, PageHeader, SaveBar, Section, SwitchRow, useSettingsForm } from "@/components/settings"
@@ -11,12 +12,17 @@ export function DailyPickPage() {
   const { t } = useT()
   const form = useSettingsForm({ DAILY_RANDOM_PICK_ENABLED: "false", DAILY_RANDOM_PICK_CHANNEL_ID: "", DAILY_RANDOM_PICK_INTERVAL: "1440" })
 
+  const [sending, setSending] = useState(false)
+
   async function test() {
+    setSending(true)
     try {
       await api.post("/test-random-pick")
       toast.success(t("Random pick sent"))
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("Something went wrong"))
+    } finally {
+      setSending(false)
     }
   }
 
@@ -26,7 +32,7 @@ export function DailyPickPage() {
         title={t("Daily pick")}
         description={t("Posts a random movie or show from Seerr (trending, upcoming, a genre mix or a hidden gem) with a Request button.")}
         actions={
-          <Button variant="outline" onClick={test}>
+          <Button variant="outline" onClick={test} disabled={sending}>
             <Send /> {t("Send one now")}
           </Button>
         }

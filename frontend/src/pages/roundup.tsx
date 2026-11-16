@@ -1,4 +1,5 @@
 import { Send } from "lucide-react"
+import { useState } from "react"
 import { toast } from "sonner"
 
 import { ChannelSelect, Field, PageHeader, SaveBar, Section, SwitchRow, useSettingsForm } from "@/components/settings"
@@ -25,12 +26,17 @@ export function RoundupPage() {
     WEEKLY_ROUNDUP_EMBED_COLOR: "",
   })
 
+  const [sending, setSending] = useState(false)
+
   async function test() {
+    setSending(true)
     try {
       await api.post("/test-weekly-roundup")
       toast.success(t("Roundup sent"))
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("Something went wrong"))
+    } finally {
+      setSending(false)
     }
   }
 
@@ -40,7 +46,7 @@ export function RoundupPage() {
         title={t("Weekly roundup")}
         description={t("Once a week, one post with everything added to Jellyfin in the last 7 days, grouped by library.")}
         actions={
-          <Button variant="outline" onClick={test}>
+          <Button variant="outline" onClick={test} disabled={sending}>
             <Send /> {t("Send one now")}
           </Button>
         }

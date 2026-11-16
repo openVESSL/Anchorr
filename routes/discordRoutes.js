@@ -288,13 +288,15 @@ router.get("/discord-roles", authenticateToken, async (_req, res) => {
     // Fetch roles
     const roles = guild.roles.cache
       .filter((role) => !role.managed) // Exclude managed roles (bot roles)
+      // Discord's own order (highest role first, @everyone last). Member counts come from a
+      // partial cache, so sorting by them shuffled the list between loads.
+      .sort((a, b) => b.position - a.position)
       .map((role) => ({
         id: role.id,
         name: role.name,
         color: role.hexColor,
         memberCount: role.members.size,
-      }))
-      .sort((a, b) => b.memberCount - a.memberCount); // Sort by member count descending
+      }));
 
     logger.debug(`[ROLES API] Returning ${roles.length} roles`);
     res.json({ success: true, roles });
