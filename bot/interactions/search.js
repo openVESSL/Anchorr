@@ -4,6 +4,7 @@
  */
 import * as metadata from "../../api/metadata.js";
 import * as seerrApi from "../../api/seerr.js";
+import { t } from "../../utils/i18n.js";
 import logger from "../../utils/logger.js";
 import { getOptionStringRobust } from "../botUtils.js";
 import { buildButtons, buildNotificationEmbed } from "../embeds.js";
@@ -21,7 +22,7 @@ import {
 
 export async function handleCommand(interaction) {
   if (!getSeerrUrl() || !getSeerrApiKey()) {
-    return interaction.reply({ content: "⚠️ This command is disabled because Seerr is not configured.", flags: 64 });
+    return interaction.reply({ content: t("replies.seerr_not_configured"), flags: 64 });
   }
   const raw = getOptionStringRobust(interaction);
   if (interaction.commandName === "search" || interaction.commandName === "trending") {
@@ -59,7 +60,7 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
   } catch (err) {
     logger.error(`Failed to defer reply for "${interaction.commandName}": ${err.message}`);
     try {
-      await interaction.reply({ content: "⚠️ Something went wrong. Please try again.", flags: 64 });
+      await interaction.reply({ content: t("replies.something_went_wrong"), flags: 64 });
     } catch {
       // Interaction token already invalid
     }
@@ -67,7 +68,7 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
   }
 
   const [tmdbId, mediaType] = await findTitle(rawInput);
-  if (!tmdbId || !mediaType) return replyPrivately(interaction, "⚠️ The title seems to be invalid.");
+  if (!tmdbId || !mediaType) return replyPrivately(interaction, t("replies.invalid_title"));
 
   try {
     const details = await metadata.getDetails(tmdbId, mediaType);
@@ -78,7 +79,7 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
     if (instantRequest) {
       const status = await seerrApi.checkMediaStatus(tmdbId, mediaType, ["all"], getSeerrUrl(), getSeerrApiKey());
       if (status.exists && status.available) {
-        await replyPrivately(interaction, "✅ This content is already available in your library!");
+        await replyPrivately(interaction, t("replies.already_available"));
         return;
       }
       await requestFromDiscord(interaction, {

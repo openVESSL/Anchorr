@@ -4,6 +4,7 @@
  */
 import * as metadata from "../../api/metadata.js";
 import * as seerrApi from "../../api/seerr.js";
+import { t } from "../../utils/i18n.js";
 import logger from "../../utils/logger.js";
 import { explicitSeasons } from "../botUtils.js";
 import { buildButtons, buildNotificationEmbed } from "../embeds.js";
@@ -25,7 +26,7 @@ export async function handleRequestButton(interaction) {
   const mediaType = parts[2] || "movie";
   const selectedSeasons = parts[3] ? parts[3].split(",") : [];
   const selectedTagNames = parts[4] ? parts[4].split(",") : [];
-  if (!tmdbId) return interaction.reply({ content: "⚠️ ID invalid.", flags: 64 });
+  if (!tmdbId) return interaction.reply({ content: t("replies.invalid_request"), flags: 64 });
 
   await interaction.deferUpdate();
   try {
@@ -35,7 +36,7 @@ export async function handleRequestButton(interaction) {
     const seasons = mediaType === "movie" ? ["all"] : selectedSeasons.length > 0 ? selectedSeasons : ["all"];
     const status = await seerrApi.checkMediaStatus(tmdbId, mediaType, seasons, getSeerrUrl(), getSeerrApiKey());
     if (status.exists && status.available) {
-      await interaction.followUp({ content: "✅ This content is already available in your library!", flags: 64 });
+      await interaction.followUp({ content: t("replies.already_available"), flags: 64 });
       return;
     }
 
@@ -66,7 +67,7 @@ export async function handleDailyPickButton(interaction) {
   const parts = interaction.customId.split("_");
   const tmdbId = parseInt(parts[2], 10);
   const mediaType = parts[3] || "movie";
-  if (!tmdbId) return interaction.reply({ content: "⚠️ Invalid media ID.", flags: 64 });
+  if (!tmdbId) return interaction.reply({ content: t("replies.invalid_request"), flags: 64 });
 
   await interaction.deferUpdate();
   try {
@@ -79,7 +80,7 @@ export async function handleDailyPickButton(interaction) {
       seasons: mediaType === "tv" ? explicitSeasons(["all"], details) : undefined,
       source: "DAILY PICK",
     });
-    await interaction.followUp({ content: `✅ **${details.title || details.name}** has been requested!`, flags: 64 });
+    await interaction.followUp({ content: t("replies.pick_requested", { title: details.title || details.name }), flags: 64 });
   } catch (err) {
     logger.error("Daily random pick request error:", err);
     await followUpPrivately(interaction, getSeerrErrorMessage(err));
@@ -88,7 +89,7 @@ export async function handleDailyPickButton(interaction) {
 
 export async function handleRequestedButton(interaction) {
   try {
-    await interaction.reply({ content: "This item was already requested.", flags: 64 });
+    await interaction.reply({ content: t("replies.already_requested"), flags: 64 });
   } catch (err) {
     logger.error("Failed to send 'already requested' reply:", err);
   }

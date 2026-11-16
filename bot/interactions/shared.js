@@ -106,7 +106,7 @@ export async function tagPickerRow(mediaType, customId) {
     if (unique.length === 0) return null;
     const menu = new StringSelectMenuBuilder()
       .setCustomId(customId)
-      .setPlaceholder("Select tags (optional)")
+      .setPlaceholder(t("buttons.select_tags"))
       .addOptions(unique.map((tag) => ({ label: tag.label || tag.name || `Tag ${tag.id}`, value: tag.id.toString() })))
       .setMinValues(0)
       .setMaxValues(Math.min(5, unique.length));

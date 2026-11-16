@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import { getRandomMedia, isMetadataConfigured } from "../api/metadata.js";
 import { isValidUrl } from "../utils/url.js";
+import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
 
@@ -82,28 +83,28 @@ export async function sendDailyRandomPick(client) {
       ? `https://image.tmdb.org/t/p/w1280${randomMedia.backdrop_path}`
       : null;
 
-    let overview = randomMedia.overview || "No description available.";
+    let overview = randomMedia.overview || t("embeds.no_description");
     if (overview.length > 300) {
       overview = overview.substring(0, 297) + "...";
     }
 
     const embed = new EmbedBuilder()
-      .setAuthor({ name: `${emoji} Today's Random Pick` })
+      .setAuthor({ name: t("embeds.daily_pick", { emoji }) })
       .setTitle(`${title}${year ? ` (${year})` : ""}`)
       .setDescription(overview)
       .setColor("#f5a962")
       .addFields({
-        name: "Rating",
+        name: t("embeds.rating"),
         value: randomMedia.vote_average
           ? `⭐ ${randomMedia.vote_average.toFixed(1)}/10`
-          : "N/A",
+          : t("embeds.not_available"),
         inline: true,
       });
 
     if (details.genres && Array.isArray(details.genres)) {
       const genreNames = details.genres.map((g) => g.name).join(", ");
       if (genreNames) {
-        embed.addFields({ name: "Genres", value: genreNames, inline: true });
+        embed.addFields({ name: t("embeds.genres"), value: genreNames, inline: true });
       }
     }
 
@@ -144,7 +145,7 @@ export async function sendDailyRandomPick(client) {
     buttonComponents.push(
       new ButtonBuilder()
         .setStyle(ButtonStyle.Primary)
-        .setLabel("Request")
+        .setLabel(t("buttons.request"))
         .setCustomId(`request_random_${randomMedia.id}_${mediaType}`)
     );
 

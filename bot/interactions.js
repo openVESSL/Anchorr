@@ -47,7 +47,7 @@ export function registerInteractions(client) {
       logger.error("Interaction handler error:", err);
       try {
         if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: "⚠️ An unexpected error occurred. Please try again.", flags: 64 });
+          await interaction.reply({ content: t("replies.unexpected"), flags: 64 });
         }
       } catch {
         // the interaction may already be acknowledged

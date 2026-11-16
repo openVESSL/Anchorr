@@ -1,8 +1,10 @@
 /**
- * The Discord post for a new Jellyfin item, and the "your request is available" DM.
+ * The Discord post for a new Jellyfin item, and the "your request is available" DM, in the
+ * bot language.
  */
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { findBestBackdrop } from "../api/metadata.js";
+import { t } from "../utils/i18n.js";
 import { buildJellyfinUrl } from "../utils/jellyfinUrl.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
@@ -27,9 +29,10 @@ export function cleanTitle(title) {
 const watchUrl = (data) => buildJellyfinUrl("web/index.html", `!/details?id=${data.ItemId}&serverId=${data.ServerId}`);
 const linkButton = (label, url) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(url);
 
+/** "HH:MM" from Jellyfin or metadata, or null when nobody knows. */
 function runtimeOf(data, details, omdb) {
   const { ItemType, RunTime } = data;
-  let runtime = "Unknown";
+  let runtime = null;
   if (ItemType === "Episode" && RunTime) {
     runtime = RunTime; // Jellyfin already gives "00:25:02"
   } else if (omdb?.Runtime && omdb.Runtime !== "N/A") {
@@ -41,37 +44,40 @@ function runtimeOf(data, details, omdb) {
     runtime = minutesToHhMm(details.episode_run_time[0]);
   }
   // Metadata often has no runtime (shows especially); Jellyfin knows the file's length
-  if (runtime === "Unknown" && RunTime) runtime = minutesToHhMm(hhmmssToMinutes(RunTime));
+  if (!runtime && RunTime) runtime = minutesToHhMm(hhmmssToMinutes(RunTime));
   return runtime;
 }
 
 function summaryHeading(itemType, omdb) {
-  if (itemType === "Movie" && omdb?.Director && omdb.Director !== "N/A") return `Directed by ${omdb.Director}`;
-  if (omdb?.Writer && omdb.Writer !== "N/A") return `Created by ${omdb.Writer.split(",")[0].trim()}`;
-  return "Summary";
+  if (itemType === "Movie" && omdb?.Director && omdb.Director !== "N/A") return t("embeds.directed_by", { names: omdb.Director });
+  if (omdb?.Writer && omdb.Writer !== "N/A") return t("embeds.created_by", { name: omdb.Writer.split(",")[0].trim() });
+  return t("embeds.summary");
 }
 
 function headingOf(data, { episodeCount, episodeDetails, seasonCount, seasonDetails }) {
   const name = cleanTitle(data.Name);
   // Series items have no SeriesName
-  const series = cleanTitle(data.SeriesName || data.Name) || "Unknown Series";
+  const series = cleanTitle(data.SeriesName || data.Name) || t("notifications.unknown_series");
   const year = data.Year || "?";
   switch (data.ItemType) {
     case "Movie":
-      return { author: "🎬 New movie added!", title: `${name || "Unknown Title"} (${year})` };
+      return { author: t("notifications.new_movie"), title: `${name || t("embeds.unknown_title")} (${year})` };
     case "Series":
-      return { author: "📺 New TV show added!", title: `${series} (${year})` };
+      return { author: t("notifications.new_show"), title: `${series} (${year})` };
     case "Season":
-      if (seasonCount > 1 && seasonDetails) return { author: `📺 ${seasonCount} new seasons added!`, title: `${series} (${year})` };
-      return { author: "📺 New season added!", title: `${series} - Season ${data.SeasonNumber || data.IndexNumber || "?"}` };
+      if (seasonCount > 1 && seasonDetails) return { author: t("notifications.new_seasons", { count: seasonCount }), title: `${series} (${year})` };
+      return {
+        author: t("notifications.new_season"),
+        title: t("notifications.season_title", { series, number: data.SeasonNumber || data.IndexNumber || "?" }),
+      };
     case "Episode": {
-      if (episodeCount > 1 && episodeDetails) return { author: `📺 ${episodeCount} new episodes added!`, title: `${series} (${year})` };
+      if (episodeCount > 1 && episodeDetails) return { author: t("notifications.new_episodes", { count: episodeCount }), title: `${series} (${year})` };
       const season = String(data.SeasonNumber || 1).padStart(2, "0");
       const episode = String(data.EpisodeNumber || data.IndexNumber || 1).padStart(2, "0");
-      return { author: "📺 New episode added!", title: `${series} - S${season}E${episode}` };
+      return { author: t("notifications.new_episode"), title: `${series} - S${season}E${episode}` };
     }
     default:
-      return { author: "✨ New item added", title: name || "Unknown Title" };
+      return { author: t("notifications.new_item"), title: name || t("embeds.unknown_title") };
   }
 }
 
@@ -86,33 +92,35 @@ function colorOf(itemType, episodeCount) {
 
 function addBatchList(embed, data, { episodeCount, episodeDetails, seasonCount, seasonDetails }) {
   if (data.ItemType === "Season") {
+    const name = t("notifications.seasons_added");
     if (seasonCount > 1 && seasonDetails && seasonDetails.seasons.length <= MAX_LISTED) {
       const number = (s) => s.SeasonNumber || s.IndexNumber || 0;
       const list = [...seasonDetails.seasons]
         .sort((a, b) => number(a) - number(b))
         .map((s) => {
           const n = s.SeasonNumber || s.IndexNumber || "?";
-          return `**Season ${n}**: ${s.Name || `Season ${n}`}`;
+          return `**${t("notifications.season_name", { number: n })}**: ${s.Name || t("notifications.season_name", { number: n })}`;
         })
         .join("\n");
-      embed.addFields({ name: "Seasons Added", value: list, inline: false });
+      embed.addFields({ name, value: list, inline: false });
     } else if (seasonCount > MAX_LISTED) {
-      embed.addFields({ name: "Seasons Added", value: `${seasonCount} seasons (too many to list individually)`, inline: false });
+      embed.addFields({ name, value: t("notifications.too_many_seasons", { count: seasonCount }), inline: false });
     }
   }
   if (data.ItemType === "Episode") {
+    const name = t("notifications.episodes_added");
     if (episodeCount > 1 && episodeDetails && episodeDetails.episodes.length <= MAX_LISTED) {
       const list = [...episodeDetails.episodes]
         .sort((a, b) => (a.EpisodeNumber || 0) - (b.EpisodeNumber || 0))
         .map((ep) => {
           const s = String(ep.SeasonNumber || 1).padStart(2, "0");
           const e = String(ep.EpisodeNumber || 0).padStart(2, "0");
-          return `**S${s}E${e}**: ${ep.Name || "Unknown Episode"}`;
+          return `**S${s}E${e}**: ${ep.Name || t("notifications.unknown_episode")}`;
         })
         .join("\n");
-      embed.addFields({ name: "Episodes Added", value: list, inline: false });
+      embed.addFields({ name, value: list, inline: false });
     } else if (episodeCount > MAX_LISTED) {
-      embed.addFields({ name: "Episodes Added", value: `${episodeCount} episodes (too many to list individually)`, inline: false });
+      embed.addFields({ name, value: t("notifications.too_many_episodes", { count: episodeCount }), inline: false });
     }
   }
 }
@@ -124,10 +132,10 @@ function addBatchList(embed, data, { episodeCount, episodeDetails, seasonCount, 
 export function buildItemNotification(data, { details, omdb, imdbId, batch }) {
   const { ItemType } = data;
   const single = !(batch.episodeCount > 1);
-  const runtime = runtimeOf(data, details, omdb);
-  const rating = omdb?.imdbRating ? `${omdb.imdbRating}/10` : "N/A";
-  const genreList = Array.isArray(data.Genres) ? data.Genres.join(", ") : data.Genres || omdb?.Genre || "Unknown";
-  const overview = data.Overview?.trim() || omdb?.Plot || "No description available.";
+  const runtime = runtimeOf(data, details, omdb) ?? t("embeds.unknown");
+  const rating = omdb?.imdbRating ? `${omdb.imdbRating}/10` : t("embeds.not_available");
+  const genreList = Array.isArray(data.Genres) ? data.Genres.join(", ") : data.Genres || omdb?.Genre || t("embeds.unknown");
+  const overview = data.Overview?.trim() || omdb?.Plot || t("embeds.no_description");
   const { author, title } = headingOf(data, batch);
 
   const embed = new EmbedBuilder().setAuthor({ name: author }).setTitle(title);
@@ -135,13 +143,13 @@ export function buildItemNotification(data, { details, omdb, imdbId, batch }) {
   embed.setColor(colorOf(ItemType, batch.episodeCount));
 
   if (ItemType === "Episode" && single) {
-    if (shown("EMBED_SHOW_OVERVIEW_EPISODES") && overview) embed.addFields({ name: "Episode Summary", value: overview });
+    if (shown("EMBED_SHOW_OVERVIEW_EPISODES") && overview) embed.addFields({ name: t("notifications.episode_summary"), value: overview });
   } else if (ItemType !== "Season") {
     const fields = [];
     if (shown("EMBED_SHOW_OVERVIEW_MOVIES")) fields.push({ name: summaryHeading(ItemType, omdb), value: overview });
-    if (shown("EMBED_SHOW_GENRE")) fields.push({ name: "Genre", value: genreList || "Unknown", inline: true });
-    if (shown("EMBED_SHOW_RUNTIME")) fields.push({ name: "Runtime", value: runtime || "Unknown", inline: true });
-    if (shown("EMBED_SHOW_RATING")) fields.push({ name: "Rating", value: rating || "N/A", inline: true });
+    if (shown("EMBED_SHOW_GENRE")) fields.push({ name: t("embeds.genre"), value: genreList, inline: true });
+    if (shown("EMBED_SHOW_RUNTIME")) fields.push({ name: t("embeds.runtime"), value: runtime, inline: true });
+    if (shown("EMBED_SHOW_RATING")) fields.push({ name: t("embeds.rating"), value: rating, inline: true });
     if (fields.length > 0) embed.addFields(...fields);
   }
   addBatchList(embed, data, batch);
@@ -172,7 +180,7 @@ export function buildItemNotification(data, { details, omdb, imdbId, batch }) {
     if (isValidUrl(url)) buttons.push(linkButton("IMDb", url));
   }
   if (shown("EMBED_SHOW_BUTTON_WATCH")) {
-    if (isDiscordLinkableUrl(watchUrl(data))) buttons.push(linkButton("▶ Watch Now!", watchUrl(data)));
+    if (isDiscordLinkableUrl(watchUrl(data))) buttons.push(linkButton(t("buttons.watch_now"), watchUrl(data)));
     else logger.warn(`Invalid watch URL generated: ${watchUrl(data)}. Skipping watch button.`);
   }
 
@@ -189,23 +197,23 @@ export function buildItemNotification(data, { details, omdb, imdbId, batch }) {
 
 /** "Your request is now available" DM for the members who requested the item. */
 export function buildAvailableDm(data, post) {
-  const embed = new EmbedBuilder().setAuthor({ name: "✅ Your request is now available!" }).setTitle(post.title);
+  const embed = new EmbedBuilder().setAuthor({ name: t("notifications.available_author") }).setTitle(post.title);
   const url = watchUrl(data);
   const linkable = isDiscordLinkableUrl(url);
   if (linkable) embed.setURL(url);
   embed
     .setColor(settings.EMBED_COLOR_SUCCESS || "#a6e3a1")
-    .setDescription(`${data.Name || data.SeriesName || "Your requested content"} is now available on Jellyfin!`)
+    .setDescription(t("notifications.available_description", { title: data.Name || data.SeriesName || t("notifications.available_fallback_title") }))
     .addFields(
-      { name: "Genre", value: post.genreList, inline: true },
-      { name: "Runtime", value: post.runtime, inline: true },
-      { name: "Rating", value: post.rating, inline: true }
+      { name: t("embeds.genre"), value: post.genreList, inline: true },
+      { name: t("embeds.runtime"), value: post.runtime, inline: true },
+      { name: t("embeds.rating"), value: post.rating, inline: true }
     );
   if (post.backdropPath) {
     const backdropUrl = `${TMDB_IMAGES}/w1280${post.backdropPath}`;
     if (isValidUrl(backdropUrl)) embed.setImage(backdropUrl);
   }
   const message = { embeds: [embed] };
-  if (linkable) message.components = [new ActionRowBuilder().addComponents(linkButton("▶ Watch Now!", url))];
+  if (linkable) message.components = [new ActionRowBuilder().addComponents(linkButton(t("buttons.watch_now"), url))];
   return message;
 }
