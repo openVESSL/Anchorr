@@ -24,6 +24,7 @@ export const keys = {
   seerrOptions: ["seerr-options"] as const,
   overview: ["overview"] as const,
   recentRequests: ["requests-recent"] as const,
+  upgrade: ["upgrade"] as const,
 }
 
 export const useAuth = () => useQuery({ queryKey: keys.auth, queryFn: () => api.get<AuthCheck>("/auth/check") })
@@ -50,6 +51,24 @@ export interface Overview {
 
 /** Live server info; jellyfin or seerr is null when that server does not answer. */
 export const useOverview = () => useQuery({ queryKey: keys.overview, queryFn: () => api.get<Overview>("/overview"), refetchInterval: 30_000 })
+
+export interface UpgradeItem {
+  id: "jellyfin_linked" | "auto_approve" | "guest_limits" | "time_zone" | "webhook_plugin" | "backup" | "removed_keys"
+  severity: "critical" | "important" | "cleanup" | "info"
+  state: "done" | "todo" | "manual" | "info"
+  link?: string
+  path?: string
+  timeZone?: string
+}
+
+export interface Upgrade {
+  show: boolean
+  upgradedAt?: string
+  items: UpgradeItem[]
+}
+
+/** Checklist for installs upgraded from 1.x; refreshed with the status so items tick off on their own. */
+export const useUpgrade = () => useQuery({ queryKey: keys.upgrade, queryFn: () => api.get<Upgrade>("/upgrade"), refetchInterval: 15_000 })
 
 /** Text channels and threads the bot can post in (needs the bot to be online). */
 export function useChannels(guildId: string | undefined) {

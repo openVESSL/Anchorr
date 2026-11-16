@@ -5,13 +5,14 @@ import { Link } from "react-router"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/settings"
+import { UpgradeCard } from "@/components/upgrade-card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, ApiError } from "@/lib/api"
 import { useT, type Translate } from "@/lib/i18n"
-import { keys, useOverview, useSetupState, useStatus, type ActivityType, type Overview } from "@/lib/queries"
+import { keys, useOverview, useSetupState, useStatus, useUpgrade, type ActivityType, type Overview } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
 
@@ -40,6 +41,7 @@ export function OverviewPage() {
   const incomplete = setup && (!setup.jellyfin || !setup.seerr || !setup.discord || !setup.discordServer)
   const overview = useOverview()
   const o = overview.data
+  const upgrade = useUpgrade().data
 
   async function toggleBot() {
     setBusy(true)
@@ -85,7 +87,9 @@ export function OverviewPage() {
           </AlertDescription>
         </Alert>
       )}
-      {s?.legacyWebhookLastSeen && (
+      {upgrade?.show && <UpgradeCard upgrade={upgrade} />}
+      {/* the upgrade checklist already lists the Webhook plugin */}
+      {s?.legacyWebhookLastSeen && !upgrade?.show && (
         <Alert className="mb-4">
           <AlertTriangle />
           <AlertTitle>{t("The Jellyfin Webhook plugin is no longer needed")}</AlertTitle>

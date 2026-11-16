@@ -180,9 +180,9 @@ Who may use the commands is set under **Requests > Roles**. Whether a request is
 
 ## Upgrading from 1.x
 
-Your existing configuration is upgraded automatically on the first start, and the original file is kept as `config.v1.json` in the config folder. Your local account, linked members, channels and other settings stay as they are.
+Your existing configuration is upgraded automatically on the first start. Before that, Anchorr copies the config folder to `backup-1.x` inside it; if the copy fails, it does not start. Your local account, linked members, channels and other settings stay as they are. Afterwards the Overview shows a checklist of what changed.
 
-1. **Back up the config folder** before you update. The automatic copy covers `config.json`, but a full copy of the folder is the easiest way back.
+1. **Back up the config folder** to another place before you update. The automatic copy stays in the same folder, so it does not help if the volume itself is lost.
 2. **Update Anchorr** as described in [Updating](#updating). Without Docker, use Node.js 22.23.4, 24.22.1, 26.12.1 or newer and run `npm run build` after `npm install`.
 3. **Remove what is no longer used:**
    - The Anchorr destination in the Jellyfin Webhook plugin. Anchorr now watches Jellyfin directly and catches up on anything added while it was offline. Calls from the plugin are ignored, and the dashboard reminds you while they keep arriving. Uninstall the plugin if nothing else uses it.

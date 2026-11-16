@@ -9,13 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - Unreleased
 
-Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Jellyfin and Seerr. The bot's commands and messages work as before. Your configuration is upgraded automatically and the original file is kept as `config.v1.json`.
+Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Jellyfin and Seerr. The bot's commands and messages work as before. Your configuration is upgraded automatically, and the config folder from 1.x is kept as `backup-1.x`.
 
 ### Upgrading from 1.6.x
 
 **Before you update**
 
-- Copy your config folder (`config.json` and the state files next to it). The upgrade keeps the original `config.json` as `config.v1.json`, but a full copy is the easiest way back.
+- Copy your config folder (`config.json` and the state files next to it) to another place. Anchorr backs the folder up to `backup-1.x` inside it before upgrading, and does not start if that fails, but a copy elsewhere also covers a lost volume.
 - Running without Docker? Use Node.js 22.23.4, 24.22.1, 26.12.1 or newer, and run `npm run build` after `npm install`: it builds the new dashboard.
 
 **What you can remove**
@@ -26,6 +26,9 @@ Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Je
 
 **What to check after the update**
 
+The Overview shows a checklist for these points after an upgrade from 1.x and ticks them off once they are done.
+
+- **Jellyfin is linked with an API key.** Installs that only used the Webhook plugin have none and announce no new items until Jellyfin is linked on the Jellyfin page.
 - **The Seerr user "Discord (Anchorr)".** Members without a linked account now request as this guest user, created automatically, instead of as the Seerr administrator. Set its quota and permissions in Seerr.
 - **Auto-approve.** The switch now applies to that guest account only. Linked members follow their own Seerr permissions, so give them the Auto-Approve permission in Seerr if you relied on the switch to approve everyone.
 - **Time zone (Docker).** The weekly roundup hour follows the container's time zone. Set `TZ`, for example `TZ=Europe/Berlin`. Unraid sets it for containers created from the template.
@@ -45,6 +48,7 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 - Notifications use Jellyfin's runtime when Seerr has none, which is common for shows.
 - `/api/overview`, `/api/requests/recent` and `/api/requests/:id/approve|decline` for the dashboard. Bot activity is kept in `activity.json` in the config folder (the last 200 events).
 - `/api/status` reports the bot and Jellyfin connection, an old plugin still calling, and a reverse proxy without `TRUST_PROXY`.
+- **Upgrade checklist.** After an upgrade from 1.x, the Overview lists what changed and what still needs a look, and where the 1.x backup is.
 - **Configuration backup.** Settings can download `config.json` and restore it later or on another install. The install keeps its own sign-in secret and network settings, and the replaced file is kept as `config.before-restore.json`.
 
 ### Changed
