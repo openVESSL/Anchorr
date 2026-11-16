@@ -32,6 +32,7 @@ Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Je
 - Notifications use Jellyfin's runtime when Seerr has none, which is common for shows.
 - `/api/overview`, `/api/requests/recent` and `/api/requests/:id/approve|decline` for the dashboard. Bot activity is kept in `activity.json` in the config folder (the last 200 events).
 - `/api/status` reports the bot and Jellyfin connection, an old plugin still calling, and a reverse proxy without `TRUST_PROXY`.
+- **Configuration backup.** Settings can download `config.json` and restore it later or on another install. The install keeps its own sign-in secret and network settings, and the replaced file is kept as `config.before-restore.json`.
 
 ### Changed
 

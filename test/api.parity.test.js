@@ -146,6 +146,27 @@ test("the old Jellyfin Webhook plugin is acknowledged, ignored and reported to t
   assert.equal(typeof (await api("GET", "/api/status")).json.legacyWebhookLastSeen, "number");
 });
 
+test("a config backup restores, keeps this install's secrets and port, and rejects other files", async () => {
+  assert.equal((await api("GET", "/api/config/backup", undefined, { auth: false })).status, 401);
+  assert.equal((await api("POST", "/api/config/restore", {}, { auth: false })).status, 401);
+
+  const backup = await api("GET", "/api/config/backup");
+  assert.equal(backup.status, 200);
+  assert.match(backup.json.JWT_SECRET, /^b64:/, "the backup is the file as stored on disk");
+  const before = (await api("GET", "/api/config")).json;
+
+  assert.equal((await api("POST", "/api/config/restore", { hello: "world" })).status, 400);
+  assert.equal((await api("POST", "/api/config/restore", { SEERR_URL: "not a url" })).status, 400);
+
+  const res = await api("POST", "/api/config/restore", { ...backup.json, LANGUAGE: "fr", JWT_SECRET: "other", WEBHOOK_PORT: "1" });
+  assert.equal(res.status, 200);
+  const after = (await api("GET", "/api/config")).json;
+  assert.equal(after.LANGUAGE, "fr");
+  assert.equal(after.SEERR_URL, before.SEERR_URL);
+  assert.equal("WEBHOOK_PORT" in after, "WEBHOOK_PORT" in before);
+  assert.equal((await api("GET", "/api/status")).status, 200, "the session survives, so JWT_SECRET was kept");
+});
+
 test("logout revokes the session", async () => {
   const old = cookie;
   assert.equal((await api("POST", "/api/auth/logout", {})).status, 200);

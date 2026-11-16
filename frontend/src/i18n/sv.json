@@ -333,5 +333,14 @@
   "Save": "Spara",
   "New": "Ny",
   "A link": "En länk",
-  "Change connection": "Ändra anslutning"
+  "Change connection": "Ändra anslutning",
+  "This file is not an Anchorr configuration backup.": "Den här filen är inte en säkerhetskopia av Anchorrs konfiguration.",
+  "Configuration restored": "Konfigurationen återställd",
+  "Backup": "Säkerhetskopia",
+  "The backup holds every setting, linked members and sign-in accounts. API keys and the bot token are in it as plain encoded text, so keep the file private.": "Säkerhetskopian innehåller alla inställningar, länkade medlemmar och inloggningskonton. API-nycklar och bot-token är bara kodade, inte krypterade, så håll filen privat.",
+  "Download backup": "Ladda ner säkerhetskopia",
+  "Restore from backup": "Återställ från säkerhetskopia",
+  "Restore {name}?": "Återställ {name}?",
+  "Every setting is replaced by the backup and a running bot restarts. The current configuration is kept as config.before-restore.json next to config.json.": "Alla inställningar ersätts av säkerhetskopian och en bot som körs startas om. Den nuvarande konfigurationen sparas som config.before-restore.json bredvid config.json.",
+  "Restore": "Återställ"
 }

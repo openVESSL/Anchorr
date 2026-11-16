@@ -48,6 +48,7 @@ Anchorr connects three things you already run: **Jellyfin**, **Seerr** and a **D
 - Guided setup: Jellyfin, Seerr and Discord in three steps
 - Overview with your servers, Seerr request counts, the latest requests (approve or decline them) and recent bot activity
 - Sign in with your Jellyfin administrator account, or an optional local account
+- Download a backup of the configuration and restore it, on the same or a new install
 - All four [Catppuccin](https://catppuccin.com) flavors with a choice of accent color (Macchiato by default)
 - English, German, French and Swedish for the dashboard and every bot message; titles, overviews and genres come in the bot's language when TMDB has a translation
 

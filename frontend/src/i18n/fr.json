@@ -333,5 +333,14 @@
   "Save": "Enregistrer",
   "New": "Nouveau",
   "A link": "Un lien",
-  "Change connection": "Modifier la connexion"
+  "Change connection": "Modifier la connexion",
+  "This file is not an Anchorr configuration backup.": "Ce fichier n'est pas une sauvegarde de configuration Anchorr.",
+  "Configuration restored": "Configuration restaurée",
+  "Backup": "Sauvegarde",
+  "The backup holds every setting, linked members and sign-in accounts. API keys and the bot token are in it as plain encoded text, so keep the file private.": "La sauvegarde contient tous les réglages, les membres liés et les comptes de connexion. Les clés API et le token du bot y sont seulement encodés, pas chiffrés : gardez le fichier privé.",
+  "Download backup": "Télécharger la sauvegarde",
+  "Restore from backup": "Restaurer une sauvegarde",
+  "Restore {name}?": "Restaurer {name} ?",
+  "Every setting is replaced by the backup and a running bot restarts. The current configuration is kept as config.before-restore.json next to config.json.": "Tous les réglages sont remplacés par la sauvegarde et le bot redémarre s'il est en marche. La configuration actuelle est conservée sous config.before-restore.json, à côté de config.json.",
+  "Restore": "Restaurer"
 }

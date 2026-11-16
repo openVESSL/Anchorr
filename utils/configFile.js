@@ -25,7 +25,7 @@ function encodeConfig(config) {
   return out;
 }
 
-function decodeConfig(config) {
+export function decodeConfig(config) {
   const out = { ...config };
   for (const field of SENSITIVE_FIELDS) {
     if (out[field] && typeof out[field] === "string" && out[field].startsWith(B64_PREFIX)) {

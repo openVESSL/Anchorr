@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState, type FormEvent } from "react"
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react"
 import { toast } from "sonner"
 
 import { Field, PageHeader, SaveBar, Section, SwitchRow, useSettingsForm } from "@/components/settings"
 import { AppearanceSettings } from "@/components/theme-picker"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -59,8 +60,82 @@ export function SystemPage() {
       </Section>
 
       <LocalAccountSection />
+      <BackupSection />
       <SaveBar form={form} />
     </>
+  )
+}
+
+function BackupSection() {
+  const { t } = useT()
+  const client = useQueryClient()
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [pending, setPending] = useState<{ name: string; config: unknown } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function pick(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+    try {
+      setPending({ name: file.name, config: JSON.parse(await file.text()) })
+    } catch {
+      toast.error(t("This file is not an Anchorr configuration backup."))
+    }
+  }
+
+  async function restore() {
+    setBusy(true)
+    try {
+      await api.post("/config/restore", pending?.config)
+      toast.success(t("Configuration restored"))
+      setPending(null)
+      client.invalidateQueries()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("Something went wrong"))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Section
+      title={t("Backup")}
+      description={t("The backup holds every setting, linked members and sign-in accounts. API keys and the bot token are in it as plain encoded text, so keep the file private.")}
+    >
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline">
+          <a href="/api/config/backup" download>
+            {t("Download backup")}
+          </a>
+        </Button>
+        <Button variant="outline" onClick={() => fileInput.current?.click()}>
+          {t("Restore from backup")}
+        </Button>
+        <input ref={fileInput} type="file" accept=".json,application/json" className="hidden" onChange={pick} />
+      </div>
+
+      {pending && (
+        <Dialog open onOpenChange={(open) => !open && setPending(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("Restore {name}?", { name: pending.name })}</DialogTitle>
+              <DialogDescription>
+                {t("Every setting is replaced by the backup and a running bot restarts. The current configuration is kept as config.before-restore.json next to config.json.")}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setPending(null)}>
+                {t("Cancel")}
+              </Button>
+              <Button onClick={restore} disabled={busy}>
+                {t("Restore")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </Section>
   )
 }
 
