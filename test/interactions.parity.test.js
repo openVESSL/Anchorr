@@ -52,9 +52,10 @@ before(async () => {
     ...Object.fromEntries(Object.entries(MOVIES).map(([id, m]) => [`GET /api/v1/movie/${id}`, () => m])),
     ...Object.fromEntries(Object.entries(SHOWS).map(([id, s]) => [`GET /api/v1/tv/${id}`, () => s])),
     "GET /api/v1/movie/603/ratingscombined": () => ({ imdb: { criticsScore: 8.7 }, rt: { criticsScore: 83 } }),
-    "GET /api/v1/search": ({ url }) => ({
-      results: SEARCHABLE.filter((r) => (r.title || r.name).toLowerCase().includes(url.searchParams.get("query").toLowerCase())),
-    }),
+    "GET /api/v1/search": ({ url }) =>
+      url.searchParams.get("query") === "seerr is down"
+        ? { status: 500, json: { message: "Internal Server Error" } }
+        : { results: SEARCHABLE.filter((r) => (r.title || r.name).toLowerCase().includes(url.searchParams.get("query").toLowerCase())) },
     "GET /api/v1/discover/trending": () => ({
       results: [
         { id: 550, mediaType: "movie", title: "Fight Club", releaseDate: "1999-10-15" },
@@ -168,6 +169,15 @@ test("/request over quota shows Seerr's reason privately", async () => {
   assert.deepEqual(calls.at(-1), {
     method: "followUp",
     content: translate("seerr_request_errors.quota", { msg: "Movie Quota exceeded" }),
+    flags: 64,
+  });
+});
+
+test("/search by typed text while Seerr fails: the member gets an error instead of a stuck reply", async () => {
+  const calls = await dispatch(command("search", { title: "seerr is down" }));
+  assert.deepEqual(calls.at(-1), {
+    method: "followUp",
+    content: translate("seerr_request_errors.server_error"),
     flags: 64,
   });
 });

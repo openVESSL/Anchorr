@@ -67,10 +67,10 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
     return;
   }
 
-  const [tmdbId, mediaType] = await findTitle(rawInput);
-  if (!tmdbId || !mediaType) return replyPrivately(interaction, t("replies.invalid_title"));
-
   try {
+    const [tmdbId, mediaType] = await findTitle(rawInput);
+    if (!tmdbId || !mediaType) return replyPrivately(interaction, t("replies.invalid_title"));
+
     const details = await metadata.getDetails(tmdbId, mediaType);
 
     // TV shows go through the season picker instead of requesting every season at once
