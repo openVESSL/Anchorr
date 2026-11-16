@@ -4,7 +4,7 @@ import path from "path";
 import { authenticateToken } from "../utils/auth.js";
 import { restartBot } from "../bot/botManager.js";
 import { botState } from "../bot/botState.js";
-import { CONFIG_PATH, MigrationBackupError, decodeConfig, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
+import { CONFIG_PATH, decodeConfig, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { sanitizeConfigForClient } from "../utils/configSanitize.js";
 import { WEBHOOK_SECRET } from "../utils/auth.js";
 import { configTemplate } from "../lib/config.js";
@@ -68,11 +68,15 @@ router.post("/config/restore", authenticateToken, async (req, res) => {
     return res.status(500).json({ success: false, error: "Failed to save configuration file. Check Docker volume permissions and server logs." });
   }
   try {
-    loadSettings(); // runs the v1 migrations when the backup is an older format
+    // Runs the v1 migrations when the backup is an older format. No 1.x folder backup here:
+    // the current folder is not a 1.x one, and the uploaded file is its own copy.
+    loadSettings({ backupV1: false });
   } catch (err) {
-    if (!(err instanceof MigrationBackupError)) throw err;
-    logger.error(`❌ ${err.message}`);
-    return res.status(500).json({ success: false, error: err.message });
+    logger.error("Restored config.json, but loading it failed:", err);
+    return res.status(500).json({
+      success: false,
+      error: `The backup was saved but could not be applied: ${err.message}. The previous configuration is kept as config.before-restore.json in the config folder.`,
+    });
   }
   logger.info("✅ Configuration restored from a backup");
 

@@ -41,7 +41,8 @@ export function OverviewPage() {
   const incomplete = setup && (!setup.jellyfin || !setup.seerr || !setup.discord || !setup.discordServer)
   const overview = useOverview()
   const o = overview.data
-  const upgrade = useUpgrade().data
+  const upgradeQuery = useUpgrade()
+  const upgrade = upgradeQuery.data
 
   async function toggleBot() {
     setBusy(true)
@@ -88,8 +89,15 @@ export function OverviewPage() {
         </Alert>
       )}
       {upgrade?.show && <UpgradeCard upgrade={upgrade} />}
-      {/* the upgrade checklist already lists the Webhook plugin */}
-      {s?.legacyWebhookLastSeen && !upgrade?.show && (
+      {upgradeQuery.isError && (
+        <Alert className="mb-4">
+          <AlertTriangle />
+          <AlertTitle>{t("Could not load the upgrade checklist")}</AlertTitle>
+          <AlertDescription>{upgradeQuery.error instanceof ApiError ? upgradeQuery.error.message : t("Something went wrong")}</AlertDescription>
+        </Alert>
+      )}
+      {/* the upgrade checklist already lists the Webhook plugin; wait for it to avoid a flash */}
+      {s?.legacyWebhookLastSeen && !upgradeQuery.isPending && !upgrade?.show && (
         <Alert className="mb-4">
           <AlertTriangle />
           <AlertTitle>{t("The Jellyfin Webhook plugin is no longer needed")}</AlertTitle>

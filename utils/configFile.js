@@ -264,7 +264,8 @@ export const v1BackupDir = () => path.join(path.dirname(CONFIG_PATH), "backup-1.
 export class MigrationBackupError extends Error {
   constructor(cause) {
     super(
-      `Could not back up the 1.x configuration to ${v1BackupDir()}: ${cause.message}. Anchorr did not change anything. Fix the folder permissions or free up space, then restart.`
+      `Could not back up the 1.x configuration to ${v1BackupDir()}: ${cause.message}. Anchorr did not change anything. Fix the folder permissions or free up space, then restart.`,
+      { cause }
     );
     this.name = "MigrationBackupError";
   }
@@ -277,7 +278,13 @@ export class MigrationBackupError extends Error {
 function backupV1Folder() {
   const configDir = path.dirname(CONFIG_PATH);
   const target = v1BackupDir();
-  if (fs.existsSync(target)) return;
+  if (fs.existsSync(target)) {
+    if (!fs.statSync(target).isDirectory()) {
+      throw new MigrationBackupError(new Error(`${target} exists but is not a folder`));
+    }
+    logger.info(`💾 Keeping the existing 1.x backup at ${target}`);
+    return;
+  }
   const partial = `${target}.partial`;
   try {
     fs.rmSync(partial, { recursive: true, force: true });
@@ -299,21 +306,25 @@ function backupV1Folder() {
   }
 }
 
+/** Number of 1.x user mappings, or null when they cannot be read (step 4 logs why). */
 function countMappings(raw) {
   try {
     const mappings = typeof raw === "string" ? JSON.parse(raw) : raw;
     return mappings && typeof mappings === "object" ? Object.keys(mappings).length : 0;
   } catch {
-    return 0; // migration step 4 logs the unreadable value
+    return null;
   }
 }
 
 /**
  * Loads config.json into the runtime settings store (utils/settings.js)
  * Includes automatic migrations for backwards compatibility
+ * @param {{ backupV1?: boolean }} options backupV1: false when restoring an uploaded file,
+ *   whose own copy is the way back (the current folder is not a 1.x one)
  * @returns {boolean} True if load succeeded
+ * @throws {MigrationBackupError} when a 1.x folder cannot be backed up; nothing was changed
  */
-export function loadSettings() {
+export function loadSettings({ backupV1 = true } = {}) {
   // First: Perform migration if needed (one-time operation on startup)
   try {
     migrateConfigIfNeeded();
@@ -345,10 +356,11 @@ export function loadSettings() {
   // MigrationBackupError), and note what the upgrade checklist needs from 1.x.
   let upgradeRecord = null;
   if ((Number(config.CONFIG_VERSION) || 1) < CURRENT_CONFIG_VERSION && V1_ONLY_KEYS.some((k) => k in config)) {
-    backupV1Folder();
+    if (backupV1) backupV1Folder();
     upgradeRecord = {
       at: new Date().toISOString(),
-      autoApprove: config.SEERR_AUTO_APPROVE === "true" || config.JELLYSEERR_AUTO_APPROVE === "true",
+      // same precedence as the key rename in step 3
+      autoApprove: (config.SEERR_AUTO_APPROVE ?? config.JELLYSEERR_AUTO_APPROVE) === "true",
       mappings: countMappings(config.USER_MAPPINGS),
     };
   }

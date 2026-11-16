@@ -164,7 +164,37 @@ test("a fresh v2 config gets its version without a backup or upgrade record", ()
   assert.equal(fs.existsSync(BACKUP_DIR), false);
 });
 
-test("if the 1.x folder cannot be backed up, nothing is changed and loading stops", (t) => {
+test("a backup-1.x that is not a folder stops the upgrade instead of being trusted", (t) => {
+  writeV1Folder();
+  t.mock.method(logger, "error", () => {});
+  fs.writeFileSync(BACKUP_DIR, "not a folder");
+  t.after(() => fs.rmSync(BACKUP_DIR, { force: true }));
+  assert.throws(() => loadSettings(), MigrationBackupError);
+});
+
+test("restoring a 1.x backup upgrades it without backing up the current 2.x folder", () => {
+  fs.rmSync(BACKUP_DIR, { recursive: true, force: true });
+  writeV1Folder();
+  fs.rmSync(BACKUP_DIR, { recursive: true, force: true });
+  assert.equal(loadSettings({ backupV1: false }), true);
+  assert.equal(fs.existsSync(BACKUP_DIR), false);
+  assert.equal(readConfig().UPGRADE_FROM_V1.mappings, 2, "the checklist still knows it came from 1.x");
+});
+
+test("unreadable 1.x user mappings are recorded as unknown, not as none", () => {
+  writeV1Folder({ USER_MAPPINGS: "{not json" });
+  assert.equal(loadSettings(), true);
+  assert.equal(readConfig().UPGRADE_FROM_V1.mappings, null);
+});
+
+test("the backup error keeps its cause", () => {
+  const cause = Object.assign(new Error("disk full"), { code: "ENOSPC" });
+  assert.equal(new MigrationBackupError(cause).cause, cause);
+});
+
+const SKIP_AS_ROOT = { skip: process.getuid?.() === 0 && "file permissions do not apply to root" };
+
+test("if the 1.x folder cannot be backed up, nothing is changed and loading stops", SKIP_AS_ROOT, (t) => {
   const before = writeV1Folder();
   t.mock.method(logger, "error", () => {});
   fs.chmodSync(CONFIG_DIR, 0o500); // readable, not writable
@@ -176,7 +206,7 @@ test("if the 1.x folder cannot be backed up, nothing is changed and loading stop
   assert.equal(fs.existsSync(BACKUP_DIR), false, "no half-written backup left behind");
 });
 
-test("Anchorr does not start when the 1.x folder cannot be backed up", () => {
+test("Anchorr does not start when the 1.x folder cannot be backed up", SKIP_AS_ROOT, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "anchorr-v1-"));
   const v1 = { TMDB_API_KEY: "", SEERR_URL: "http://seerr.local", JWT_SECRET: "j".repeat(64), WEBHOOK_SECRET: "w".repeat(64) };
   fs.writeFileSync(path.join(dir, "config.json"), JSON.stringify(v1));

@@ -11,7 +11,7 @@ import { useT, type Translate } from "@/lib/i18n"
 import { keys, type Upgrade, type UpgradeItem } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
-function texts(item: UpgradeItem, t: Translate): { title: string; text: string } {
+function texts(item: UpgradeItem, t: Translate): { title: string; text: string } | null {
   switch (item.id) {
     case "jellyfin_linked":
       return {
@@ -53,13 +53,17 @@ function texts(item: UpgradeItem, t: Translate): { title: string; text: string }
     case "backup":
       return {
         title: t("Your 1.x configuration is backed up"),
-        text: t("Saved in {path}. To go back: stop Anchorr, copy those files back into the config folder and run version 1.6.5.", { path: item.path ?? "" }),
+        text: item.exists
+          ? t("Saved in {path}. To go back: stop Anchorr, copy those files back into the config folder, delete the backup-1.x folder and run version 1.6.5.", { path: item.path ?? "" })
+          : t("No 1.x backup was found at {path}. Use your own copy of the config folder if you need to go back to 1.x.", { path: item.path ?? "" }),
       }
     case "removed_keys":
       return {
         title: t("TMDB and OMDb keys were removed"),
         text: t("Seerr provides all details now. If you ever shared 1.x log files, rotate the Jellyfin and Seerr API keys."),
       }
+    default:
+      return null // an item this dashboard build does not know yet
   }
 }
 
@@ -119,7 +123,9 @@ export function UpgradeCard({ upgrade }: { upgrade: Upgrade }) {
       <CardContent>
         <ul className="space-y-3">
           {upgrade.items.map((item) => {
-            const { title, text } = texts(item, t)
+            const shown = texts(item, t)
+            if (!shown) return null
+            const { title, text } = shown
             const open = item.state === "todo" && item.severity === "critical"
             return (
               <li key={item.id} className={cn("flex gap-3 rounded-md", open && "bg-destructive/10 -mx-2 p-2")}>

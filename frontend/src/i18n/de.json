@@ -362,8 +362,10 @@
   "No calls from the plugin since Anchorr started.": "Seit dem Start von Anchorr keine Aufrufe vom Plugin.",
   "Anchorr watches Jellyfin directly now. Remove Anchorr from the plugin's destinations, or uninstall the plugin.": "Anchorr beobachtet Jellyfin jetzt direkt. Entferne Anchorr aus den Zielen des Plugins oder deinstalliere das Plugin.",
   "Your 1.x configuration is backed up": "Deine 1.x-Konfiguration ist gesichert",
-  "Saved in {path}. To go back: stop Anchorr, copy those files back into the config folder and run version 1.6.5.": "Gespeichert in {path}. Zurück zu 1.x: Anchorr stoppen, die Dateien zurück in den Config-Ordner kopieren und Version 1.6.5 starten.",
   "TMDB and OMDb keys were removed": "TMDB- und OMDb-Schlüssel wurden entfernt",
   "Seerr provides all details now. If you ever shared 1.x log files, rotate the Jellyfin and Seerr API keys.": "Seerr liefert jetzt alle Details. Falls du jemals 1.x-Logdateien geteilt hast, erneuere die API-Schlüssel von Jellyfin und Seerr.",
-  "Hide anyway": "Trotzdem ausblenden"
+  "Hide anyway": "Trotzdem ausblenden",
+  "Saved in {path}. To go back: stop Anchorr, copy those files back into the config folder, delete the backup-1.x folder and run version 1.6.5.": "Gespeichert in {path}. Zurück zu 1.x: Anchorr stoppen, die Dateien zurück in den Config-Ordner kopieren, den Ordner backup-1.x löschen und Version 1.6.5 starten.",
+  "No 1.x backup was found at {path}. Use your own copy of the config folder if you need to go back to 1.x.": "Unter {path} wurde keine 1.x-Sicherung gefunden. Nutze deine eigene Kopie des Config-Ordners, falls du zu 1.x zurück musst.",
+  "Could not load the upgrade checklist": "Die Upgrade-Checkliste konnte nicht geladen werden"
 }

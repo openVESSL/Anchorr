@@ -46,7 +46,9 @@ function loadConfig() {
     if (!(err instanceof MigrationBackupError)) throw err;
     // Starting anyway would serve the setup wizard with an empty config
     logger.error(`❌ ${err.message}`);
-    process.exit(1);
+    // The log files write asynchronously: give them a moment to record the reason
+    setTimeout(() => process.exit(1), 1000);
+    return null; // startServer stops here
   }
 
   if (success) {
@@ -302,7 +304,7 @@ function startServer() {
   // Check volume configuration early
   verifyVolumeConfiguration();
 
-  loadConfig();
+  if (loadConfig() === null) return; // exiting: the 1.x backup failed
   port = settings.WEBHOOK_PORT || 8282;
   // Default to localhost-only for bare-metal safety. Docker sets BIND_HOST=0.0.0.0
   // so that container port mapping works. Never expose the dashboard externally

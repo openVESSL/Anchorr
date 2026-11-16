@@ -58,6 +58,7 @@ export interface UpgradeItem {
   state: "done" | "todo" | "manual" | "info"
   link?: string
   path?: string
+  exists?: boolean
   timeZone?: string
 }
 
