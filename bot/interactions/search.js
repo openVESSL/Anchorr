@@ -143,12 +143,13 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
     if (requested) {
       // Reporting a failed request here would invite a duplicate
       // Title and error stay arguments: a "%o" in a title must not expand the error object
-      logger.error("Requested %s, but could not show the result: %s", JSON.stringify(title), err.message);
+      // The stack, not the error object: a Discord error keeps the interaction token in err.url
+      logger.error("Requested %s, but could not show the result: %s", JSON.stringify(title), err?.stack ?? String(err));
       await replyPrivately(interaction, t("replies.pick_requested", { title: title ?? rawInput }));
       return;
     }
     if (showingResult) {
-      logger.error("Could not show the result for %s: %s", JSON.stringify(title), err.message);
+      logger.error("Could not show the result for %s: %s", JSON.stringify(title), err?.stack ?? String(err));
       await replyPrivately(interaction, t("replies.unexpected"));
       return;
     }
