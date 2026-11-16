@@ -40,7 +40,11 @@ async function detectLibraryId(data) {
     return null;
   }
   const jellyfin = await import("../api/jellyfin.js");
-  const libraries = libraryCache.get() ?? (await jellyfin.fetchLibraries(apiKey, baseUrl));
+  let libraries = libraryCache.get();
+  if (!libraries) {
+    libraries = await jellyfin.fetchLibraries(apiKey, baseUrl);
+    if (libraries?.length) libraryCache.set(libraries);
+  }
 
   if (data.Path) {
     const itemPath = data.Path.replace(/\\/g, "/").toLowerCase();
