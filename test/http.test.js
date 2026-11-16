@@ -41,6 +41,8 @@ test("redirects are followed on the same host, never to another one with the API
     "GET /ok": ({ headers }) => ({ key: headers["x-api-key"] }),
     // same port on another host name: a different server as far as the key is concerned
     "GET /away": () => ({ status: 302, headers: { location: other.url.replace("127.0.0.1", "localhost") + "/steal" }, json: {} }),
+    // same host, another port: another service
+    "GET /port": () => ({ status: 302, headers: { location: other.url + "/steal" }, json: {} }),
   });
   try {
     const followed = await http.get(`${hop.url}/moved`, { headers: { "X-Api-Key": "SECRET" } });
@@ -48,7 +50,9 @@ test("redirects are followed on the same host, never to another one with the API
 
     const refused = await http.get(`${hop.url}/away`, { headers: { "X-Api-Key": "SECRET" } }).catch((e) => e);
     assert.equal(refused.code, "EREDIRECT");
-    assert.equal(other.requests.length, 0, "the other host never saw the key");
+    const otherPort = await http.get(`${hop.url}/port`, { headers: { "X-Api-Key": "SECRET" } }).catch((e) => e);
+    assert.equal(otherPort.code, "EREDIRECT");
+    assert.equal(other.requests.length, 0, "the other host and port never saw the key");
   } finally {
     await hop.close();
     await other.close();
