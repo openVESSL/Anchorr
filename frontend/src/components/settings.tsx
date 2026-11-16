@@ -161,6 +161,7 @@ export function ChannelSelect({ form, name, label, help, allowNone = true }: { f
           ))}
         </SelectContent>
       </Select>
+      {channels.isError && <p className="text-muted-foreground text-sm">{t("Start the bot to list channels")}</p>}
     </Field>
   )
 }

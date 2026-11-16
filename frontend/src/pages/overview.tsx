@@ -11,21 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, ApiError } from "@/lib/api"
 import { useT, type Translate } from "@/lib/i18n"
-import { keys, useSetupState, useStatus } from "@/lib/queries"
+import { keys, useOverview, useSetupState, useStatus, type ActivityType, type Overview } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
-type ActivityType = "notification" | "request" | "daily-pick" | "roundup"
-
-interface Overview {
-  jellyfin: { serverName: string; version: string; watching: boolean; url: string } | null
-  seerr: { version: string | null; url: string } | null
-  discord: { botTag: string; botAvatar: string; serverName: string | null; serverIcon: string | null; memberCount: number | null; ping: number | null } | null
-  requestCounts: { total: number; movie: number; tv: number; pending: number; approved: number; declined: number; processing: number; available: number } | null
-  activity: {
-    recent: { at: number; type: ActivityType; title: string | null; detail: string | null; user: string | null }[]
-    week: Partial<Record<ActivityType, number>>
-  }
-}
 
 interface SeerrRequest {
   id: number
@@ -50,7 +38,7 @@ export function OverviewPage() {
   const [busy, setBusy] = useState(false)
   const s = status.data
   const incomplete = setup && (!setup.jellyfin || !setup.seerr || !setup.discord || !setup.discordServer)
-  const overview = useQuery({ queryKey: keys.overview, queryFn: () => api.get<Overview>("/overview"), refetchInterval: 30_000 })
+  const overview = useOverview()
   const o = overview.data
 
   async function toggleBot() {

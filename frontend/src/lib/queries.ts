@@ -35,6 +35,22 @@ export const useConfig = () => useQuery({ queryKey: keys.config, queryFn: () => 
 export const useDiscordSetup = () =>
   useQuery({ queryKey: keys.discord, staleTime: 30_000, queryFn: () => api.get<DiscordSetup & { success: boolean }>("/setup/discord") })
 
+export type ActivityType = "notification" | "request" | "daily-pick" | "roundup"
+
+export interface Overview {
+  jellyfin: { serverName: string; version: string; watching: boolean; url: string } | null
+  seerr: { version: string | null; url: string } | null
+  discord: { botTag: string; botAvatar: string; serverName: string | null; serverIcon: string | null; memberCount: number | null; ping: number | null } | null
+  requestCounts: { total: number; movie: number; tv: number; pending: number; approved: number; declined: number; processing: number; available: number } | null
+  activity: {
+    recent: { at: number; type: ActivityType; title: string | null; detail: string | null; user: string | null }[]
+    week: Partial<Record<ActivityType, number>>
+  }
+}
+
+/** Live server info; jellyfin or seerr is null when that server does not answer. */
+export const useOverview = () => useQuery({ queryKey: keys.overview, queryFn: () => api.get<Overview>("/overview"), refetchInterval: 30_000 })
+
 /** Text channels and threads the bot can post in (needs the bot to be online). */
 export function useChannels(guildId: string | undefined) {
   return useQuery({

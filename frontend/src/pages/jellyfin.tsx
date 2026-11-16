@@ -6,7 +6,7 @@ import { PageHeader, Section } from "@/components/settings"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useT } from "@/lib/i18n"
-import { keys, useConfig, useLibraries, useSetupState, useStatus } from "@/lib/queries"
+import { keys, useConfig, useLibraries, useOverview, useSetupState, useStatus } from "@/lib/queries"
 import { JellyfinStep } from "@/pages/setup"
 
 export function JellyfinPage() {
@@ -14,6 +14,7 @@ export function JellyfinPage() {
   const config = useConfig().data
   const setup = useSetupState().data
   const status = useStatus().data
+  const overview = useOverview().data
   const libraries = useLibraries()
   const client = useQueryClient()
   const [editing, setEditing] = useState(false)
@@ -27,7 +28,7 @@ export function JellyfinPage() {
         <Section title={t("Connection")}>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="font-medium">{url}</span>
-            <Badge variant="outline">{status?.jellyfinConnected ? t("Watching for new items") : t("Not connected")}</Badge>
+            <Badge variant="outline">{overview && !overview.jellyfin ? t("Not reachable") : status?.jellyfinConnected ? t("Watching for new items") : t("Not watching for new items")}</Badge>
             <Button variant="outline" size="sm" className="ml-auto" onClick={() => setEditing(!editing)}>
               {editing ? t("Cancel") : t("Change connection")}
             </Button>

@@ -3,15 +3,17 @@ import { useState } from "react"
 import { toast } from "sonner"
 
 import { PageHeader, Section } from "@/components/settings"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useT } from "@/lib/i18n"
-import { keys, useConfig, useSetupState } from "@/lib/queries"
+import { keys, useConfig, useOverview, useSetupState } from "@/lib/queries"
 import { SeerrStep } from "@/pages/setup"
 
 export function SeerrPage() {
   const { t } = useT()
   const config = useConfig().data
   const setup = useSetupState().data
+  const overview = useOverview().data
   const client = useQueryClient()
   const [editing, setEditing] = useState(false)
   const url = config?.SEERR_URL as string | undefined
@@ -25,6 +27,7 @@ export function SeerrPage() {
         <Section title={t("Connection")}>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="font-medium">{url}</span>
+            {overview && <Badge variant="outline">{overview.seerr ? t("Connected") : t("Not reachable")}</Badge>}
             <Button variant="outline" size="sm" className="ml-auto" onClick={() => setEditing(!editing)}>
               {editing ? t("Cancel") : t("Change connection")}
             </Button>

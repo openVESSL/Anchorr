@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle } from "lucide-react"
+import { AlertCircle, CheckCircle2, Circle } from "lucide-react"
 import { Link, useLocation } from "react-router"
 
 import { Logo } from "@/components/logo"
@@ -16,12 +16,14 @@ import {
 } from "@/components/ui/sidebar"
 import { useT } from "@/lib/i18n"
 import { PAGE_ICONS } from "@/lib/nav"
-import { useSetupState } from "@/lib/queries"
+import { useOverview, useSetupState } from "@/lib/queries"
 
 interface Item {
   to: string
   label: string
   done?: boolean
+  /** Set up, but the server does not answer */
+  down?: boolean
 }
 
 export function AppSidebar() {
@@ -29,14 +31,15 @@ export function AppSidebar() {
   const { pathname } = useLocation()
   const { setOpenMobile } = useSidebar()
   const setup = useSetupState().data
+  const overview = useOverview().data
 
   const groups: { label?: string; items: Item[] }[] = [
     { items: [{ to: "/", label: t("Overview") }] },
     {
       label: t("Connections"),
       items: [
-        { to: "/jellyfin", label: "Jellyfin", done: setup?.jellyfin },
-        { to: "/seerr", label: "Seerr", done: setup?.seerr },
+        { to: "/jellyfin", label: "Jellyfin", done: setup?.jellyfin, down: Boolean(setup?.jellyfin && overview && !overview.jellyfin) },
+        { to: "/seerr", label: "Seerr", done: setup?.seerr, down: Boolean(setup?.seerr && overview && !overview.seerr) },
         { to: "/discord", label: "Discord", done: setup?.discord && setup?.discordServer },
       ],
     },
@@ -83,7 +86,9 @@ export function AppSidebar() {
                         <Icon />
                         <span>{item.label}</span>
                         {item.done !== undefined &&
-                          (item.done ? (
+                          (item.down ? (
+                            <AlertCircle className="text-warning ml-auto size-4" aria-label={t("Not reachable")} />
+                          ) : item.done ? (
                             <CheckCircle2 className="text-success ml-auto size-4" aria-label={t("Connected")} />
                           ) : (
                             <Circle className="text-muted-foreground ml-auto size-4" aria-label={t("Not connected")} />

@@ -108,6 +108,7 @@ export function UsersPage() {
 
       <Section title={t("Add a link")}>
         {!botRunning && <p className="text-muted-foreground text-sm">{t("Start the bot to list your Discord members.")}</p>}
+        {seerrUsers.isError && <p className="text-muted-foreground text-sm">{t("Could not reach Seerr.")}</p>}
         {members.data?.warning && <p className="text-warning text-sm">{t("Turn on Server Members Intent in the Discord Developer Portal to see every member.")}</p>}
         <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
           <div className="space-y-2">
