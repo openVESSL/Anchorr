@@ -37,7 +37,7 @@ While working on the dashboard, run Anchorr with `npm start` and the dashboard d
 | --- | --- |
 | `app.js` | Web server setup and startup |
 | `routes/` | Dashboard API (auth, setup, configuration, tests, logs) |
-| `bot/` | Discord bot: commands, buttons, embeds, daily pick, weekly roundup, guest account |
+| `bot/` | Discord bot: embeds, daily pick, weekly roundup, guest account. `interactions.js` checks roles and routes each interaction to `interactions/` (commands, autocomplete, request buttons, season and tag pickers) |
 | `jellyfin/` | Jellyfin feed (poll every minute, WebSocket for the connection status) and turning new items into Discord announcements: library routing, dedup and episode grouping (`itemHandler.js`), the post itself (`notificationEmbed.js`, `notificationSender.js`) |
 | `api/` | Clients for Seerr, Jellyfin, Discord and Seerr metadata |
 | `utils/` | Settings, config file, logging, HTTP client, auth, validation |

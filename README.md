@@ -30,7 +30,7 @@ Anchorr connects three things you already run: **Jellyfin**, **Seerr** and a **D
 
 **New content announcements**
 
-- Movies, shows, seasons and episodes, each switchable and routable to its own channel
+- Movies, shows, seasons and episodes, each switchable and routable to its own channel, usually posted within a minute of Jellyfin adding them
 - Episodes that arrive together are grouped into one message
 - Per-library channels, and libraries marked as anime use their own default quality profile
 - Quality upgrades from Sonarr and Radarr are not announced again
@@ -49,7 +49,7 @@ Anchorr connects three things you already run: **Jellyfin**, **Seerr** and a **D
 - Overview with your servers, Seerr request counts, the latest requests (approve or decline them) and recent bot activity
 - Sign in with your Jellyfin administrator account, or an optional local account
 - All four [Catppuccin](https://catppuccin.com) flavors with a choice of accent color (Macchiato by default)
-- English, German, French and Swedish (the bot and the dashboard)
+- English, German, French and Swedish for the dashboard and every bot message; titles, overviews and genres come in the bot's language when TMDB has a translation
 
 ## Requirements
 
