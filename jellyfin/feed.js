@@ -30,6 +30,8 @@ const MAX_RECONNECT_DELAY_MS = 60_000;
 const RECENT_DISPATCH_LIMIT = 2000;
 const NEVER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const CURSOR_KEY = "cursor";
+// Items still waiting for metadata live only in memory: after a restart, look back this far
+const RESTART_LOOKBACK_MS = METADATA_WAIT_MS * MAX_METADATA_ATTEMPTS + POLL_INTERVAL_MS;
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -100,6 +102,7 @@ export class JellyfinFeed {
     this.timers = new Set();
     this.queueTimer = null;
     this.reconnectAttempts = 0;
+    this.caughtUp = false; // the first poll of a run looks back past the cursor
   }
 
   start() {
@@ -175,7 +178,12 @@ export class JellyfinFeed {
         const everyMs = Math.max(5, Number(message.Data) || 60) * 500;
         keepAlive = this.every(everyMs, () => ws.readyState === 1 && ws.send(JSON.stringify({ MessageType: "KeepAlive" })));
       } else if (message.MessageType === "LibraryChanged") {
-        const data = typeof message.Data === "string" ? JSON.parse(message.Data) : message.Data;
+        let data = message.Data;
+        try {
+          if (typeof data === "string") data = JSON.parse(data);
+        } catch {
+          return; // the catch-up poll still finds the items
+        }
         for (const id of data?.ItemsAdded || []) this.enqueue(id);
       }
     });
@@ -300,18 +308,23 @@ export class JellyfinFeed {
       return;
     }
     try {
+      const cursorMs = Date.parse(cursor);
+      // Already announced items found again are dropped by the notification dedup
+      const sinceMs = this.caughtUp ? cursorMs : cursorMs - RESTART_LOOKBACK_MS;
       const { items, complete } = await fetchRecentlyAdded(
         settings.JELLYFIN_API_KEY,
         settings.JELLYFIN_BASE_URL,
         200,
-        cursor
+        new Date(sinceMs).toISOString()
       );
-      const cursorMs = Date.parse(cursor);
+      this.caughtUp = true;
       let newest = cursorMs;
+      let found = false;
       for (const item of items) {
         const created = Date.parse(item.DateCreated);
-        if (!NOTIFY_TYPES.has(item.Type) || !(created > cursorMs)) continue;
+        if (!NOTIFY_TYPES.has(item.Type) || !(created > sinceMs)) continue;
         this.enqueue(item.Id);
+        found = true;
         newest = Math.max(newest, created);
       }
       if (complete && newest > cursorMs) {
@@ -319,7 +332,7 @@ export class JellyfinFeed {
         this.state.flush();
       }
       // Already identified items go out now; the others wait for Jellyfin as usual
-      if (newest > cursorMs) await this.processQueue();
+      if (found) await this.processQueue();
     } catch (err) {
       logger.warn(`Jellyfin feed: catch-up poll failed: ${err.message}`);
     }

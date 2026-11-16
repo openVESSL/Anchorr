@@ -139,6 +139,34 @@ test("catch-up poll: first start announces nothing old, later polls send only ne
   assert.equal(state.get("cursor"), "2026-11-15T10:00:00.000Z");
 });
 
+test("after a restart the first poll looks back, so items still waiting for metadata are not lost", async (t) => {
+  // cursor already moved past m1 (queued, then Anchorr restarted before it was sent)
+  const state = memoryState({ cursor: "2026-11-15T10:00:00.000Z" });
+  const dispatched = [];
+  const feed = new JellyfinFeed({ dispatch: async (p) => dispatched.push(p.ItemId), state });
+  t.after(() => feed.stop());
+  feed.running = true;
+  recent = [MOVIE];
+  items = { m1: MOVIE };
+
+  await feed.poll();
+  assert.deepEqual(dispatched, ["m1"]);
+  feed.recentlyDispatched.clear();
+  await feed.poll();
+  assert.deepEqual(dispatched, ["m1"], "later polls of the same run start at the cursor");
+});
+
+test("a LibraryChanged message with unreadable data is ignored", async (t) => {
+  const feed = new JellyfinFeed({ dispatch: async () => {}, state: memoryState({ cursor: new Date().toISOString() }) });
+  t.after(() => feed.stop());
+  const before = sockets.length;
+  feed.start();
+  await until(() => sockets.length === before + 1, "connection");
+  sockets.at(-1).socket.send(JSON.stringify({ MessageType: "LibraryChanged", Data: "{not json" }));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(feed.pending.size, 0);
+});
+
 test("stop closes the connection and does not reconnect", async (t) => {
   const feed = new JellyfinFeed({ dispatch: async () => {}, state: memoryState({ cursor: new Date().toISOString() }) });
   const before = sockets.length;
