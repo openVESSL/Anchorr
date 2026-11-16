@@ -53,6 +53,7 @@ Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Je
 - Requests from Discord no longer bypass Seerr approvals, quotas or permission checks, and members can no longer pick a 4K server or quality profile Seerr would not allow them.
 - A fresh install can only be claimed by proving Jellyfin administrator access. The local account can only be added from a signed-in session.
 - Failed HTTP requests no longer write API keys (`X-Api-Key`, `Authorization`) into the log files.
+- Calls to Jellyfin, Seerr and Discord follow redirects only on the same host, so a redirect can never carry the API key to another server.
 - Settings saved from the dashboard can no longer set arbitrary environment variables such as `NODE_TLS_REJECT_UNAUTHORIZED`.
 - Failed sign-ins lock per address and username, so nobody can lock the administrator out from elsewhere.
 - Signing out is remembered across restarts.

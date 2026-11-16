@@ -25,6 +25,32 @@ function withParams(url, params) {
   return `${url}${url.includes("?") ? "&" : "?"}${query}`;
 }
 
+const MAX_REDIRECTS = 5;
+
+/**
+ * fetch, following redirects only on the same host (http -> https, a moved path). Requests
+ * carry API keys in their headers, and fetch would send them along to any other host a
+ * server redirects to.
+ */
+async function fetchSameHost(url, init) {
+  let target = new URL(url);
+  for (let hops = 0; ; hops++) {
+    const res = await fetch(target, { ...init, redirect: "manual" });
+    const location = res.status >= 300 && res.status < 400 && res.headers.get("location");
+    if (!location) return res;
+    const next = new URL(location, target);
+    if (next.hostname !== target.hostname) {
+      throw new HttpError(`Refused a redirect from ${target.host} to another host (${next.host})`, { code: "EREDIRECT" });
+    }
+    if (hops >= MAX_REDIRECTS) throw new HttpError("Too many redirects", { code: "EREDIRECT" });
+    // Like browsers: 301/302/303 turn a POST into a GET without a body
+    if (res.status === 303 || ((res.status === 301 || res.status === 302) && init.method === "POST")) {
+      init = { ...init, method: "GET", body: undefined };
+    }
+    target = next;
+  }
+}
+
 export async function request({ method = "GET", url, params, data, headers = {}, timeout = 8000 }) {
   const init = {
     method: method.toUpperCase(),
@@ -40,8 +66,9 @@ export async function request({ method = "GET", url, params, data, headers = {},
 
   let res;
   try {
-    res = await fetch(withParams(url, params), init);
+    res = await fetchSameHost(withParams(url, params), init);
   } catch (err) {
+    if (err instanceof HttpError) throw err;
     const code = err?.name === "TimeoutError" ? "ETIMEDOUT" : err?.cause?.code || err?.code || "ENETWORK";
     throw new HttpError(`Request failed: ${code}`, { code });
   }

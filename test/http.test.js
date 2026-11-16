@@ -34,6 +34,27 @@ test("HTTP errors expose status and body, never the request headers", async () =
   assert.doesNotMatch(JSON.stringify(err), /SECRET/);
 });
 
+test("redirects are followed on the same host, never to another one with the API key", async () => {
+  const other = await startFakeServer({ "GET /steal": ({ headers }) => ({ key: headers["x-api-key"] }) });
+  const hop = await startFakeServer({
+    "GET /moved": () => ({ status: 301, headers: { location: "/ok" }, json: {} }),
+    "GET /ok": ({ headers }) => ({ key: headers["x-api-key"] }),
+    // same port on another host name: a different server as far as the key is concerned
+    "GET /away": () => ({ status: 302, headers: { location: other.url.replace("127.0.0.1", "localhost") + "/steal" }, json: {} }),
+  });
+  try {
+    const followed = await http.get(`${hop.url}/moved`, { headers: { "X-Api-Key": "SECRET" } });
+    assert.equal(followed.data.key, "SECRET");
+
+    const refused = await http.get(`${hop.url}/away`, { headers: { "X-Api-Key": "SECRET" } }).catch((e) => e);
+    assert.equal(refused.code, "EREDIRECT");
+    assert.equal(other.requests.length, 0, "the other host never saw the key");
+  } finally {
+    await hop.close();
+    await other.close();
+  }
+});
+
 test("network failures carry a code", async () => {
   const probe = net.createServer();
   await new Promise((resolve) => probe.listen(0, "127.0.0.1", resolve));
