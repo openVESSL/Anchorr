@@ -150,3 +150,20 @@ test("stop closes the connection and does not reconnect", async (t) => {
   assert.equal(feed.ws, null);
   t.after(() => feed.stop());
 });
+
+test("a failed page keeps the items already fetched and reports the fetch as incomplete", async () => {
+  const { fetchRecentlyAdded } = await import("../api/jellyfin.js");
+  const jf = await startFakeServer({
+    "GET /Items": ({ url }) =>
+      url.searchParams.get("StartIndex") === "0"
+        ? { Items: [{ ...MOVIE, DateCreated: new Date().toISOString() }] }
+        : { status: 500, json: {} },
+  });
+  try {
+    const result = await fetchRecentlyAdded("key", jf.url, 1, new Date(Date.now() - 86_400_000).toISOString());
+    assert.equal(result.complete, false);
+    assert.equal(result.items.length, 1);
+  } finally {
+    await jf.close();
+  }
+});

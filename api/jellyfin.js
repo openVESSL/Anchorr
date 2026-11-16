@@ -1,4 +1,4 @@
-import http from "../utils/http.js";
+import http, { HttpError } from "../utils/http.js";
 import { createRequire } from "module";
 import logger from "../utils/logger.js";
 
@@ -377,7 +377,7 @@ export async function fetchRecentlyAdded(
         }
         page = body.Items;
       } catch (err) {
-        if (!err?.isAxiosError) throw err;
+        if (!(err instanceof HttpError)) throw err;
         logger.warn(
           `fetchRecentlyAdded: page at StartIndex=${startIndex} failed (${err?.message || err}); returning ${collected.length} items collected so far (incomplete)`
         );
