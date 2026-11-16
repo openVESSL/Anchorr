@@ -239,6 +239,33 @@ test("/request movie: if showing the result fails after the request went through
   });
 });
 
+test("/request movie in private mode: a failed result display still confirms the request", async (t) => {
+  configure(t, { PRIVATE_MESSAGE_MODE: "true" });
+  t.mock.method(logger, "error", () => {});
+  const interaction = command("request", { title: "603|movie" });
+  const edits = [];
+  interaction.editReply = async (payload) => {
+    edits.push(payload);
+    if (payload.embeds) throw new Error("Invalid Form Body");
+  };
+  await dispatch(interaction);
+  assert.equal(edits.at(-1).content, translate("replies.pick_requested", { title: "The Matrix" }));
+});
+
+test("/search: when Discord refuses the result, the member gets a generic error, not a Seerr error", async (t) => {
+  const errors = t.mock.method(logger, "error", () => {});
+  const interaction = command("search", { title: "603|movie" });
+  interaction.editReply = async () => {
+    throw new Error("Invalid Form Body");
+  };
+  const calls = await dispatch(interaction);
+  assert.deepEqual(calls.at(-1), { method: "followUp", content: translate("replies.unexpected"), flags: 64 });
+  const logged = errors.mock.calls.find((c) => /could not show the result/i.test(String(c.arguments[0])));
+  assert.ok(logged);
+  assert.doesNotMatch(logged.arguments[0], /Matrix/, "the title is an argument, never part of the format string");
+  assert.ok(logged.arguments.every((a) => typeof a === "string"), "only the error message is logged, not the error object");
+});
+
 test("/request TV: requests nothing yet and opens the season picker", async () => {
   const before = posts().length;
   const calls = await dispatch(command("request", { title: "1399|tv" }));

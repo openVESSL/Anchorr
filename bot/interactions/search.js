@@ -78,7 +78,9 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
     return;
   }
 
-  let requestedTitle = null; // set once Seerr accepted the request
+  let requested = false; // Seerr accepted the request
+  let showingResult = false; // Seerr calls are done, only Discord is left
+  let title = null;
   try {
     const [tmdbId, mediaType] = await findTitle(rawInput);
     if (!tmdbId || !mediaType) {
@@ -87,6 +89,7 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
     }
 
     const details = await metadata.getDetails(tmdbId, mediaType);
+    title = details.title || details.name || null;
 
     // TV shows go through the season picker instead of requesting every season at once
     const instantRequest = mode === "request" && mediaType !== "tv";
@@ -105,7 +108,7 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
         tagIds: await tagIdsFor(tags, mediaType),
         options,
       });
-      requestedTitle = details.title || details.name;
+      requested = true;
     }
 
     const imdbId = await metadata.getImdbId(tmdbId, mediaType);
@@ -134,12 +137,19 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
       if (tagRow) components.push(tagRow);
     }
 
+    showingResult = true;
     await interaction.editReply({ embeds: [embed], components });
   } catch (err) {
-    if (requestedTitle) {
-      // Only showing the result failed: reporting a failed request would invite a duplicate
-      logger.error(`Requested "${requestedTitle}", but could not show the result:`, err);
-      await replyPrivately(interaction, t("replies.pick_requested", { title: requestedTitle }));
+    if (requested) {
+      // Reporting a failed request here would invite a duplicate
+      // Title and error stay arguments: a "%o" in a title must not expand the error object
+      logger.error("Requested %s, but could not show the result: %s", JSON.stringify(title), err.message);
+      await replyPrivately(interaction, t("replies.pick_requested", { title: title ?? rawInput }));
+      return;
+    }
+    if (showingResult) {
+      logger.error("Could not show the result for %s: %s", JSON.stringify(title), err.message);
+      await replyPrivately(interaction, t("replies.unexpected"));
       return;
     }
     logger.error("Error in handleSearchOrRequest:", err);
