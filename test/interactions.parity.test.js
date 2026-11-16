@@ -18,6 +18,7 @@ const MOVIES = {
   },
   604: { id: 604, title: "Already Here", releaseDate: "2003-05-15", overview: "x", runtime: 100, genres: [], originalLanguage: "en", mediaInfo: { status: 5 } },
   605: { id: 605, title: "Over Quota", releaseDate: "2003-11-05", overview: "x", runtime: 100, genres: [], originalLanguage: "en", mediaInfo: null },
+  606: { id: 606, title: "Spirited Away", releaseDate: "2001-07-20", overview: "x", runtime: 125, genres: [{ id: 16, name: "Animation" }], originalLanguage: "ja", mediaInfo: null },
 };
 const SHOWS = {
   1399: {
@@ -125,7 +126,7 @@ test("/search movie: shows details with a Request button and a Radarr tag picker
     ["Request", "request_btn|603|movie||", false],
   ]);
   const tagMenu = calls[1].components[1].components[0];
-  assert.equal(tagMenu.custom_id, "select_tags|603|");
+  assert.equal(tagMenu.custom_id, "select_tags|603||movie");
   assert.deepEqual(tagMenu.options.map(({ label, value }) => ({ label, value })), [{ label: "kids", value: "3" }]);
   assert.equal(posts().length, before);
 });
@@ -224,10 +225,18 @@ test("picking a season enables the Request button for that season", async () => 
   );
   assert.deepEqual(calls.map((c) => c.method), ["deferUpdate", "editReply"]);
   assert.deepEqual(buttons(calls[1]).at(-1), ["Request season 1", "request_btn|1399|tv|1|", false]);
-  // v1 also lists Radarr tags here (known bug, fixed in v2): only check the Sonarr tag and the customId.
+  // v1 also listed Radarr tags here, which a show request then dropped
   const tagMenu = calls[1].components[2].components[0];
-  assert.equal(tagMenu.custom_id, "select_tags|1399|1");
-  assert.ok(tagMenu.options.some((o) => o.label === "anime"));
+  assert.equal(tagMenu.custom_id, "select_tags|1399|1|tv");
+  assert.deepEqual(tagMenu.options.map((o) => o.label), ["anime"]);
+});
+
+test("the tag picker keeps the media type, also for a show without chosen seasons", async () => {
+  const select = (customId) =>
+    createInteraction({ type: "select", customId, values: ["7"], messageComponents: [{ components: [{ customId, options: [] }] }] });
+  const detailsFetched = () => seerr.requests.filter((r) => r.method === "GET" && /^\/api\/v1\/(tv|movie)\/1399$/.test(r.path)).at(-1)?.path;
+  await dispatch(select("select_tags|1399||tv"));
+  assert.equal(detailsFetched(), "/api/v1/tv/1399", "v1 treated it as movie 1399");
 });
 
 test("Request button for chosen seasons requests exactly those seasons", async () => {
@@ -254,6 +263,16 @@ test("Daily Random Pick button requests the title and confirms privately", async
   const calls = await dispatch(button("request_random_603_movie"));
   assert.deepEqual(lastPost().body, { mediaType: "movie", mediaId: 603 });
   assert.deepEqual(calls.at(-1), { method: "followUp", content: "✅ **The Matrix** has been requested!", flags: 64 });
+});
+
+test("Daily Random Pick: a show asks for its seasons explicitly, like /request", async () => {
+  await dispatch(button("request_random_1399_tv"));
+  assert.deepEqual(lastPost().body.seasons, [1, 2], "v1 sent 'all'; specials stay out");
+});
+
+test("Daily Random Pick: anime is requested as anime, like /request", async () => {
+  await dispatch(button("request_random_606_movie"));
+  assert.equal(lastPost().body.isAnime, true);
 });
 
 // ----- autocomplete -----

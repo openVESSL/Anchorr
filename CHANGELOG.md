@@ -41,6 +41,12 @@ Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Je
 - Smaller install: axios, lodash.debounce and node-cache were replaced by built-in Node.js features.
 - The Docker image listens on all interfaces by default and builds the dashboard in its own stage.
 
+### Fixed
+
+- The tag picker for shows only lists Sonarr tags. A Radarr tag picked for a show used to be dropped from the request.
+- Picking tags for a show without chosen seasons no longer treats it as a movie.
+- Requests from the daily pick use the anime server and quality profile for anime, and ask for a show's seasons explicitly, the same as `/request`.
+
 ### Security
 
 - Requests from Discord no longer bypass Seerr approvals, quotas or permission checks, and members can no longer pick a 4K server or quality profile Seerr would not allow them.

@@ -31,6 +31,18 @@ export function getOptionStringRobust(
   return null;
 }
 
+/** Anime: the Animation genre (TMDB id 16) and Japanese as the original language. */
+export function isAnimeTitle(details) {
+  return Array.isArray(details?.genres) && details.genres.some((g) => g.id === 16) && details.original_language === "ja";
+}
+
+/** Seerr requests: "all" becomes the explicit season list (specials excluded) when known. */
+export function explicitSeasons(seasons, details) {
+  if (!seasons?.includes("all")) return seasons;
+  const numbers = (details?.seasons ?? []).filter((s) => s.season_number > 0).map((s) => s.season_number);
+  return numbers.length > 0 ? numbers : seasons;
+}
+
 export function parseQualityAndServerOptions(options, mediaType, isAnime = false) {
   let profileId = null;
   let serverId = null;

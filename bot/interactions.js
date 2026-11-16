@@ -7,6 +7,8 @@ import {
   getOptionStringRobust,
   parseQualityAndServerOptions,
   checkRolePermission,
+  explicitSeasons,
+  isAnimeTitle,
 } from "./botUtils.js";
 import {
   botState,
@@ -201,11 +203,7 @@ async function handleSearchOrRequest(
         }
       }
 
-      // Detect anime: Animation genre (id 16) + Japanese origin
-      const isAnime =
-        Array.isArray(details.genres) &&
-        details.genres.some((g) => g.id === 16) &&
-        details.original_language === "ja";
+      const isAnime = isAnimeTitle(details);
       if (isAnime) logger.info(`[REQUEST] Detected anime content: ${tmdbId}`);
 
       const { profileId, serverId } = parseQualityAndServerOptions(
@@ -214,19 +212,7 @@ async function handleSearchOrRequest(
         isAnime
       );
 
-      let seasonsToRequest = ["all"];
-      if (mediaType === "tv" && details.seasons) {
-        const seasonNumbers = details.seasons
-          .filter((s) => s.season_number > 0)
-          .map((s) => s.season_number);
-
-        if (seasonNumbers.length > 0) {
-          seasonsToRequest = seasonNumbers;
-          logger.info(
-            `[REQUEST] Resolved 'all' seasons to explicit list: ${seasonsToRequest.join(", ")}`
-          );
-        }
-      }
+      const seasonsToRequest = mediaType === "tv" ? explicitSeasons(["all"], details) : ["all"];
 
       await seerrApi.sendRequest({
         tmdbId,
@@ -327,7 +313,7 @@ async function handleSearchOrRequest(
           }));
 
           const tagMenu = new StringSelectMenuBuilder()
-            .setCustomId(`select_tags|${tmdbId}|`)
+            .setCustomId(`select_tags|${tmdbId}||movie`)
             .setPlaceholder("Select tags (optional)")
             .addOptions(tagOptions)
             .setMinValues(0)
@@ -734,37 +720,12 @@ export function registerInteractions(client) {
             return;
           }
 
-          let seasonsToRequest =
+          const seasonsToRequest =
             mediaType === "movie"
               ? undefined
-              : selectedSeasons.length > 0
-                ? selectedSeasons
-                : ["all"];
+              : explicitSeasons(selectedSeasons.length > 0 ? selectedSeasons : ["all"], details);
 
-          if (
-            mediaType === "tv" &&
-            (seasonsToRequest.includes("all") ||
-              (Array.isArray(seasonsToRequest) &&
-                seasonsToRequest[0] === "all"))
-          ) {
-            if (details.seasons) {
-              const seasonNumbers = details.seasons
-                .filter((s) => s.season_number > 0)
-                .map((s) => s.season_number);
-              if (seasonNumbers.length > 0) {
-                seasonsToRequest = seasonNumbers;
-                logger.info(
-                  `[REQUEST BTN] Resolved 'all' seasons to explicit list: ${seasonsToRequest.join(", ")}`
-                );
-              }
-            }
-          }
-
-          // Detect anime: Animation genre (id 16) + Japanese origin
-          const isAnime =
-            Array.isArray(details.genres) &&
-            details.genres.some((g) => g.id === 16) &&
-            details.original_language === "ja";
+          const isAnime = isAnimeTitle(details);
           if (isAnime) logger.info(`[REQUEST BTN] Detected anime content: ${tmdbId}`);
 
           const { profileId, serverId } = parseQualityAndServerOptions(
@@ -1023,11 +984,13 @@ export function registerInteractions(client) {
                 getSeerrApiKey()
               );
 
-              if (tags && tags.length > 0) {
+              // A show only takes Sonarr tags; a Radarr tag would be dropped on request
+              const sonarrTags = Array.isArray(tags) ? tags.filter((tag) => tag.type === "sonarr") : [];
+              if (sonarrTags.length > 0) {
                 const uniqueTags = [];
                 const seenIds = new Set();
 
-                for (const tag of tags) {
+                for (const tag of sonarrTags) {
                   if (!seenIds.has(tag.id)) {
                     seenIds.add(tag.id);
                     uniqueTags.push(tag);
@@ -1041,7 +1004,7 @@ export function registerInteractions(client) {
 
                 const tagMenu = new StringSelectMenuBuilder()
                   .setCustomId(
-                    `select_tags|${tmdbId}|${allSelectedSeasons.join(",")}`
+                    `select_tags|${tmdbId}|${allSelectedSeasons.join(",")}|tv`
                   )
                   .setPlaceholder("Select tags (optional)")
                   .addOptions(tagOptions)
@@ -1112,18 +1075,17 @@ export function registerInteractions(client) {
 
         try {
           const details = await metadata.getDetails(tmdbId, mediaType);
-
-          const { profileId, serverId } = parseQualityAndServerOptions(
-            {},
-            mediaType
-          );
+          // Same defaults as /request: anime goes to the anime server and profile
+          const isAnime = isAnimeTitle(details);
+          const { profileId, serverId } = parseQualityAndServerOptions({}, mediaType, isAnime);
 
           await seerrApi.sendRequest({
             tmdbId,
             mediaType,
-            seasons: mediaType === "tv" ? ["all"] : undefined,
+            seasons: mediaType === "tv" ? explicitSeasons(["all"], details) : undefined,
             profileId,
             serverId,
+            isAnime,
             seerrUrl: getSeerrUrl(),
             apiKey: getSeerrApiKey(),
             discordUserId: interaction.user.id,
@@ -1155,7 +1117,7 @@ export function registerInteractions(client) {
       }
 
       // ===== SELECT TAGS HANDLER =====
-      // customId format: select_tags|tmdbId|selectedSeasonsParam
+      // customId format: select_tags|tmdbId|selectedSeasonsParam|mediaType
       if (
         interaction.isStringSelectMenu() &&
         interaction.customId.startsWith("select_tags|")
@@ -1178,7 +1140,8 @@ export function registerInteractions(client) {
         await interaction.deferUpdate();
 
         try {
-          const mediaType = selectedSeasons.length > 0 ? "tv" : "movie";
+          // Menus posted before 2.0 carry no type: those only had seasons for shows
+          const mediaType = ["movie", "tv"].includes(parts[3]) ? parts[3] : selectedSeasons.length > 0 ? "tv" : "movie";
 
           const details = await metadata.getDetails(tmdbId, mediaType);
           const imdbId = await metadata.getImdbId(tmdbId, mediaType);
