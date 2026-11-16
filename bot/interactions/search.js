@@ -36,15 +36,26 @@ export async function handleCommand(interaction) {
   }
 }
 
-/** In public mode the thinking reply is replaced by a private message. */
+/**
+ * In public mode the thinking reply is replaced by a private message. Logs instead of
+ * throwing when Discord refuses it, so a Discord error is never shown as a Seerr error.
+ */
 async function replyPrivately(interaction, content) {
-  if (isPrivateMode()) return interaction.editReply({ content, components: [], embeds: [] });
   try {
-    await interaction.deleteReply();
-  } catch {
-    // already deleted
+    if (isPrivateMode()) {
+      await interaction.editReply({ content, components: [], embeds: [] });
+      return;
+    }
+    try {
+      await interaction.deleteReply();
+    } catch (err) {
+      // 10008 Unknown Message: already deleted
+      if (err.code !== 10008) logger.warn(`Could not delete the thinking reply: ${err.message}`);
+    }
+    await interaction.followUp({ content, flags: 64 });
+  } catch (err) {
+    logger.error(`Could not send a private reply to user ${interaction.user.id}: ${err.message}`);
   }
-  return interaction.followUp({ content, flags: 64 });
 }
 
 async function findTitle(rawInput) {
@@ -69,7 +80,10 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
 
   try {
     const [tmdbId, mediaType] = await findTitle(rawInput);
-    if (!tmdbId || !mediaType) return replyPrivately(interaction, t("replies.invalid_title"));
+    if (!tmdbId || !mediaType) {
+      await replyPrivately(interaction, t("replies.invalid_title"));
+      return;
+    }
 
     const details = await metadata.getDetails(tmdbId, mediaType);
 

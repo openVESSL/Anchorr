@@ -43,6 +43,8 @@ const { writeConfig } = await import("../utils/configFile.js");
 const { t: translate } = await import("../utils/i18n.js");
 const { registerInteractions } = await import("../bot/interactions.js");
 const { pendingRequests } = await import("../bot/botState.js");
+const { getSeerrErrorMessage } = await import("../bot/interactions/shared.js");
+const { default: logger } = await import("../utils/logger.js");
 
 let seerr;
 let dispatch;
@@ -180,6 +182,45 @@ test("/search by typed text while Seerr fails: the member gets an error instead 
     content: translate("seerr_request_errors.server_error"),
     flags: 64,
   });
+});
+
+test("a refused Seerr redirect is reported as unreachable, without Seerr's address", () => {
+  const err = Object.assign(new Error("Refused a redirect from http://seerr.lan:5055 to http://elsewhere"), { code: "EREDIRECT" });
+  assert.equal(getSeerrErrorMessage(err), translate("seerr_request_errors.unreachable"));
+});
+
+test("a failing Discord delete is logged, and the private answer still goes out", async (t) => {
+  const warnings = t.mock.method(logger, "warn", () => {});
+  const interaction = command("search", { title: "seerr is down" });
+  interaction.deleteReply = async () => {
+    throw Object.assign(new Error("Service Unavailable"), { code: 0 });
+  };
+  const calls = await dispatch(interaction);
+  assert.equal(calls.at(-1).method, "followUp");
+  assert.ok(warnings.mock.calls.some((c) => /thinking reply/.test(c.arguments[0])));
+});
+
+test("an already deleted thinking reply is not logged as a problem", async (t) => {
+  const warnings = t.mock.method(logger, "warn", () => {});
+  const interaction = command("search", { title: "seerr is down" });
+  interaction.deleteReply = async () => {
+    throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+  };
+  await dispatch(interaction);
+  assert.equal(warnings.mock.calls.some((c) => /thinking reply/.test(c.arguments[0])), false);
+});
+
+test("when Discord refuses the private answer, it is logged instead of shown as a Seerr error", async (t) => {
+  const errors = t.mock.method(logger, "error", () => {});
+  const interaction = command("request", { title: "604|movie" });
+  const sent = [];
+  interaction.followUp = async (payload) => {
+    sent.push(payload);
+    throw new Error("Missing Access");
+  };
+  await dispatch(interaction);
+  assert.equal(sent.length, 1, "no second, misleading error reply");
+  assert.ok(errors.mock.calls.some((c) => /private reply/.test(c.arguments[0])));
 });
 
 test("/request TV: requests nothing yet and opens the season picker", async () => {
