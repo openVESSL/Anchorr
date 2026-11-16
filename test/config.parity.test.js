@@ -8,6 +8,7 @@ import test from "node:test";
 import { CONFIG_PATH, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { MASKED_PREFIX, isMaskedValue, sanitizeConfigForClient } from "../utils/configSanitize.js";
 import { normalizeSeerrUrl } from "../utils/seerrUrl.js";
+import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
 import { configSchema } from "../utils/validation.js";
 
@@ -52,6 +53,13 @@ test("loaded config is readable through settings but never leaks into process.en
   assert.equal(process.env.SEERR_URL, undefined);
   assert.equal(process.env.NODE_TLS_REJECT_UNAUTHORIZED, undefined);
   assert.equal(settings.TRUST_PROXY, process.env.TRUST_PROXY, "deployment keys come from the environment only");
+});
+
+test("the Detailed logs switch in config.json sets the log level", () => {
+  writeConfig({ DEBUG: "true" });
+  assert.equal(logger.level, "debug");
+  writeConfig({ DEBUG: "false" });
+  assert.equal(logger.level, "info");
 });
 
 test("writing config refreshes settings without a reload", () => {

@@ -2,7 +2,13 @@ import fs from "fs";
 import path from "path";
 import logger from "./logger.js";
 import { configSchema } from "./validation.js";
-import { replaceSettings } from "./settings.js";
+import { replaceSettings as storeSettings, settings } from "./settings.js";
+
+// The "Detailed logs" switch lives in config.json, which never reaches process.env
+function replaceSettings(config) {
+  storeSettings(config);
+  logger.level = settings.DEBUG === "true" ? "debug" : "info";
+}
 
 // Fields that contain sensitive credentials and should be base64-encoded at rest
 const SENSITIVE_FIELDS = new Set([

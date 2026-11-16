@@ -13,10 +13,13 @@ import { settings } from "../utils/settings.js";
 
 let dailyRandomPickTimer = null;
 
+export function stopDailyRandomPick() {
+  clearInterval(dailyRandomPickTimer);
+  dailyRandomPickTimer = null;
+}
+
 export function scheduleDailyRandomPick(client) {
-  if (dailyRandomPickTimer) {
-    clearInterval(dailyRandomPickTimer);
-  }
+  stopDailyRandomPick();
 
   const enabled = settings.DAILY_RANDOM_PICK_ENABLED === "true";
   if (!enabled) return;

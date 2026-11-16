@@ -3,6 +3,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { setGuestAutoApprove } from "../api/seerr.js";
 import { restartBot, startBot } from "../bot/botManager.js";
+import { scheduleDailyRandomPick } from "../bot/dailyPick.js";
 import { botState } from "../bot/botState.js";
 import { authenticateToken } from "../utils/auth.js";
 import { loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
@@ -35,6 +36,8 @@ router.post(
     const oldGuildId = settings.GUILD_ID;
     const oldJellyfinApiKey = settings.JELLYFIN_API_KEY;
     const oldAutoApprove = settings.SEERR_AUTO_APPROVE;
+    const DAILY_PICK_KEYS = ["DAILY_RANDOM_PICK_ENABLED", "DAILY_RANDOM_PICK_CHANNEL_ID", "DAILY_RANDOM_PICK_INTERVAL"];
+    const oldDailyPick = DAILY_PICK_KEYS.map((k) => settings[k]).join("|");
 
     // Normalize SEERR_URL to remove /api/v1 suffix if present
     if (
@@ -125,6 +128,11 @@ router.post(
       oldToken !== settings.DISCORD_TOKEN ||
       oldGuildId !== settings.GUILD_ID ||
       jellyfinApiKeyChanged;
+
+    // A restart schedules the daily pick itself; otherwise apply its new settings now
+    if (botState.isBotRunning && !needsRestart && DAILY_PICK_KEYS.map((k) => settings[k]).join("|") !== oldDailyPick) {
+      scheduleDailyRandomPick(botState.discordClient);
+    }
 
     if (botState.isBotRunning && needsRestart) {
       logger.warn(

@@ -10,7 +10,7 @@ import { JellyfinFeed } from "../jellyfin/feed.js";
 import { handleJellyfinItem } from "../jellyfin/itemHandler.js";
 import { registerInteractions } from "./interactions.js";
 import { prepareGuestUser } from "./guestUser.js";
-import { scheduleDailyRandomPick } from "./dailyPick.js";
+import { scheduleDailyRandomPick, stopDailyRandomPick } from "./dailyPick.js";
 import { start as startRoundupScheduler, stop as stopRoundupScheduler } from "./roundupScheduler.js";
 import { loadSettings } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
@@ -118,6 +118,7 @@ async function startBotNow() {
 /** Disconnects the bot and stops its schedulers and the Jellyfin feed. */
 async function stopBotNow() {
   stopRoundupScheduler();
+  stopDailyRandomPick();
   botState.jellyfinFeed?.stop();
   botState.jellyfinFeed = null;
   const client = botState.discordClient;

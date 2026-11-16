@@ -222,7 +222,7 @@ router.get("/setup/discord", authenticateToken, async (req, res) => {
 });
 
 // Picks the server and (re)starts the bot so commands register there. Picking the server
-// the running bot already uses changes nothing.
+// the running bot already uses changes nothing, unless the bot token changed since it started.
 router.post("/setup/discord/server", setupLimiter, authenticateToken, async (req, res) => {
   const guildId = String(req.body?.guildId || "");
   if (!settings.DISCORD_TOKEN) return res.status(400).json({ success: false, message: "Add the bot token first" });
@@ -234,7 +234,7 @@ router.post("/setup/discord/server", setupLimiter, authenticateToken, async (req
   }
   const guild = guilds.find((g) => g.id === guildId);
   if (!guild) return res.status(400).json({ success: false, message: "The bot is not in that server yet. Invite it first." });
-  if (guildId === settings.GUILD_ID && botState.isBotRunning) {
+  if (guildId === settings.GUILD_ID && botState.isBotRunning && botState.discordClient?.token === settings.DISCORD_TOKEN) {
     return res.json({ success: true, guild, botRunning: true, unchanged: true });
   }
   if (!updateConfig({ GUILD_ID: guildId })) {
