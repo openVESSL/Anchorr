@@ -118,9 +118,10 @@ test("items without metadata wait, then go out anyway after a few tries", async 
   assert.equal(dispatched.length, 1);
 });
 
-test("catch-up poll: first start announces nothing old, later polls queue only newer items", async (t) => {
+test("catch-up poll: first start announces nothing old, later polls send only newer items at once", async (t) => {
   const state = memoryState();
-  const feed = new JellyfinFeed({ dispatch: async () => {}, state });
+  const dispatched = [];
+  const feed = new JellyfinFeed({ dispatch: async (p) => dispatched.push(p.ItemId), state });
   t.after(() => feed.stop());
   feed.running = true; // poll without opening a socket
 
@@ -131,8 +132,10 @@ test("catch-up poll: first start announces nothing old, later polls queue only n
 
   state.set("cursor", "2026-11-15T09:00:00.000Z");
   recent = [MOVIE, { ...MOVIE, Id: "old", DateCreated: "2026-11-15T08:00:00.0000000Z" }];
+  items = { m1: MOVIE };
   await feed.poll();
-  assert.deepEqual([...feed.pending.keys()], ["m1"]);
+  assert.deepEqual(dispatched, ["m1"], "identified items do not wait for the queue timer");
+  assert.equal(feed.pending.size, 0);
   assert.equal(state.get("cursor"), "2026-11-15T10:00:00.000Z");
 });
 

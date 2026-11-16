@@ -26,7 +26,7 @@ Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Je
 - **Sign in with Jellyfin.** Jellyfin administrators can sign in to the dashboard with their Jellyfin account. The local account stays available.
 - **New dashboard** with a sidebar, a status bar, all four Catppuccin flavors (Macchiato by default, each with a live preview in Settings) plus an accent color, and English, German, French and Swedish.
 - **Discord setup checks the token**, fills in the bot id, builds the invite link with the right permissions and warns when Server Members Intent is off.
-- **No plugin needed for notifications.** New items arrive over Jellyfin's WebSocket, and a catch-up check finds anything added while Anchorr was offline. Like the plugin, items wait until Jellyfin has identified them.
+- **No plugin needed for notifications.** Anchorr checks Jellyfin for new items every minute (one small request) and catches up on anything added while it was offline. Like the plugin, items wait until Jellyfin has identified them.
 - **Overview of what is happening**: the connected Jellyfin server and version, the Seerr version and request counts, the latest requests with approve and decline, and recent bot activity (notifications, requests from Discord, daily pick, weekly roundup).
 - **Guest account for unlinked members**, so everyone in your server can request out of the box within limits you control in Seerr.
 - Notifications use Jellyfin's runtime when Seerr has none, which is common for shows.

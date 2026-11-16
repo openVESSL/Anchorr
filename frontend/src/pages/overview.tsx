@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 type ActivityType = "notification" | "request" | "daily-pick" | "roundup"
 
 interface Overview {
-  jellyfin: { serverName: string; version: string; watching: boolean } | null
+  jellyfin: { serverName: string; version: string; watching: boolean; url: string } | null
   seerr: { version: string | null; url: string } | null
   discord: { botTag: string; botAvatar: string; serverName: string | null; serverIcon: string | null; memberCount: number | null; ping: number | null } | null
   requestCounts: { total: number; movie: number; tv: number; pending: number; approved: number; declined: number; processing: number; available: number } | null
@@ -132,6 +132,7 @@ export function OverviewPage() {
             jellyfin?.version && t("Version {version}", { version: jellyfin.version }),
             s?.jellyfinConnected ? t("Watching for new items") : setup?.jellyfin && t("Not watching for new items"),
           ]}
+          link={jellyfin?.url}
         />
         <StatusCard
           title="Seerr"

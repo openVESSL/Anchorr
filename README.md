@@ -199,7 +199,7 @@ Almost everything is set in the dashboard and saved in `config.json`. A few sett
 | `BIND_HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise | Address to listen on. |
 | `TRUST_PROXY` | off | Set to `true` behind a reverse proxy, so sign-in cookies are marked secure and rate limits see real client addresses. |
 | `ANCHORR_CONFIG_DIR` | `/usr/src/app/config` in Docker, `./config` otherwise | Where the configuration and state files (`config.json`, `pending-requests.json`, `activity.json`) are kept. |
-| `JELLYFIN_POLLING_INTERVAL` | `900000` (15 min) | How often to double-check Jellyfin for new items, in milliseconds. |
+| `JELLYFIN_POLLING_INTERVAL` | `60000` (1 min) | How often to check Jellyfin for new items, in milliseconds. |
 
 ## Security
 

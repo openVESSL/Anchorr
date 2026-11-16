@@ -60,6 +60,7 @@ test("overview shows the Jellyfin server name, the Seerr version and request cou
   assert.equal(status, 200);
   assert.equal(json.jellyfin.serverName, "Living room");
   assert.equal(json.jellyfin.version, "10.11.2");
+  assert.equal(json.jellyfin.url, jellyfin.url, "for the card's link to Jellyfin");
   assert.equal(json.seerr.version, "3.5.2");
   assert.equal(json.requestCounts.pending, 2);
   assert.equal(json.discord, null, "bot is not running");

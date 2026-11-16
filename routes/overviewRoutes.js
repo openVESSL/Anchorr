@@ -70,7 +70,11 @@ router.get("/overview", authenticateToken, async (_req, res) => {
     }
   }
   res.json({
-    jellyfin: info.jellyfin && { ...info.jellyfin, watching: Boolean(botState.jellyfinFeed?.ws?.readyState === 1) },
+    jellyfin: info.jellyfin && {
+      ...info.jellyfin,
+      watching: Boolean(botState.jellyfinFeed?.ws?.readyState === 1),
+      url: settings.JELLYFIN_BASE_URL.replace(/\/+$/, ""),
+    },
     seerr: info.seerr && { ...info.seerr, url: normalizeSeerrUrl(settings.SEERR_URL) },
     discord: discordInfo(),
     requestCounts,

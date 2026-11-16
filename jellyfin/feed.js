@@ -1,7 +1,12 @@
 /**
  * Jellyfin item feed: finds new movies, shows, seasons and episodes without any Jellyfin
- * plugin. A WebSocket delivers LibraryChanged events live; a catch-up poll (on connect and
- * every few minutes) picks up whatever was added while Anchorr was offline.
+ * plugin. A poll every minute asks Jellyfin for items saved since the last check (one small
+ * request, usually empty) and also catches up on whatever was added while Anchorr was offline.
+ *
+ * The WebSocket stays open for the connection status and an immediate poll on reconnect.
+ * Jellyfin only sends LibraryChanged to sessions that belong to a user, and Anchorr connects
+ * with an API key, so in practice the poll finds the items; LibraryChanged is still handled
+ * in case a Jellyfin version sends it.
  *
  * Every new item becomes the same payload the Jellyfin Webhook plugin used to send and
  * goes through the same handler, so dedup, episode batching and channel routing are shared.
@@ -20,7 +25,7 @@ const ITEM_FIELDS =
   "ProviderIds,Overview,Genres,Path,ProductionYear,RunTimeTicks,DateCreated,SeriesName,SeriesId,SeasonId,IndexNumber,ParentIndexNumber,IndexNumberEnd";
 const METADATA_WAIT_MS = 30_000;
 const MAX_METADATA_ATTEMPTS = 4; // then sent with whatever Jellyfin has
-const POLL_INTERVAL_MS = Number(process.env.JELLYFIN_POLLING_INTERVAL) || 15 * 60_000;
+const POLL_INTERVAL_MS = Number(process.env.JELLYFIN_POLLING_INTERVAL) || 60_000;
 const MAX_RECONNECT_DELAY_MS = 60_000;
 const RECENT_DISPATCH_LIMIT = 2000;
 const NEVER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
@@ -106,7 +111,7 @@ export class JellyfinFeed {
     this.running = true;
     this.connect();
     this.every(POLL_INTERVAL_MS, () => this.poll());
-    logger.info("📡 Watching Jellyfin for new items (WebSocket + catch-up poll)");
+    logger.info(`📡 Watching Jellyfin for new items (checked every ${Math.round(POLL_INTERVAL_MS / 1000)} s)`);
   }
 
   stop() {
@@ -224,16 +229,25 @@ export class JellyfinFeed {
     return items;
   }
 
+  /** Sends the queued items Jellyfin has identified; the rest wait for the next round. */
   async processQueue() {
-    const ids = [...this.pending.keys()];
-    if (ids.length === 0) return;
-    let items;
+    // The poll and the queue timer can both get here; one round at a time sends nothing twice
+    if (this.processing) return;
+    this.processing = true;
     try {
-      items = await this.fetchItems(ids);
+      await this.dispatchReady();
     } catch (err) {
       logger.warn(`Jellyfin feed: could not load new items, retrying: ${err.message}`);
-      return this.retryLater();
+    } finally {
+      this.processing = false;
     }
+    this.retryLater();
+  }
+
+  async dispatchReady() {
+    const ids = [...this.pending.keys()];
+    if (ids.length === 0) return;
+    const items = await this.fetchItems(ids);
     const byId = new Map(items.map((item) => [item.Id, item]));
 
     for (const id of ids) {
@@ -255,7 +269,6 @@ export class JellyfinFeed {
         logger.error(`Jellyfin feed: notification for "${item.Name}" failed: ${err.message}`);
       }
     }
-    this.retryLater();
   }
 
   retryLater() {
@@ -305,6 +318,8 @@ export class JellyfinFeed {
         this.state.set(CURSOR_KEY, new Date(newest).toISOString());
         this.state.flush();
       }
+      // Already identified items go out now; the others wait for Jellyfin as usual
+      if (newest > cursorMs) await this.processQueue();
     } catch (err) {
       logger.warn(`Jellyfin feed: catch-up poll failed: ${err.message}`);
     }
