@@ -223,6 +223,22 @@ test("when Discord refuses the private answer, it is logged instead of shown as 
   assert.ok(errors.mock.calls.some((c) => /private reply/.test(c.arguments[0])));
 });
 
+test("/request movie: if showing the result fails after the request went through, the member is told it was requested", async (t) => {
+  t.mock.method(logger, "error", () => {});
+  const before = posts().length;
+  const interaction = command("request", { title: "603|movie" });
+  interaction.editReply = async () => {
+    throw new Error("Invalid Form Body");
+  };
+  const calls = await dispatch(interaction);
+  assert.equal(posts().length, before + 1);
+  assert.deepEqual(calls.at(-1), {
+    method: "followUp",
+    content: translate("replies.pick_requested", { title: "The Matrix" }),
+    flags: 64,
+  });
+});
+
 test("/request TV: requests nothing yet and opens the season picker", async () => {
   const before = posts().length;
   const calls = await dispatch(command("request", { title: "1399|tv" }));

@@ -78,6 +78,7 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
     return;
   }
 
+  let requestedTitle = null; // set once Seerr accepted the request
   try {
     const [tmdbId, mediaType] = await findTitle(rawInput);
     if (!tmdbId || !mediaType) {
@@ -104,6 +105,7 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
         tagIds: await tagIdsFor(tags, mediaType),
         options,
       });
+      requestedTitle = details.title || details.name;
     }
 
     const imdbId = await metadata.getImdbId(tmdbId, mediaType);
@@ -134,6 +136,12 @@ async function handleSearchOrRequest(interaction, rawInput, mode, tags = [], opt
 
     await interaction.editReply({ embeds: [embed], components });
   } catch (err) {
+    if (requestedTitle) {
+      // Only showing the result failed: reporting a failed request would invite a duplicate
+      logger.error(`Requested "${requestedTitle}", but could not show the result:`, err);
+      await replyPrivately(interaction, t("replies.pick_requested", { title: requestedTitle }));
+      return;
+    }
     logger.error("Error in handleSearchOrRequest:", err);
     await replyPrivately(interaction, getSeerrErrorMessage(err));
   }
