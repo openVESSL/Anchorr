@@ -1,11 +1,13 @@
 // Parity net for config storage: on-disk format, v1 key migrations, masking for the dashboard.
 // These are the inputs the v2 automatic migration must accept.
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-import { CONFIG_PATH, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
+import { CONFIG_PATH, MigrationBackupError, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { MASKED_PREFIX, isMaskedValue, sanitizeConfigForClient } from "../utils/configSanitize.js";
 import { normalizeSeerrUrl } from "../utils/seerrUrl.js";
 import logger from "../utils/logger.js";
@@ -91,33 +93,108 @@ test("schema accepts both library formats and rejects a malformed URL", () => {
   assert.equal(ok({ SEERR_URL: "not a url" }), false);
 });
 
-test("v1 config upgrades to format v2: TMDB/OMDb keys removed, original kept as config.v1.json", () => {
-  const backup = path.join(path.dirname(CONFIG_PATH), "config.v1.json");
-  fs.rmSync(backup, { force: true });
-  writeConfig({ SEERR_URL: "http://seerr.local", TMDB_API_KEY: "tmdb-secret", OMDB_API_KEY: "", HEADER_VISIBLE: "true", startBot: true, LIBRARY_SEEDED: "true" });
+const CONFIG_DIR = path.dirname(CONFIG_PATH);
+const BACKUP_DIR = path.join(CONFIG_DIR, "backup-1.x");
+
+// A 1.x config folder: config.json in the old format plus state files next to it
+function writeV1Folder(extra = {}) {
+  fs.rmSync(BACKUP_DIR, { recursive: true, force: true });
+  writeConfig({
+    JELLYSEERR_URL: "http://seerr.local/api/v1",
+    JELLYSEERR_AUTO_APPROVE: "true",
+    TMDB_API_KEY: "tmdb-secret",
+    OMDB_API_KEY: "",
+    HEADER_VISIBLE: "true",
+    startBot: true,
+    LIBRARY_SEEDED: "true",
+    USER_MAPPINGS: [{ discordUserId: "1", jellyseerrUserId: 2 }, { discordUserId: "3", jellyseerrUserId: 4 }],
+    ...extra,
+  });
+  fs.writeFileSync(path.join(CONFIG_DIR, "dedup-seen-items.json"), '{"seen":["a"]}');
+  fs.writeFileSync(path.join(CONFIG_DIR, "pending-requests.json"), '{"603-movie":["1"]}');
+  return Object.fromEntries(
+    ["config.json", "dedup-seen-items.json", "pending-requests.json"].map((f) => [f, fs.readFileSync(path.join(CONFIG_DIR, f))])
+  );
+}
+
+test("v1 config upgrades to format v2 after the whole folder is backed up untouched", () => {
+  const before = writeV1Folder();
 
   assert.equal(loadSettings(), true);
+  for (const [file, bytes] of Object.entries(before)) {
+    assert.deepEqual(fs.readFileSync(path.join(BACKUP_DIR, file)), bytes, `${file} backed up as it was in 1.x`);
+  }
+  assert.equal(fs.existsSync(path.join(CONFIG_DIR, "config.v1.json")), false, "one backup place only");
+
   const upgraded = readConfig();
   assert.equal(upgraded.CONFIG_VERSION, 2);
   for (const key of ["TMDB_API_KEY", "OMDB_API_KEY", "HEADER_VISIBLE", "startBot", "LIBRARY_SEEDED"]) {
     assert.equal(key in upgraded, false, `${key} removed`);
   }
   assert.equal(upgraded.SEERR_URL, "http://seerr.local");
-  assert.equal(JSON.parse(fs.readFileSync(backup, "utf8")).TMDB_API_KEY, "tmdb-secret", "v1 file kept as is");
-
-  // already upgraded: no second backup, nothing removed
-  writeConfig({ ...upgraded, LANGUAGE: "de" });
-  fs.rmSync(backup);
-  assert.equal(loadSettings(), true);
-  assert.equal(fs.existsSync(backup), false);
-  assert.equal(readConfig().LANGUAGE, "de");
+  assert.equal(fs.existsSync(path.join(CONFIG_DIR, "dedup-seen-items.json")), false);
+  assert.deepEqual(
+    { autoApprove: upgraded.UPGRADE_FROM_V1.autoApprove, mappings: upgraded.UPGRADE_FROM_V1.mappings },
+    { autoApprove: true, mappings: 2 },
+    "what 1.x had, read before the key renames"
+  );
+  assert.ok(Date.parse(upgraded.UPGRADE_FROM_V1.at));
 });
 
-test("a fresh v2 config gets its version without a pointless backup", () => {
-  const backup = path.join(path.dirname(CONFIG_PATH), "config.v1.json");
-  fs.rmSync(backup, { force: true });
+test("an existing backup and upgrade record are never overwritten", () => {
+  writeV1Folder();
+  assert.equal(loadSettings(), true);
+  const record = readConfig().UPGRADE_FROM_V1;
+  const backedUp = fs.readFileSync(path.join(BACKUP_DIR, "config.json"));
+
+  // a later start, and a v1 backup restored later on
+  assert.equal(loadSettings(), true);
+  writeConfig({ ...readConfig(), CONFIG_VERSION: undefined, TMDB_API_KEY: "other", SEERR_AUTO_APPROVE: "false" });
+  assert.equal(loadSettings(), true);
+  assert.deepEqual(fs.readFileSync(path.join(BACKUP_DIR, "config.json")), backedUp);
+  assert.deepEqual(readConfig().UPGRADE_FROM_V1, record);
+});
+
+test("a fresh v2 config gets its version without a backup or upgrade record", () => {
+  fs.rmSync(BACKUP_DIR, { recursive: true, force: true });
   writeConfig({ SEERR_URL: "http://seerr.local" });
   assert.equal(loadSettings(), true);
   assert.equal(readConfig().CONFIG_VERSION, 2);
-  assert.equal(fs.existsSync(backup), false);
+  assert.equal("UPGRADE_FROM_V1" in readConfig(), false);
+  assert.equal(fs.existsSync(BACKUP_DIR), false);
+});
+
+test("if the 1.x folder cannot be backed up, nothing is changed and loading stops", (t) => {
+  const before = writeV1Folder();
+  t.mock.method(logger, "error", () => {});
+  fs.chmodSync(CONFIG_DIR, 0o500); // readable, not writable
+  t.after(() => fs.chmodSync(CONFIG_DIR, 0o700));
+
+  assert.throws(() => loadSettings(), MigrationBackupError);
+  fs.chmodSync(CONFIG_DIR, 0o700);
+  assert.deepEqual(fs.readFileSync(CONFIG_PATH), before["config.json"], "config.json untouched");
+  assert.equal(fs.existsSync(BACKUP_DIR), false, "no half-written backup left behind");
+});
+
+test("Anchorr does not start when the 1.x folder cannot be backed up", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "anchorr-v1-"));
+  const v1 = { TMDB_API_KEY: "", SEERR_URL: "http://seerr.local", JWT_SECRET: "j".repeat(64), WEBHOOK_SECRET: "w".repeat(64) };
+  fs.writeFileSync(path.join(dir, "config.json"), JSON.stringify(v1));
+  const unreadable = path.join(dir, "pending-requests.json");
+  fs.writeFileSync(unreadable, "{}");
+  fs.chmodSync(unreadable, 0o000); // the copy fails halfway through the folder
+  try {
+    const run = spawnSync(process.execPath, ["app.js"], {
+      env: { ...process.env, ANCHORR_CONFIG_DIR: dir, NODE_ENV: "production", AUTO_START_BOT: "false", WEBHOOK_PORT: "0" },
+      encoding: "utf8",
+      timeout: 20_000,
+    });
+    assert.equal(run.status, 1, "exits instead of serving the setup wizard");
+    assert.match(run.stdout + run.stderr, /Could not back up the 1\.x configuration/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, "config.json"), "utf8")), v1, "config.json untouched");
+    assert.deepEqual(fs.readdirSync(dir).filter((f) => f.startsWith("backup-1.x")), [], "no half-written backup");
+  } finally {
+    fs.chmodSync(unreadable, 0o600);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -12,7 +12,8 @@ export const configSchema = Joi.object({
   BOT_ID: Joi.string().allow("").optional(),
   GUILD_ID: Joi.string().allow("").optional(),
   SEERR_URL: Joi.string().uri().allow("").optional(),
-  SEERR_API_KEY: Joi.string().allow("").optional(),  JELLYFIN_BASE_URL: Joi.string().uri().allow("").optional(),
+  SEERR_API_KEY: Joi.string().allow("").optional(),
+  JELLYFIN_BASE_URL: Joi.string().uri().allow("").optional(),
   JELLYFIN_API_KEY: Joi.string().allow("").optional(),
   JELLYFIN_SERVER_ID: Joi.string().allow("").optional(),
   JELLYFIN_CHANNEL_ID: Joi.string().allow("").optional(),
@@ -103,6 +104,8 @@ export const DASHBOARD_PROTECTED_KEYS = [
   "USER_MAPPING_METADATA",
   "WEEKLY_ROUNDUP_LAST_POSTED_AT",
   "CONFIG_VERSION",
+  "UPGRADE_FROM_V1",
+  "UPGRADE_DISMISSED_AT",
 ];
 
 // save-config body: every known config key plus the one-shot startBot flag; unknown keys are dropped.

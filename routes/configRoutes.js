@@ -4,7 +4,7 @@ import path from "path";
 import { authenticateToken } from "../utils/auth.js";
 import { restartBot } from "../bot/botManager.js";
 import { botState } from "../bot/botState.js";
-import { CONFIG_PATH, decodeConfig, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
+import { CONFIG_PATH, MigrationBackupError, decodeConfig, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { sanitizeConfigForClient } from "../utils/configSanitize.js";
 import { WEBHOOK_SECRET } from "../utils/auth.js";
 import { configTemplate } from "../lib/config.js";
@@ -67,7 +67,13 @@ router.post("/config/restore", authenticateToken, async (req, res) => {
   if (!writeConfig(restored)) {
     return res.status(500).json({ success: false, error: "Failed to save configuration file. Check Docker volume permissions and server logs." });
   }
-  loadSettings(); // runs the v1 migrations when the backup is an older format
+  try {
+    loadSettings(); // runs the v1 migrations when the backup is an older format
+  } catch (err) {
+    if (!(err instanceof MigrationBackupError)) throw err;
+    logger.error(`❌ ${err.message}`);
+    return res.status(500).json({ success: false, error: err.message });
+  }
   logger.info("✅ Configuration restored from a backup");
 
   if (botState.isBotRunning) {

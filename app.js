@@ -26,8 +26,9 @@ import saveConfigRouter from "./routes/saveConfigRoutes.js";
 import testRouter from "./routes/testRoutes.js";
 import setupRouter from "./routes/setupRoutes.js";
 import overviewRouter from "./routes/overviewRoutes.js";
+import upgradeRouter from "./routes/upgradeRoutes.js";
 import { startBot } from "./bot/botManager.js";
-import { CONFIG_PATH, loadSettings } from "./utils/configFile.js";
+import { CONFIG_PATH, MigrationBackupError, loadSettings } from "./utils/configFile.js";
 import { settings } from "./utils/settings.js";
 
 // --- Helper Functions ---
@@ -38,7 +39,15 @@ function loadConfig() {
   logger.debug("[LOADCONFIG] File exists:", fs.existsSync(CONFIG_PATH));
 
   // Centralized loader (includes all migrations)
-  const success = loadSettings();
+  let success;
+  try {
+    success = loadSettings();
+  } catch (err) {
+    if (!(err instanceof MigrationBackupError)) throw err;
+    // Starting anyway would serve the setup wizard with an empty config
+    logger.error(`❌ ${err.message}`);
+    process.exit(1);
+  }
 
   if (success) {
     logger.debug(
@@ -200,6 +209,7 @@ function configureWebServer() {
   app.use("/api", saveConfigRouter);
   app.use("/api", testRouter);
   app.use("/api", overviewRouter);
+  app.use("/api", upgradeRouter);
 
   app.use("/assets", express.static(path.join(__dirname, "assets")));
   app.use("/locales", express.static(path.join(__dirname, "locales")));
