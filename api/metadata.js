@@ -11,8 +11,8 @@ import { TIMEOUTS } from "../lib/constants.js";
 import { getSeerrApiUrl } from "../utils/seerrUrl.js";
 import { settings } from "../utils/settings.js";
 
-// Metadata language stays English, as with the former TMDB calls.
-const LANGUAGE = "en";
+// Titles, overviews and genres follow the bot language; TMDB falls back to English per field.
+const language = () => settings.LANGUAGE || "en";
 
 export function isMetadataConfigured() {
   return Boolean(settings.SEERR_URL && settings.SEERR_API_KEY);
@@ -26,7 +26,7 @@ const encodeQuery = (params) =>
     .join("&");
 
 async function seerrGet(path, params = {}) {
-  const query = encodeQuery({ language: LANGUAGE, ...params });
+  const query = encodeQuery({ language: language(), ...params });
   const res = await http.get(`${getSeerrApiUrl(settings.SEERR_URL)}${path}?${query}`, {
     headers: { "X-Api-Key": settings.SEERR_API_KEY },
     timeout: TIMEOUTS.SEERR_API,

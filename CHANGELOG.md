@@ -36,6 +36,7 @@ Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Je
 ### Changed
 
 - Metadata comes from Seerr: movies keep their IMDb rating, shows (which have no IMDb score in Seerr) show the TMDB score.
+- Titles, overviews and genres in search, requests, notifications and the daily pick follow the bot language instead of always being English. TMDB falls back to English where a translation is missing.
 - The configuration lives in memory instead of process environment variables, and saving from the dashboard only accepts known settings.
 - Smaller install: axios, lodash.debounce and node-cache were replaced by built-in Node.js features.
 - The Docker image listens on all interfaces by default and builds the dashboard in its own stage.

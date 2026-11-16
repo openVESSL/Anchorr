@@ -40,7 +40,7 @@ export function SystemPage() {
       </Section>
 
       <Section title={t("Bot")}>
-        <Field id="bot-language" label={t("Bot language")} help={t("Language of the bot's messages in Discord.")} error={form.errors.LANGUAGE}>
+        <Field id="bot-language" label={t("Bot language")} help={t("Language of the bot's messages in Discord, and of titles and descriptions where TMDB has a translation.")} error={form.errors.LANGUAGE}>
           <Select value={String(form.values.LANGUAGE ?? "en")} onValueChange={(v) => form.set("LANGUAGE", v)}>
             <SelectTrigger id="bot-language" className="w-56">
               <SelectValue />

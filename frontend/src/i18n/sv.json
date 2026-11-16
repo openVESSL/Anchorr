@@ -93,7 +93,7 @@
   "Jellyfin connected": "Jellyfin anslutet",
   "Jellyfin: Dashboard > API Keys > +.": "Jellyfin: Kontrollpanel > API-nycklar > +.",
   "Language": "Språk",
-  "Language of the bot's messages in Discord.": "Språket i botens meddelanden på Discord.",
+  "Language of the bot's messages in Discord, and of titles and descriptions where TMDB has a translation.": "Språket i botens meddelanden på Discord, och i titlar och beskrivningar där TMDB har en översättning.",
   "Libraries": "Bibliotek",
   "Link": "Koppla",
   "Link Discord members to their Seerr accounts": "Koppla Discord-medlemmar till deras Seerr-konton",

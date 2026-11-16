@@ -93,7 +93,7 @@
   "Jellyfin connected": "Jellyfin connecté",
   "Jellyfin: Dashboard > API Keys > +.": "Jellyfin : Tableau de bord > Clés API > +.",
   "Language": "Langue",
-  "Language of the bot's messages in Discord.": "Langue des messages du bot dans Discord.",
+  "Language of the bot's messages in Discord, and of titles and descriptions where TMDB has a translation.": "Langue des messages du bot dans Discord, ainsi que des titres et descriptions lorsque TMDB en a une traduction.",
   "Libraries": "Bibliothèques",
   "Link": "Associer",
   "Link Discord members to their Seerr accounts": "Associer les membres Discord à leurs comptes Seerr",

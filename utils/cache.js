@@ -1,8 +1,13 @@
 /**
- * In-memory cache for Seerr metadata (search, trending, details), 5 minutes per entry.
+ * In-memory cache for Seerr metadata (search, trending, details), 5 minutes per entry,
+ * kept per bot language.
  */
 import { CACHE_TTL } from "../lib/constants.js";
 import logger from "./logger.js";
+import { settings } from "./settings.js";
+
+// Metadata comes in the bot language: a language change must not serve the old one
+const scoped = (key) => `${settings.LANGUAGE || "en"}:${key}`;
 
 const SWEEP_ABOVE = 500; // drop expired entries once the cache grows past this
 
@@ -15,6 +20,7 @@ class MetadataCache {
   }
 
   read(key) {
+    key = scoped(key);
     const entry = this.entries.get(key);
     if (entry && entry.expiresAt > Date.now()) {
       this.hits++;
@@ -27,7 +33,7 @@ class MetadataCache {
 
   write(key, value) {
     if (this.entries.size >= SWEEP_ABOVE) this.sweep();
-    this.entries.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    this.entries.set(scoped(key), { value, expiresAt: Date.now() + this.ttlMs });
     return value;
   }
 
