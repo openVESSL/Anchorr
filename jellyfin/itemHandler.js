@@ -154,6 +154,11 @@ async function handleSeriesItem(data, send, isTest) {
   }
 
   const batch = batches.get(seriesKey) ?? startBatch(seriesKey, burstKey, data, level, sentLevel, send);
+  // A flushed batch is being posted: items of the same import count as covered by that post
+  if (batch.flushed) {
+    if (!isTest) sentNotifications.set(itemKey, { level });
+    return;
+  }
   if (!isTest) batch.itemKeys.set(itemKey, level);
   // The post shows the highest level received (Series > Season > Episode), the latest of it
   if (level >= getItemLevel(batch.latestData.ItemType)) batch.latestData = data;
@@ -166,6 +171,11 @@ async function handleSeriesItem(data, send, isTest) {
     batch.seasonCount,
     { seasons: batch.seasons }
   );
+  // A whole season or show at once: post now instead of waiting
+  if (batch.episodeCount > FLUSH_ABOVE_EPISODES || batch.seasonCount > FLUSH_ABOVE_SEASONS) {
+    batch.flushed = true;
+    batch.sender.flush();
+  }
   logger.debug(`[DEBOUNCER] Batch for ${seriesId}: ${batch.episodeCount} episode(s), ${batch.seasonCount} season(s)`);
 }
 
@@ -243,8 +253,6 @@ function addToBatch(batch, data) {
     }
     batch.seasonCount++;
     batch.seasons.push(data);
-    // A whole show at once: post now instead of waiting
-    if (batch.seasonCount > FLUSH_ABOVE_SEASONS) batch.sender.flush?.();
   }
   if (data.ItemType === "Episode") {
     const duplicate = batch.episodes.find(
@@ -262,7 +270,6 @@ function addToBatch(batch, data) {
     batch.episodes.push(data);
     if (!batch.firstEpisode || data.EpisodeNumber < batch.firstEpisode.EpisodeNumber) batch.firstEpisode = data;
     if (!batch.lastEpisode || data.EpisodeNumber > batch.lastEpisode.EpisodeNumber) batch.lastEpisode = data;
-    if (batch.episodeCount > FLUSH_ABOVE_EPISODES) batch.sender.flush?.();
   }
   return true;
 }

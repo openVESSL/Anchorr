@@ -235,6 +235,25 @@ test("a new show is one post: its episodes join it and are not announced later",
   assert.equal(discord.sent.length, 1);
 });
 
+test("a large import posts once when the batch flushes early, with no repeat afterwards", async (t) => {
+  configure(t, { JELLYFIN_NOTIFY_EPISODES: "true", JELLYFIN_NOTIFY_SEASONS: "true" });
+  const discord = createFakeDiscord();
+  for (let n = 1; n <= 11; n++) await send(season("show-seasons", n), discord);
+  await flush();
+  assert.equal(discord.sent.length, 1, "posted as soon as it passed 10 seasons");
+  mock.timers.tick(130_000);
+  await flush();
+  assert.equal(discord.sent.length, 1, "no trailing post repeating the seasons");
+
+  for (let n = 1; n <= 31; n++) await send(episode("show-big", n), discord);
+  await flush();
+  assert.equal(discord.sent.length, 2, "posted as soon as it passed 30 episodes");
+  mock.timers.tick(130_000);
+  await flush();
+  assert.equal(discord.sent.length, 2);
+  assert.equal(discord.edits.length, 0, "the post is not rewritten by a smaller trailing batch");
+});
+
 test("a season right after its show's post is skipped, a later one is announced", async (t) => {
   configure(t, { JELLYFIN_NOTIFY_SEASONS: "true" });
   const discord = createFakeDiscord();
