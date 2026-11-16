@@ -1,20 +1,26 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { login, register, logout, checkAuth } from "../utils/auth.js";
+import { authenticateToken, checkAuth, login, loginWithJellyfin, logout, register } from "../utils/auth.js";
 
 const router = Router();
 
-const authLimiter = rateLimit({
+// Counts failed sign-ins only. Guessing is also slowed down and locked per address and
+// username in utils/auth.js; this is the coarse cap per address on top of that.
+const signInLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  message: { success: false, error: "Too many attempts, please try again later." },
+  skipSuccessfulRequests: true,
+  message: { success: false, message: "Too many failed sign-ins from this address. Try again in a few minutes." },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-router.post("/auth/login", authLimiter, login);
-router.post("/auth/register", authLimiter, register);
+router.post("/auth/login", signInLimiter, login);
+router.post("/auth/jellyfin", signInLimiter, loginWithJellyfin);
+// The single local account is added from a signed-in session (audit S4)
+router.post("/auth/register", signInLimiter, authenticateToken, register);
 router.post("/auth/logout", logout);
-router.get("/auth/check", authLimiter, checkAuth);
+// Read-only and called on every page load, so it never counts as an attempt
+router.get("/auth/check", checkAuth);
 
 export default router;

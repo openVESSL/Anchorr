@@ -40,11 +40,19 @@ const level = () => {
   return env === "true" ? "debug" : "info";
 };
 
+// HTTP client errors carry the request config, whose headers hold API keys
+// (X-Api-Key, Authorization). Never write those objects to log files.
+const dropHttpInternals = winston.format((info) => {
+  for (const key of ["config", "request", "response"]) delete info[key];
+  return info;
+});
+
 // Define log format
-const format = winston.format.combine(
+export const format = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
   winston.format.errors({ stack: true }),
   winston.format.splat(),
+  dropHttpInternals(),
   winston.format.json()
 );
 
@@ -95,6 +103,7 @@ const logger = winston.createLogger({
   levels,
   format,
   transports,
+  silent: process.env.NODE_ENV === "test",
   exitOnError: false,
 });
 

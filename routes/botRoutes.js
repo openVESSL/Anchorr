@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import { createRequire } from "module";
 import { authenticateToken } from "../utils/auth.js";
 import { botState } from "../bot/botState.js";
-import { stop as stopRoundupScheduler } from "../bot/roundupScheduler.js";
+import { stopBot } from "../bot/botManager.js";
 import cache from "../utils/cache.js";
 import logger from "../utils/logger.js";
 
@@ -20,59 +20,40 @@ const botControlLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Public liveness probe for Docker/uptime checks: no version or bot details (audit S9)
 router.get("/health", (req, res) => {
-  const uptime = process.uptime();
-  const cacheStats = cache.getStats();
-  const totalHits = cacheStats.tmdb.hits + cacheStats.seerr.hits;
-  const totalMisses = cacheStats.tmdb.misses + cacheStats.seerr.misses;
-  const totalKeys = cacheStats.tmdb.keys + cacheStats.seerr.keys;
-
-  res.json({
-    status: "healthy",
-    version: APP_VERSION,
-    uptime: Math.floor(uptime),
-    uptimeFormatted: `${Math.floor(uptime / 3600)}h ${Math.floor(
-      (uptime % 3600) / 60
-    )}m ${Math.floor(uptime % 60)}s`,
-    bot: {
-      running: botState.isBotRunning,
-      username:
-        botState.isBotRunning && botState.discordClient?.user
-          ? botState.discordClient.user.tag
-          : null,
-      connected: botState.discordClient?.ws?.status === 0,
-    },
-    cache: {
-      hits: totalHits,
-      misses: totalMisses,
-      keys: totalKeys,
-      hitRate:
-        totalHits + totalMisses > 0
-          ? ((totalHits / (totalHits + totalMisses)) * 100).toFixed(2) + "%"
-          : "0%",
-      tmdb: cacheStats.tmdb,
-      seerr: cacheStats.seerr,
-    },
-    memory: {
-      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + " MB",
-      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + " MB",
-    },
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ status: "healthy" });
 });
 
 router.get("/status", authenticateToken, (req, res) => {
+  const uptime = Math.floor(process.uptime());
+  const memory = process.memoryUsage();
   res.json({
+    version: APP_VERSION,
+    uptime,
+    uptimeFormatted: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${uptime % 60}s`,
     isBotRunning: botState.isBotRunning,
     botUsername:
       botState.isBotRunning && botState.discordClient?.user
         ? botState.discordClient.user.tag
         : null,
+    botConnected: botState.discordClient?.ws?.status === 0,
+    jellyfinConnected: Boolean(botState.jellyfinFeed?.ws && botState.jellyfinFeed.ws.readyState === 1),
+    // Set when the old Jellyfin Webhook plugin still calls Anchorr (it can be removed)
+    legacyWebhookLastSeen: botState.legacyWebhookLastSeen ?? null,
+    // Behind a reverse proxy without TRUST_PROXY, cookies are not marked Secure and
+    // rate limits see every visitor as the proxy's address (audit S13)
+    proxyWithoutTrust: Boolean(req.headers["x-forwarded-for"]) && process.env.TRUST_PROXY !== "true",
+    cache: cache.getStats(),
+    memory: {
+      used: `${Math.round(memory.heapUsed / 1024 / 1024)} MB`,
+      total: `${Math.round(memory.heapTotal / 1024 / 1024)} MB`,
+    },
   });
 });
 
-// Factory so routes can call startBot() and jellyfinPoller.stop() from app.js
-export function createBotRoutes({ startBot, jellyfinPoller }) {
+// Factory so routes can call startBot() from app.js
+export function createBotRoutes({ startBot }) {
   router.post("/start-bot", botControlLimiter, authenticateToken, async (req, res) => {
     if (botState.isBotRunning) {
       return res.status(400).json({ message: "Bot is already running." });
@@ -90,33 +71,7 @@ export function createBotRoutes({ startBot, jellyfinPoller }) {
       return res.status(400).json({ message: "Bot is not running." });
     }
 
-    try {
-      if (botState.jellyfinWebSocketClient) {
-        botState.jellyfinWebSocketClient.stop();
-        botState.jellyfinWebSocketClient = null;
-        logger.info("Jellyfin WebSocket client stopped");
-      }
-    } catch (error) {
-      logger.error("Error stopping Jellyfin WebSocket client:", error);
-    }
-
-    try {
-      jellyfinPoller.stop();
-      logger.info("Jellyfin poller stopped");
-    } catch (error) {
-      logger.error("Error stopping Jellyfin poller:", error);
-    }
-
-    try {
-      stopRoundupScheduler();
-      logger.info("Weekly Roundup scheduler stopped");
-    } catch (error) {
-      logger.error("Error stopping Weekly Roundup scheduler:", error);
-    }
-
-    await botState.discordClient.destroy();
-    botState.isBotRunning = false;
-    botState.discordClient = null;
+    await stopBot();
     logger.info("Bot has been stopped.");
     res.status(200).json({ message: "Bot stopped successfully." });
   });

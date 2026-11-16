@@ -39,3 +39,21 @@ test("legacy season keys remain derivable for persisted-state migration", () => 
 
   assert.equal(key, "series:tmdb:119980:s1");
 });
+
+test("library detection fetches the Jellyfin libraries once, then reuses them", async (t) => {
+  const { startFakeServer } = await import("./helpers/http.js");
+  const { applyConfig } = await import("./helpers/config.js");
+  const { chooseLibraryChannel, libraryCache } = await import("../jellyfin/libraryDetection.js");
+  const jf = await startFakeServer({
+    "GET /Library/VirtualFolders": () => [{ ItemId: "lib-movies", CollectionId: "col-movies", Name: "Movies", CollectionType: "movies", Locations: ["/media/movies"] }],
+  });
+  t.after(() => jf.close());
+  t.after(applyConfig({ JELLYFIN_BASE_URL: jf.url, JELLYFIN_API_KEY: "key", JELLYFIN_CHANNEL_ID: "chan", JELLYFIN_NOTIFICATION_LIBRARIES: { "lib-movies": "chan-movies" } }));
+  libraryCache.data = null;
+
+  for (const id of ["m1", "m2", "m3"]) {
+    const { channelId } = await chooseLibraryChannel({ ItemType: "Movie", ItemId: id, Path: `/media/movies/${id}.mkv` }, false);
+    assert.equal(channelId, "chan-movies");
+  }
+  assert.equal(jf.requests.filter((r) => r.path === "/Library/VirtualFolders").length, 1);
+});

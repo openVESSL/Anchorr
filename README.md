@@ -1,358 +1,261 @@
 <p align="center">
-  <img src="./assets/logo-text.png" alt="Anchorr logo-text" width="300"/>
+  <img src="./assets/logo-text.png" alt="Anchorr" width="300"/>
 </p>
 
 <p align="center">
-  <strong>A helpful Discord bot for requesting media via Seerr and receiving Jellyfin notifications for new content in your library.</strong>
+  <strong>A Discord bot for your media server: request movies and shows through Seerr, and announce what arrives in Jellyfin.</strong>
 </p>
 
 <p align="center">
-  <a href="#-features">Features</a> •
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-configuration">Configuration</a> •
-  <a href="#-commands">Commands</a> •
-  <a href="#-docker-deployment">Docker</a> •
-  <a href="./CHANGELOG.md">Changelog</a> •
-  <a href="./CONTRIBUTING.md">Contributing</a> •
+  <a href="#installation">Installation</a> ·
+  <a href="#first-setup">First setup</a> ·
+  <a href="#commands">Commands</a> ·
+  <a href="#upgrading-from-1x">Upgrading from 1.x</a> ·
+  <a href="./CHANGELOG.md">Changelog</a> ·
   <a href="https://discord.gg/S5JrsZe9mB">Discord</a>
 </p>
 
-## 💬 Discord Server
-
-**Before anything else, I invite you to join my Discord server for faster assistance, discussions, and important information such as an organized list of known bugs that are currently being tracked or planned features scheduled for future releases!**
-
-##### This helps avoid duplicate requests and keeps everyone informed about what's coming next!
-
-### Join Here:
-
-[![](https://dcbadge.limes.pink/api/server/https://discord.gg/S5JrsZe9mB)](https://discord.gg/S5JrsZe9mB)
-
-I also have a dedicated channel on the [r/JellyfinCommunity](https://discord.gg/awFC5m4xkr) server (if you are already a member): [Join me here](https://discord.gg/awFC5m4xkr)
-
-## 🌟 Features
-
-- **🔍 Media Search**: Search for movies and TV shows with `/search` command - you can then request it later within the message embed
-- **🔥 Trending Content**: Browse weekly trending movies and TV shows with `/trending` command
-- **📤 One-Click Requests**: Directly request media to Seerr with `/request` command
-- **📺 Smart TV Handling**: Choose specific seasons when searching for TV series using `/search`, or request all seasons at once with `/request`
-- **🎚️ Server and Quality**: Choose which Radarr or Sonarr instance to request to, and which quality profile
-- **🚫 Duplicate Detection**: Automatically check if content already exists in Seerr before allowing requests
-- **🏷️ Tag Selection**: Select Radarr/Sonarr tags when requesting media for better organization and categorization
-- **📬 Jellyfin Notifications**: Automatic Discord notifications when new media is added to your library
-- **📚 Library Filtering and Mapping**: Choose which Jellyfin libraries send notifications and to which Discord channel
-- **👤 User Mapping**: Map Discord users to Seerr accounts so requests appear from the correct user
-- **🔐 Role-Based Permissions**: Control which users can use bot commands via Discord roles (allowlist/blocklist)
-- **🔔 Private Notifications**: Optional PM when your requested content becomes available on Jellyfin
-- **👻 Ephemeral Mode**: Make bot responses visible only to the command user
-- **🌍 Multi-Language Support**: Fully translated interface with automatic language detection
-- **🎨 Rich Embeds**: Beautiful, detailed embeds with:
-  - Movie/TV show posters and backdrops
-  - Director/Creator information
-  - IMDb ratings and links
-  - Runtime, genres, and synopsis
-  - Quick action buttons (IMDb, Letterboxd, Watch Now)
-- **🔗 Autocomplete Support**: Intelligent autocomplete for search queries with rich metadata
-- **⚙️ Web Dashboard**: User-friendly web interface for configuration with auto-detection
-
-## ⚠️ Security Notice
-
-Anchorr is designed to run **locally on your home network** alongside your Jellyfin server. It is **not hardened for public internet exposure**.
-
-If you choose to expose Anchorr to the internet (e.g. via port forwarding or a reverse proxy), be aware of the following risks:
-
-- The **web dashboard** (including configuration and secrets) would be publicly reachable
-- **Authentication** is a simple username/password with no 2FA (brute-force lockout is in place, but it is not a substitute for proper access control)
-- **Secrets** (Discord token, API keys, webhook secret) are base64-encoded in `config.json` — note that base64 is not encryption and can be trivially decoded
-- There is **no HTTPS** built in — use a reverse proxy (e.g. Nginx + Let's Encrypt) if you expose it
-
-**Recommendation:** Keep Anchorr on your local network. If remote access is needed, use a VPN instead of direct port forwarding.
-
 ---
 
-## 📋 Prerequisites
+Anchorr connects three things you already run: **Jellyfin**, **Seerr** and a **Discord** server. Members search and request titles from Discord, and the bot announces new movies and episodes as soon as Jellyfin has them. Everything is set up from a web dashboard by signing in; there are no API keys to copy and no Jellyfin plugin to install.
 
-Before getting started, ensure you have:
+## Features
 
-- ✅ A running **Jellyfin** server
-- ✅ A running **Seerr** instance
-- ✅ A **Discord account** with a server where you have admin privileges
-- ✅ API keys from:
-  - [The Movie Database (TMDB)](https://www.themoviedb.org/settings/api) - **Required**
-  - [OMDb API](http://www.omdbapi.com/apikey.aspx) - Optional, but recommended for richer data
-- ✅ **Node.js** 22 (22.23.4 or later), 24 (24.22.1 or later) or 26 (26.12.1 or later), or **Docker & Docker Compose**
+**Requests from Discord**
 
-## 🚀 Quick Start
+- `/search`, `/request` and `/trending`, with autocomplete as you type
+- Season picker for shows, plus optional server, quality profile and tags
+- Checks Seerr first, so titles that are already available are not requested again
+- Linked members request as their own Seerr user, with their own quota and permissions. Everyone else requests through a guest account whose limits you set in Seerr
 
-### 1️⃣ Clone and Install
+**New content announcements**
 
-```bash
-git clone https://github.com/nairdahh/anchorr.git
-cd anchorr
-npm install
-```
+- Movies, shows, seasons and episodes, each switchable and routable to its own channel, usually posted within a minute of Jellyfin adding them
+- Episodes that arrive together are grouped into one message
+- Per-library channels, and libraries marked as anime use their own default quality profile
+- Quality upgrades from Sonarr and Radarr are not announced again
+- Optional direct message to whoever requested a title once it is available
 
-### 2️⃣ Start the Application
+**Extras**
 
-```bash
-node app.js
-```
+- Daily random pick with a Request button
+- Weekly roundup of everything added in the last seven days
+- Role allowlist and blocklist, private replies
+- Customizable embeds: fields, buttons and colors
 
-The web dashboard will be available at `http://localhost:8282`
+**Dashboard**
 
-> **Note:** The server binds to `127.0.0.1` (localhost only) by default. This means the dashboard is only accessible from the machine running Anchorr. If you need to access it from another device on your network, either use a reverse proxy or set `BIND_HOST=0.0.0.0` before starting (e.g. `BIND_HOST=0.0.0.0 node app.js`). Docker deployments handle this automatically.
+- Guided setup: Jellyfin, Seerr and Discord in three steps
+- Overview with your servers, Seerr request counts, the latest requests (approve or decline them) and recent bot activity
+- Sign in with your Jellyfin administrator account, or an optional local account
+- Download a backup of the configuration and restore it, on the same or a new install
+- All four [Catppuccin](https://catppuccin.com) flavors with a choice of accent color (Macchiato by default)
+- English, German, French and Swedish for the dashboard and every bot message; titles, overviews and genres come in the bot's language when TMDB has a translation
 
-### 3️⃣ Configure via Web Dashboard
+## Requirements
 
-1. Open `http://localhost:8282` in your browser
-2. Fill in your Discord Bot credentials, API keys, and service URLs
-3. Click the test buttons to verify connections
-4. Start the bot using the dashboard button
+- A Jellyfin server (10.10 or 12.x)
+- A Seerr instance connected to that Jellyfin
+- A Discord server where you can add bots
+- Docker, or Node.js 22 (22.23.4 or later), 24 (24.22.1 or later) or 26 (26.12.1 or later)
 
-### 4️⃣ Invite Bot to Discord
+## Installation
 
-Generate an OAuth2 URL in [Discord Developer Portal](https://discord.com/developers/applications):
+Anchorr runs well next to Jellyfin and Seerr on the same machine or network. Pick one method below, then continue with [First setup](#first-setup).
 
-- OAuth2 → URL Generator
-- Scopes: `bot`, `applications.commands`
-- Permissions: Send Messages, Embed Links
-- Copy generated URL and open in browser
+### Docker Compose (recommended)
 
-### 5️⃣ Configure Jellyfin Webhook
-
-In Jellyfin Dashboard → Webhooks:
-
-1. Click **+** to add new Discord webhook
-2. Enter URL: `http://<bot-host>:<port>/jellyfin-webhook`
-3. Example: `http://192.168.1.100:8282/jellyfin-webhook`
-4. Add a custom HTTP header for authentication (see below)
-5. Save and you're done! 🎉
-
-> **Security:** Anchorr auto-generates a webhook secret on first start. Open the Anchorr dashboard, find the **Webhook Secret** field in the Jellyfin section, and click **Copy Secret**. Then add it as a custom HTTP header in the Jellyfin webhook plugin:
->
-> | Header name | Value |
-> |---|---|
-> | `X-Webhook-Secret` | *(paste from dashboard)* |
->
-> Requests without a valid secret are rejected with `401 Unauthorized`.
-
-## ⚙️ Configuration
-
-Configuration is managed through a **web dashboard** at `http://localhost:8282/`. However, you can also configure it programmatically.
-
-## 🐳 Docker Deployment
-
-Deploying with Docker is the recommended method for running Anchorr. You can use Docker Compose (the easiest way) or run the container manually.
-
-### Method 1: Docker Compose
-
-**Option A: Clone the full repository**
-
-```bash
-git clone https://github.com/nairdahh/anchorr.git
-cd anchorr
-docker compose up -d
-```
-
-**Option B: Download only docker-compose.yml**
+Create a folder, download the compose file and start it:
 
 ```bash
 mkdir anchorr && cd anchorr
-wget https://raw.githubusercontent.com/nairdahh/anchorr/main/docker-compose.yml
-# OR with curl: curl -O https://raw.githubusercontent.com/nairdahh/anchorr/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/openVESSL/Anchorr/main/docker-compose.yml
 docker compose up -d
 ```
 
-**Access:** Open browser at `http://<your-server-ip>:8282` (e.g., `http://192.168.1.100:8282` or `http://localhost:8282`)
+Open `http://<server-ip>:8282`. Settings are stored in `./anchorr-data` next to the compose file. Set `TZ` in the compose file to your time zone. This works the same way in Portainer stacks, TrueNAS and Synology Container Manager.
 
-### Method 2: Manual Docker Run
+### Docker run
 
 ```bash
-# Run container (using port 8282)
 docker run -d \
   --name anchorr \
   --restart unless-stopped \
   -p 8282:8282 \
+  -e TZ=Europe/Berlin \
   -v ./anchorr-data:/usr/src/app/config \
-  -e WEBHOOK_PORT=8282 \
-  -e NODE_ENV=production \
-  -e BIND_HOST=0.0.0.0 \
   nairdah/anchorr:latest
 ```
 
-**Access:** Open browser at `http://<your-server-ip>:8282`
+To use another port on the host, change the first number, for example `-p 9000:8282`. Set `TZ` to your time zone: the weekly roundup hour and the log times follow it.
 
-**Important parameters:**
+### Unraid
 
-- `-p 8282:8282` - **Port mapping** (host:container). First number is the port on your host.
-- `-v ./anchorr-data:/usr/src/app/config` - Persistent config storage (saves to `./anchorr-data/config.json`)
-- `--restart unless-stopped` - Auto-restart on failure
-- `-e WEBHOOK_PORT=8282` - Web dashboard port
-- `-e NODE_ENV=production` - Production mode
+1. Open **Apps** (Community Applications) and search for **Anchorr**.
+2. Keep the defaults: port `8282` and the config path `/mnt/user/appdata/anchorr`.
+3. Select **Apply**, then open the WebUI from the container's menu.
 
-**Example for Unraid:**
-When adding the container in Unraid Community Apps, add this volume mapping in the "Path" section:
+If Anchorr does not show up in Apps, add the template manually: **Docker > Add Container > Template**, using `https://raw.githubusercontent.com/openVESSL/Anchorr/main/anchorr.xml`.
 
-- **Container Path**: `/usr/src/app/config`
-- **Host Path**: `/mnt/user/appdata/anchorr`
-- **Access Mode**: `RW` (Read-Write)
+### Node.js (Linux, macOS, Windows)
 
-### Method 3: Install Directly from Docker Hub
-
-If you use **Docker Desktop** or other GUI tools (Portainer, Unraid, etc.), you can install directly from Docker Hub without cloning the repository:
-
-1. Open Docker Desktop → Images (or search in your GUI)
-2. Search for `nairdah/anchorr` or just `anchorr`
-3. Pull the latest image
-4. Create a new container with these settings:
-   - **Port:** `8282:8282` (or change as needed)
-   - **Volume:** `./anchorr-data` → `/usr/src/app/config`
-   - **Environment variables:**
-     - `WEBHOOK_PORT=8282`
-     - `NODE_ENV=production`
-     - `BIND_HOST=0.0.0.0`
-   - **Restart policy:** Unless stopped
-
-### Using a Different Port
-
-If port 8282 is already in use:
-
-**Docker Compose:** Edit `docker-compose.yml`
-
-```yaml
-ports:
-  - "9000:8282" # Change 9000 to your desired port
-```
-
-**Docker Run:** Change the first port number
+Install Node.js first (see [Requirements](#requirements)), then:
 
 ```bash
-docker run -d \
-  --name anchorr \
-  --restart unless-stopped \
-  -p 9000:8282 \              # Use port 9000 on host
-  -v ./anchorr-data:/usr/src/app/config \
-  -e WEBHOOK_PORT=8282 \
-  -e NODE_ENV=production \
-  nairdah/anchorr:latest
-```
-
-Then access at: `http://localhost:9000`
-
-## 🔄 Updates
-
-### Node.js Installation
-
-```bash
-cd anchorr
-git pull origin main
+git clone https://github.com/openVESSL/Anchorr.git
+cd Anchorr
 npm install
-# Restart the application (Ctrl+C, then run: node app.js)
+npm run build
+npm start
 ```
 
-### Docker Compose
+`npm run build` builds the dashboard and is needed once per update. Anchorr then listens on `http://127.0.0.1:8282`, reachable only from the same machine. To open it from other devices on your network, set `BIND_HOST`:
 
 ```bash
-cd anchorr
-git pull origin main
-docker compose up -d --pull always
+# Linux and macOS
+BIND_HOST=0.0.0.0 npm start
 ```
 
-### Docker Manual Run
+```powershell
+# Windows (PowerShell)
+$env:BIND_HOST = "0.0.0.0"; npm start
+```
+
+Settings are stored in the `config` folder inside the project. Set `ANCHORR_CONFIG_DIR` to keep them somewhere else.
+
+<details>
+<summary>Run as a service on Linux (systemd)</summary>
+
+Create `/etc/systemd/system/anchorr.service`, adjusting the user and path:
+
+```ini
+[Unit]
+Description=Anchorr
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=anchorr
+WorkingDirectory=/opt/anchorr
+ExecStart=/usr/bin/node app.js
+Environment=NODE_ENV=production
+Environment=BIND_HOST=0.0.0.0
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable it:
 
 ```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now anchorr
+journalctl -u anchorr -f   # follow the logs
+```
+
+</details>
+
+## First setup
+
+Open the dashboard. On the first visit it starts a short setup:
+
+1. **Jellyfin.** Enter its address and sign in with a Jellyfin administrator account. Anchorr creates its own API key named "Anchorr" in Jellyfin. Your password is not stored. Signing in as a Jellyfin administrator is also what makes you the owner of this Anchorr.
+2. **Seerr.** Enter its address. Anchorr signs in to Seerr with the same Jellyfin account to read Seerr's API key, then creates the guest account used by members without a linked account.
+3. **Discord.** Create an application in the [Discord Developer Portal](https://discord.com/developers/applications). Under **Bot**, select **Reset Token**, copy the token and turn on **Server Members Intent**. Paste the token in Anchorr, use the invite button to add the bot to your server, and pick that server.
+
+The bot comes online and the commands are ready. Everything else, such as the announcement channel, linked users and the weekly roundup, can be set later from the sidebar.
+
+You can paste API keys instead of signing in at the Jellyfin and Seerr steps if you prefer.
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `/search <title>` | Shows details for a movie or show, with a Request button. Shows open a season picker. |
+| `/request <title>` | Requests a movie right away, or opens the season picker for a show. Optional `server`, `quality` and `tag`. |
+| `/trending` | Lists this week's trending titles to pick from. |
+
+Who may use the commands is set under **Requests > Roles**. Whether a request is approved automatically follows the requesting user's permissions in Seerr.
+
+## Upgrading from 1.x
+
+Your existing configuration is upgraded automatically on the first start, and the original file is kept as `config.v1.json` in the config folder. Your local account, linked members, channels and other settings stay as they are.
+
+1. **Back up the config folder** before you update. The automatic copy covers `config.json`, but a full copy of the folder is the easiest way back.
+2. **Update Anchorr** as described in [Updating](#updating). Without Docker, use Node.js 22.23.4, 24.22.1, 26.12.1 or newer and run `npm run build` after `npm install`.
+3. **Remove what is no longer used:**
+   - The Anchorr destination in the Jellyfin Webhook plugin. Anchorr now watches Jellyfin directly and catches up on anything added while it was offline. Calls from the plugin are ignored, and the dashboard reminds you while they keep arriving. Uninstall the plugin if nothing else uses it.
+   - Your TMDB and OMDb keys. Search, details, ratings and the daily pick come from Seerr, and the keys are removed from the configuration automatically.
+   - The `JELLYFIN_POLLING_ENABLED` variable, if you set it. Watching Jellyfin is always on.
+4. **Check the Seerr user "Discord (Anchorr)".** In 1.x, members without a linked account requested as the API key's owner, which skipped approvals and quotas. In 2.0 they request as this guest user, created automatically. Set its quota and permissions in Seerr.
+5. **Check auto-approve.** Anchorr's switch now applies to the guest account only; linked members follow their own Seerr permissions. If you relied on the switch to approve everyone, give those users the Auto-Approve permission in Seerr.
+6. **Set the time zone** on Docker with `TZ`, for example `TZ=Europe/Berlin`, so the weekly roundup posts at the hour you pick. Unraid sets it for containers created from the template.
+7. **Rotate API keys if you shared logs.** Versions before 2.0 could write the Jellyfin and Seerr API keys into the log files when a request failed.
+
+You can also sign in with a Jellyfin administrator account now. The previous dashboard is still available at `/legacy` during the 2.0 series.
+
+## Configuration reference
+
+Almost everything is set in the dashboard and saved in `config.json`. A few settings belong to the environment, mainly for Docker:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `WEBHOOK_PORT` | `8282` | Port of the dashboard inside the container or process. |
+| `BIND_HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise | Address to listen on. |
+| `TRUST_PROXY` | off | Set to `true` behind a reverse proxy, so sign-in cookies are marked secure and rate limits see real client addresses. |
+| `ANCHORR_CONFIG_DIR` | `/usr/src/app/config` in Docker, `./config` otherwise | Where the configuration and state files (`config.json`, `pending-requests.json`, `activity.json`) are kept. |
+| `JELLYFIN_POLLING_INTERVAL` | `60000` (1 min) | How often to check Jellyfin for new items, in milliseconds. |
+
+## Security
+
+Anchorr is meant for your home network. The dashboard holds your Discord token and API keys, so do not expose it directly to the internet.
+
+- For remote access, prefer a VPN. If you use a reverse proxy, put it behind HTTPS and set `TRUST_PROXY=true`.
+- Only Jellyfin administrators, or the local account, can sign in. Failed sign-ins are slowed down and locked per address.
+- Secrets in `config.json` are encoded, not encrypted. Keep the config folder and any backup downloaded from Settings private.
+
+See [SECURITY.md](./SECURITY.md) to report a vulnerability.
+
+## Updating
+
+```bash
+# Docker Compose
+docker compose pull && docker compose up -d
+
+# Docker run: pull, remove and recreate the container with the same options
 docker pull nairdah/anchorr:latest
-docker stop anchorr
-docker rm anchorr
-docker run -d \
-  --name anchorr \
-  --restart unless-stopped \
-  -p 8282:8282 \
-  -v ./anchorr-data:/usr/src/app/config \
-  -e WEBHOOK_PORT=8282 \
-  -e NODE_ENV=production \
-  -e BIND_HOST=0.0.0.0 \
-  nairdah/anchorr:latest
+
+# Node.js
+git pull && npm install && npm run build
 ```
 
-## 📸 Screenshots (a bit outdated for now)
+On Unraid, use **Check for Updates** on the Docker tab.
 
-| Feature               | Screenshot                                            |
-| --------------------- | ----------------------------------------------------- |
-| Autocomplete          | ![Autocomplete](./assets/screenshot-autocomplete.png) |
-| Search Results        | ![Search](./assets/screenshot-search.png)             |
-| Request Confirmation  | ![Request](./assets/screenshot-request.png)           |
-| Jellyfin Notification | ![New Media](./assets/screenshot-newmedia.png)        |
+## Translations
 
-## 🤝 Contributing
+The bot's messages live in `locales/`, the dashboard's in `frontend/src/i18n/`. To add a language, see [CONTRIBUTING.md](./CONTRIBUTING.md#translations).
 
-Contributions are welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+## Community and contributing
 
-### 🌍 Adding Translations
+Questions, ideas and known issues are discussed on the [Anchorr Discord server](https://discord.gg/S5JrsZe9mB). There is also a channel on the [r/JellyfinCommunity](https://discord.gg/awFC5m4xkr) server.
 
-Help make Anchorr accessible to more users by contributing translations! The system automatically detects and loads new languages — no code changes needed.
+Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md). If Anchorr is useful to you, you can support it on [Ko-fi](https://ko-fi.com/nairdah).
 
-**Quick start:** Copy `locales/template.json` to `locales/<language_code>.json`, fill in the `_meta` section, translate the values, and open a PR.
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md#-add-translations) for detailed instructions.
-
-## 👥 Contributors
-
-A huge thank you to all the amazing people who have contributed to making Anchorr better! 🎉
+### Contributors
 
 <table>
   <tr>
-    <td align="center">
-      <a href="https://github.com/nairdahh">
-        <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/nairdahh?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" border="0" style="border:none;" />
-        <br/>
-        <sub><b>nairdahh</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/lucideds">
-        <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/lucideds?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" border="0" style="border:none;" />
-        <br/>
-        <sub><b>lucideds</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/retardgerman">
-        <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/retardgerman?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" border="0" style="border:none;" />
-        <br/>
-        <sub><b>retardgerman</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/TheColorman">
-        <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/TheColorman?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" border="0" style="border:none;" />
-        <br/>
-        <sub><b>TheColorman</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/IPvNick">
-        <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/IPvNick?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" border="0" style="border:none;" />
-        <br/>
-        <sub><b>IPvNick</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/whoopsi-daisy">
-        <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/whoopsi-daisy?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" border="0" style="border:none;" />
-        <br/>
-        <sub><b>whoopsi-daisy</b></sub>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/nyakuoff">
-        <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/nyakuoff?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" border="0" style="border:none;" />
-        <br/>
-        <sub><b>nyakuoff</b></sub>
-      </a>
-    </td>
+    <td align="center"><a href="https://github.com/nairdahh"><img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/nairdahh?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" width="80" alt="" /><br/><sub><b>nairdahh</b></sub></a></td>
+    <td align="center"><a href="https://github.com/lucideds"><img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/lucideds?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" width="80" alt="" /><br/><sub><b>lucideds</b></sub></a></td>
+    <td align="center"><a href="https://github.com/retardgerman"><img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/retardgerman?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" width="80" alt="" /><br/><sub><b>retardgerman</b></sub></a></td>
+    <td align="center"><a href="https://github.com/TheColorman"><img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/TheColorman?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" width="80" alt="" /><br/><sub><b>TheColorman</b></sub></a></td>
+    <td align="center"><a href="https://github.com/IPvNick"><img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/IPvNick?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" width="80" alt="" /><br/><sub><b>IPvNick</b></sub></a></td>
+    <td align="center"><a href="https://github.com/whoopsi-daisy"><img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/whoopsi-daisy?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" width="80" alt="" /><br/><sub><b>whoopsi-daisy</b></sub></a></td>
+    <td align="center"><a href="https://github.com/nyakuoff"><img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/nyakuoff?v=4&h=80&w=80&fit=cover&mask=circle&maxage=7d" width="80" alt="" /><br/><sub><b>nyakuoff</b></sub></a></td>
   </tr>
 </table>
 
-## 📄 License
+## License
 
-This project is released under the **Unlicense** — it's public domain. Do anything you want with the code!
+Released into the public domain under the [Unlicense](./LICENSE).

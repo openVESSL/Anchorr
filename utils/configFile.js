@@ -2,6 +2,13 @@ import fs from "fs";
 import path from "path";
 import logger from "./logger.js";
 import { configSchema } from "./validation.js";
+import { replaceSettings as storeSettings, settings } from "./settings.js";
+
+// The "Detailed logs" switch lives in config.json, which never reaches process.env
+function replaceSettings(config) {
+  storeSettings(config);
+  logger.level = settings.DEBUG === "true" ? "debug" : "info";
+}
 
 // Fields that contain sensitive credentials and should be base64-encoded at rest
 const SENSITIVE_FIELDS = new Set([
@@ -10,8 +17,6 @@ const SENSITIVE_FIELDS = new Set([
   "JELLYFIN_API_KEY",
   "WEBHOOK_SECRET",
   "JWT_SECRET",
-  "TMDB_API_KEY",
-  "OMDB_API_KEY",
 ]);
 
 const B64_PREFIX = "b64:";
@@ -26,7 +31,7 @@ function encodeConfig(config) {
   return out;
 }
 
-function decodeConfig(config) {
+export function decodeConfig(config) {
   const out = { ...config };
   for (const field of SENSITIVE_FIELDS) {
     if (out[field] && typeof out[field] === "string" && out[field].startsWith(B64_PREFIX)) {
@@ -48,7 +53,12 @@ function decodeConfig(config) {
 const LEGACY_CONFIG_PATH = path.join(process.cwd(), "lib", "config.json");
 
 const getNewConfigPath = () => {
-  // First priority: Check if /config exists and is writable (user-mounted volume)
+  // Explicit data directory (native installs, tests) wins over auto-detection
+  if (process.env.ANCHORR_CONFIG_DIR) {
+    return path.join(process.env.ANCHORR_CONFIG_DIR, "config.json");
+  }
+
+  // Check if /config exists and is writable (user-mounted volume)
   if (fs.existsSync("/config")) {
     try {
       const testFile = path.join("/config", ".write-test");
@@ -117,7 +127,7 @@ function migrateConfigIfNeeded() {
     // Ensure new directory exists
     const configDir = path.dirname(CONFIG_PATH);
     if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true, mode: 0o777 });
+      fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
     }
 
     // Write to new location
@@ -176,7 +186,7 @@ export function writeConfig(config) {
     // Ensure /config directory exists
     if (!fs.existsSync(configDir)) {
       logger.info(`Creating config directory: ${configDir}`);
-      fs.mkdirSync(configDir, { recursive: true, mode: 0o777 });
+      fs.mkdirSync(configDir, { recursive: true, mode: 0o700 });
     }
 
     // Atomic write: write to a temp file then rename so a mid-write kill never
@@ -191,6 +201,7 @@ export function writeConfig(config) {
     // config.json via the rename, so set it explicitly.
     fs.chmodSync(tmpPath, 0o600);
     fs.renameSync(tmpPath, CONFIG_PATH);
+    replaceSettings(config);
 
     logger.debug(`Config saved successfully to ${CONFIG_PATH}`);
     return true;
@@ -243,12 +254,28 @@ export function updateConfig(updates) {
   return writeConfig(updatedConfig);
 }
 
+export const CURRENT_CONFIG_VERSION = 2;
+
+// Keeps the first pre-upgrade config.json next to it; never overwrites an earlier backup.
+function backupV1Config() {
+  const backupPath = path.join(path.dirname(CONFIG_PATH), "config.v1.json");
+  try {
+    if (!fs.existsSync(backupPath) && fs.existsSync(CONFIG_PATH)) {
+      fs.copyFileSync(CONFIG_PATH, backupPath);
+      fs.chmodSync(backupPath, 0o600);
+      logger.info(`💾 Saved a copy of the v1 config to ${backupPath}`);
+    }
+  } catch (err) {
+    logger.warn(`Could not back up the v1 config: ${err.message}`);
+  }
+}
+
 /**
- * Loads config into process.env for compatibility with existing code
+ * Loads config.json into the runtime settings store (utils/settings.js)
  * Includes automatic migrations for backwards compatibility
  * @returns {boolean} True if load succeeded
  */
-export function loadConfigToEnv() {
+export function loadSettings() {
   // First: Perform migration if needed (one-time operation on startup)
   try {
     migrateConfigIfNeeded();
@@ -275,17 +302,6 @@ export function loadConfigToEnv() {
   }
 
   // --- AUTO-MIGRATIONS ---
-
-  // 1. Normalize SEERR_URL (remove /api/v1 suffix)
-  if (config.SEERR_URL && typeof config.SEERR_URL === "string") {
-    const originalUrl = config.SEERR_URL;
-    config.SEERR_URL = config.SEERR_URL.replace(/\/api\/v1\/?$/, "");
-    if (originalUrl !== config.SEERR_URL) {
-      logger.debug(
-        `Normalized SEERR_URL: ${originalUrl} → ${config.SEERR_URL}`
-      );
-    }
-  }
 
   // 2. Auto-migrate JELLYFIN_NOTIFICATION_LIBRARIES from array to object
   if (Array.isArray(config.JELLYFIN_NOTIFICATION_LIBRARIES)) {
@@ -326,6 +342,19 @@ export function loadConfigToEnv() {
       delete config[oldKey];
       seerrKeysMigrated = true;
       logger.info(`🔄 Migrated config key: ${oldKey} → ${newKey}`);
+    }
+  }
+
+  // 1. Normalize SEERR_URL (remove /api/v1 suffix). Runs after the key rename so a
+  // legacy JELLYSEERR_URL is cleaned too, and before the save below persists it.
+  if (config.SEERR_URL && typeof config.SEERR_URL === "string") {
+    const originalUrl = config.SEERR_URL;
+    config.SEERR_URL = config.SEERR_URL.replace(/\/api\/v1\/?$/, "");
+    if (originalUrl !== config.SEERR_URL) {
+      seerrKeysMigrated = true;
+      logger.debug(
+        `Normalized SEERR_URL: ${originalUrl} → ${config.SEERR_URL}`
+      );
     }
   }
 
@@ -390,16 +419,24 @@ export function loadConfigToEnv() {
     }
   }
 
-  // --- LOAD INTO PROCESS.ENV ---
-  for (const [key, value] of Object.entries(config)) {
-    // Convert objects/arrays to JSON strings to avoid "[object Object]"
-    process.env[key] =
-      typeof value === "object" ? JSON.stringify(value) : String(value);
+  // 6. v2 format: Seerr provides all metadata, so TMDB/OMDb keys and v1 UI leftovers go.
+  // The untouched v1 file is kept once as config.v1.json.
+  if ((Number(config.CONFIG_VERSION) || 1) < CURRENT_CONFIG_VERSION) {
+    const obsolete = ["TMDB_API_KEY", "OMDB_API_KEY", "HEADER_VISIBLE", "startBot", "LIBRARY_SEEDED"].filter((k) => k in config);
+    // v1 library seed store, read only by the removed poller
+    fs.rmSync(path.join(path.dirname(CONFIG_PATH), "dedup-seen-items.json"), { force: true });
+    if (obsolete.length > 0) backupV1Config();
+    for (const key of obsolete) delete config[key];
+    config.CONFIG_VERSION = CURRENT_CONFIG_VERSION;
+    if (writeConfig(config)) {
+      logger.info(`✅ Config upgraded to format v${CURRENT_CONFIG_VERSION}${obsolete.length ? ` (removed: ${obsolete.join(", ")})` : ""}`);
+    } else {
+      logger.error("❌ Failed to save config format upgrade");
+    }
   }
 
-  logger.debug(
-    `Config loaded into process.env (${Object.keys(config).length} keys)`
-  );
+  replaceSettings(config);
+  logger.debug(`Config loaded (${Object.keys(config).length} keys)`);
   return true;
 }
 

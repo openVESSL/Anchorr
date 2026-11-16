@@ -5,6 +5,14 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
+# build the dashboard (React) on the build host; only its static output ships
+FROM --platform=$BUILDPLATFORM node:22-alpine AS dashboard
+WORKDIR /build
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 # use a stable node LTS
 FROM node:22-alpine
 
@@ -18,13 +26,15 @@ RUN apk add --no-cache su-exec
 
 # copy source
 COPY . .
+COPY --from=dashboard /build/dist ./frontend/dist
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# create non-root user
+# Non-root user. The application files stay owned by root (read-only for the app);
+# only the config and log directories are writable.
 RUN addgroup -S app && adduser -S -G app app && \
-    chown -R app:app /usr/src/app && \
-    chmod -R 755 /usr/src/app
+    mkdir -p /usr/src/app/config /usr/src/app/logs && \
+    chown app:app /usr/src/app/config /usr/src/app/logs
 
 EXPOSE 8282
 
@@ -32,16 +42,15 @@ EXPOSE 8282
 LABEL org.opencontainers.image.title="Anchorr" \
       org.opencontainers.image.description="Discord bot for requesting media and Jellyfin notifications" \
       org.opencontainers.image.authors="nairdahh" \
-      org.opencontainers.image.url="https://github.com/nairdahh/anchorr" \
-      org.opencontainers.image.documentation="https://github.com/nairdahh/anchorr/blob/main/README.md" \
-      org.opencontainers.image.source="https://github.com/nairdahh/anchorr" \
-      org.opencontainers.image.version="1.4.9" \
-      org.opencontainers.image.icon="https://raw.githubusercontent.com/nairdahh/anchorr/main/assets/logo.png" \
+      org.opencontainers.image.url="https://github.com/openVESSL/Anchorr" \
+      org.opencontainers.image.documentation="https://github.com/openVESSL/Anchorr/blob/main/README.md" \
+      org.opencontainers.image.source="https://github.com/openVESSL/Anchorr" \
+      org.opencontainers.image.icon="https://raw.githubusercontent.com/openVESSL/Anchorr/main/assets/logo.png" \
       org.opencontainers.image.volumes="/usr/src/app/config" \
       com.example.webui="http://localhost:8282" \
-      org.unraid.icon="https://raw.githubusercontent.com/nairdahh/anchorr/main/assets/logo.png" \
+      org.unraid.icon="https://raw.githubusercontent.com/openVESSL/Anchorr/main/assets/logo.png" \
       org.unraid.category="MediaServer:Other" \
-      org.unraid.support="https://github.com/nairdahh/anchorr/issues" \
+      org.unraid.support="https://github.com/openVESSL/Anchorr/issues" \
       org.unraid.webui="http://[IP]:[PORT:8282]" \
       org.unraid.volume.config="/usr/src/app/config" \
       org.unraid.volume.config.description="Configuration files (REQUIRED for persistence)" \
@@ -50,10 +59,8 @@ LABEL org.opencontainers.image.title="Anchorr" \
 
 # set production mode
 ENV NODE_ENV=production
-
-# Create config directory inside the app for persistent storage
-# This keeps config with the application and avoids permission issues
-RUN mkdir -p /usr/src/app/config && chown app:app /usr/src/app/config && chmod 755 /usr/src/app/config
+# Inside a container the app must listen on all interfaces; -p decides what is exposed
+ENV BIND_HOST=0.0.0.0
 
 # Declare config directory as a persistent volume
 # This ensures data persists when container is recreated/updated

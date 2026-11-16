@@ -1,20 +1,21 @@
 {
   "name": "anchorr",
-  "version": "1.6.5",
+  "version": "2.0.0",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
     "create-translation": "node scripts/create-translation.js",
-    "test": "node --test"
+    "test": "node --import ./test/setup.js --test \"test/**/*.test.js\"",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "dev:dashboard": "npm --prefix frontend run dev"
   },
   "type": "module",
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "description": "",
+  "license": "Unlicense",
+  "description": "Discord bot for requesting media through Seerr and announcing new Jellyfin content",
   "dependencies": {
-    "axios": "^1.17.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "discord.js": "^14.22.1",
@@ -22,15 +23,15 @@
     "express-rate-limit": "^7.1.5",
     "joi": "^18.2.1",
     "jsonwebtoken": "^9.0.2",
-    "lodash.debounce": "^4.0.8",
-    "node-cache": "^5.1.2",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1",
     "ws": "^8.18.0"
   },
   "overrides": {
-    "follow-redirects": "^1.16.1",
     "undici": "^6.26.1",
     "body-parser": "^1.20.6"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

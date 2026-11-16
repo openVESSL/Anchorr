@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import logger from "./logger.js";
+import { settings } from "./settings.js";
 
 // Resolve relative to this module so the loader works regardless of cwd
 // (e.g. when the bot is launched from a different working directory).
@@ -41,7 +42,7 @@ function loadLocaleFile(lang) {
 }
 
 function ensureLoaded() {
-  const lang = safeLang(process.env.LANGUAGE || FALLBACK_LANG);
+  const lang = safeLang(settings.LANGUAGE || FALLBACK_LANG);
   if (translations && loadedLang === lang) return;
 
   const primary = loadLocaleFile(lang);

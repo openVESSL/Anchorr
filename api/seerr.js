@@ -3,7 +3,8 @@
  * Handles all Seerr API interactions
  */
 
-import axios from "axios";
+import crypto from "node:crypto";
+import http from "../utils/http.js";
 import logger from "../utils/logger.js";
 import { TIMEOUTS, CACHE_TTL } from "../lib/constants.js";
 import { getSeerrApiUrl } from "../utils/seerrUrl.js";
@@ -46,7 +47,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
 
   // Fetch from Radarr servers
   try {
-    const radarrListResponse = await axios.get(
+    const radarrListResponse = await http.get(
       buildUrl("/service/radarr"),
       {
         headers: { "X-Api-Key": apiKey },
@@ -58,7 +59,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
       try {
         if (fetchDetails) {
           const serverId = parseInt(server.id, 10);
-          const detailsResponse = await axios.get(
+          const detailsResponse = await http.get(
             buildUrl(`/service/radarr/${serverId}`),
             {
               headers: { "X-Api-Key": apiKey },
@@ -84,7 +85,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
 
   // Fetch from Sonarr servers
   try {
-    const sonarrListResponse = await axios.get(
+    const sonarrListResponse = await http.get(
       buildUrl("/service/sonarr"),
       {
         headers: { "X-Api-Key": apiKey },
@@ -96,7 +97,7 @@ async function fetchFromServers(seerrUrl, apiKey, fetchDetails, extractData) {
       try {
         if (fetchDetails) {
           const serverId = parseInt(server.id, 10);
-          const detailsResponse = await axios.get(
+          const detailsResponse = await http.get(
             buildUrl(`/service/sonarr/${serverId}`),
             {
               headers: { "X-Api-Key": apiKey },
@@ -147,7 +148,7 @@ export async function checkMediaStatus(
         ? `${apiUrl}/movie/${tmdbId}`
         : `${apiUrl}/tv/${tmdbId}`;
 
-    const response = await axios.get(url, {
+    const response = await http.get(url, {
       headers: { "X-Api-Key": apiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
@@ -348,10 +349,37 @@ export async function fetchQualityProfiles(seerrUrl, apiKey) {
   }
 }
 
+/** Thrown when a Discord user has no Seerr account to request with (not mapped, no guest). */
+export class NoSeerrUserError extends Error {
+  constructor(discordUserId) {
+    super(`No Seerr user to request with for Discord user ${discordUserId}`);
+    this.name = "NoSeerrUserError";
+  }
+}
+
+function findMappedSeerrUserId(discordUserId, userMappings) {
+  let mappings = userMappings;
+  if (typeof mappings === "string") {
+    try {
+      mappings = JSON.parse(mappings);
+    } catch (err) {
+      logger.error(`[SEERR] Failed to parse USER_MAPPINGS: ${err.message}`);
+      return null;
+    }
+  }
+  if (Array.isArray(mappings)) {
+    return mappings.find((m) => String(m.discordUserId) === String(discordUserId))?.seerrUserId ?? null;
+  }
+  if (mappings && typeof mappings === "object") return mappings[discordUserId] ?? null;
+  return null;
+}
+
 /**
- * Send a media request to Seerr
- * @param {Object} params - Request parameters
- * @returns {Promise<Object>} Response data
+ * Create a media request on behalf of a Discord user. It always runs as a Seerr user
+ * (x-api-user): the mapped account, or the guest account for unmapped users, so Seerr
+ * applies that user's permissions, quota and auto-approval. Never as the API key owner.
+ * @param {number|string|Function} [params.guestUserId] guest account id, or an async resolver
+ * @throws {NoSeerrUserError} when the user is not mapped and there is no guest account
  */
 export async function sendRequest({
   tmdbId,
@@ -363,193 +391,138 @@ export async function sendRequest({
   profileId = null,
   tags = null,
   isAnime = false,
-  isAutoApproved = null,
   seerrUrl,
   apiKey,
   userMappings = {},
+  guestUserId = null,
 }) {
-  // Prepare seasons for TV shows
-  let seasonsFormatted = null;
-  if (mediaType === "tv" && seasons && seasons.length > 0) {
-    // If seasons is ["all"] or contains "all", send empty array to request all seasons
-    // Seerr expects an empty array [], not a missing field
-    if (seasons.includes("all") || seasons[0] === "all") {
-      seasonsFormatted = []; // Empty array requests all seasons
-      logger.debug("[SEERR] Requesting all seasons (sending empty array)");
-    } else {
-      // Convert to array of numbers
-      seasonsFormatted = seasons.map((s) => parseInt(s, 10));
-      logger.debug(`[SEERR] Requesting specific seasons: ${seasonsFormatted.join(", ")}`);
-    }
-  }
+  const mappedUserId = discordUserId ? findMappedSeerrUserId(discordUserId, userMappings) : null;
+  // guestUserId may be a resolver, only called when the user has no mapping
+  const guest = mappedUserId === null && typeof guestUserId === "function" ? await guestUserId() : guestUserId;
+  const seerrUserId = mappedUserId ?? (typeof guest === "function" ? null : guest || null);
+  if (seerrUserId === null) throw new NoSeerrUserError(discordUserId);
 
   const payload = {
     mediaType,
     mediaId: parseInt(tmdbId, 10),
     ...(isAnime && { isAnime: true }),
   };
-
-  // Always include seasons field for TV shows (empty array = all seasons)
-  if (mediaType === "tv" && seasonsFormatted !== null) {
-    payload.seasons = seasonsFormatted;
+  // TV: an empty list requests every season
+  if (mediaType === "tv" && Array.isArray(seasons) && seasons.length > 0) {
+    payload.seasons = seasons.includes("all") ? [] : seasons.map((s) => parseInt(s, 10));
   }
+  if (Array.isArray(tags) && tags.length > 0) payload.tags = tags.map((t) => parseInt(t, 10));
+  // Seerr only honors these for users allowed advanced requests
+  if (serverId !== null && serverId !== undefined) payload.serverId = parseInt(serverId, 10);
+  if (profileId !== null && profileId !== undefined) payload.profileId = parseInt(profileId, 10);
+  if (rootFolder) payload.rootFolder = rootFolder;
 
-  // Add tags if provided
-  if (tags && Array.isArray(tags) && tags.length > 0) {
-    payload.tags = tags.map((t) => parseInt(t, 10));
-    logger.debug(`[SEERR] Using tags: ${payload.tags.join(", ")}`);
-  }
-
-  // Auto-approval is controlled by the isAutoApproved flag AND the x-api-user header
-  // (set below). When isAutoApproved is false, we explicitly set payload.isAutoApproved = false
-  // and send x-api-user so the request runs under the mapped user's permissions.
-  // serverId/profileId are included in both branches because Seerr requires them
-  // for TV show requests to work correctly — the pending/approved outcome is determined
-  // by the combination of isAutoApproved and x-api-user, not by omitting server fields.
-
-  if (isAutoApproved === true) {
-    // User wants auto-approval - send all details
-    payload.isAutoApproved = true;
-    logger.info("[SEERR] 🚀 Auto-Approve is ON - including server details");
-
-    if (rootFolder) {
-      payload.rootFolder = rootFolder;
-    }
-    if (serverId !== null && serverId !== undefined) {
-      payload.serverId = parseInt(serverId, 10);
-    }
-    if (profileId !== null && profileId !== undefined) {
-      payload.profileId = parseInt(profileId, 10);
-    }
-
-    // Note: userId will be added later after user mapping check
-  } else {
-    // isAutoApproved is false OR null - create as PENDING request
-    // IMPORTANT: We still need to send serverId and profileId for TV shows
-    // to work properly, but we set isAutoApproved to false to force manual approval
-    payload.isAutoApproved = false;
-    logger.info("[SEERR] ✋ Auto-Approve is OFF - request will be PENDING (admin must approve manually)");
-
-    // Include serverId and profileId if provided (needed for TV show requests to work)
-    if (serverId !== null && serverId !== undefined) {
-      payload.serverId = parseInt(serverId, 10);
-      logger.debug(`[SEERR] Including serverId ${serverId} in PENDING request (required for TV shows)`);
-    }
-    if (profileId !== null && profileId !== undefined) {
-      payload.profileId = parseInt(profileId, 10);
-      logger.debug(`[SEERR] Including profileId ${profileId} in PENDING request (required for TV shows)`);
-    }
-    if (rootFolder) {
-      payload.rootFolder = rootFolder;
-      logger.debug(`[SEERR] Including rootFolder in PENDING request`);
-    }
-  }
-
-  // Check if we have a user mapping for this Discord user
-  let seerrUserId = null;
-
-  if (discordUserId) {
-    try {
-      const mappings =
-        typeof userMappings === "string"
-          ? JSON.parse(userMappings)
-          : userMappings;
-
-      logger.info(`[SEERR] 🔍 Mapping check for Discord User: ${discordUserId}`);
-
-      // Handle array format (current standard)
-      if (Array.isArray(mappings)) {
-        const mapping = mappings.find((m) => String(m.discordUserId) === String(discordUserId));
-        if (mapping) {
-          seerrUserId = mapping.seerrUserId;
-          logger.info(`[SEERR] ✅ Match found in config: Discord ${discordUserId} -> Seerr User ${seerrUserId} (${mapping.seerrDisplayName || 'no name'})`);
-        }
-      }
-      // Handle object format (legacy/fallback)
-      else if (mappings && typeof mappings === "object" && mappings[discordUserId]) {
-        seerrUserId = mappings[discordUserId];
-        logger.info(`[SEERR] ✅ Match found in legacy config: Discord ${discordUserId} -> Seerr User ${seerrUserId}`);
-      }
-
-      if (seerrUserId !== null && seerrUserId !== undefined) {
-        logger.info(`[SEERR] 👤 Requesting as Seerr User ID: ${seerrUserId}`);
-
-        // If auto-approve is ON, add userId to payload for tracking
-        // This helps identify who made the request in Seerr's history
-        if (isAutoApproved === true) {
-          payload.userId = parseInt(seerrUserId, 10);
-          logger.info(`[SEERR] 📝 Adding userId to payload for tracking: ${payload.userId}`);
-        }
-      } else {
-        logger.warn(`[SEERR] ❌ No mapping found for Discord user ${discordUserId}. Requesting as API Key Owner (ADMIN).`);
-      }
-    } catch (e) {
-      logger.error("[SEERR] ❌ Failed to parse USER_MAPPINGS:", e);
-    }
-  }
-
+  logger.info(
+    `[SEERR] Requesting ${mediaType} ${tmdbId} for Discord user ${discordUserId} as Seerr user ${seerrUserId}${mappedUserId === null ? " (guest)" : ""}`
+  );
   try {
-    const apiUrl = normalizeApiUrl(seerrUrl);
-    const finalUrl = `${apiUrl}/request`;
-
-    logger.info(`[SEERR] 🚀 Sending POST to: ${finalUrl}`);
-
-    // Build headers
-    const headers = {
-      "X-Api-Key": apiKey,
-      "Content-Type": "application/json"
-    };
-
-    // CRITICAL: x-api-user header logic based on auto-approve setting
-    // 
-    // When isAutoApproved === true:
-    //   - DO NOT set x-api-user header
-    //   - Request will use API key owner's permissions (admin with auto-approve)
-    //   - Result: Request is auto-approved immediately
-    //
-    // When isAutoApproved === false:
-    //   - SET x-api-user header to mapped user ID
-    //   - Request will use mapped user's permissions (no auto-approve)
-    //   - Result: Request is created as PENDING, requires manual approval
-
-    if (isAutoApproved === false && seerrUserId !== null && seerrUserId !== undefined) {
-      headers["x-api-user"] = String(seerrUserId);
-      logger.info(`[SEERR] 🎭 Setting x-api-user header: ${seerrUserId} (request will use this user's permissions - no auto-approve)`);
-    } else if (isAutoApproved === true) {
-      logger.info(`[SEERR] 🔓 NOT setting x-api-user header (request will use API key owner's permissions - auto-approve enabled)`);
-    }
-
-    const response = await axios.post(finalUrl, payload, {
-      headers,
+    const response = await http.post(`${normalizeApiUrl(seerrUrl)}/request`, payload, {
+      headers: { "X-Api-Key": apiKey, "Content-Type": "application/json", "x-api-user": String(seerrUserId) },
       timeout: TIMEOUTS.SEERR_POST,
     });
-
-    logger.info("[SEERR] ✨ Request successful!");
-    logger.debug(`[SEERR] Response: ${JSON.stringify(response.data)}`);
     return response.data;
   } catch (err) {
-    const errorData = err?.response?.data;
-    const statusCode = err?.response?.status;
-
-    logger.error("[SEERR] ❌ Request failed!");
-
-    // Log status code if available
-    if (statusCode) {
-      logger.error(`[SEERR] HTTP Status Code: ${statusCode}`);
-    }
-
-    // Log detailed error information
-    if (errorData) {
-      logger.error(`[SEERR] Error Details: ${JSON.stringify(errorData)}`);
-    } else if (err.message) {
-      logger.error(`[SEERR] Error Message: ${err.message}`);
-    }
-
-    // Log the full error for debugging
-    if (err.code) {
-      logger.error(`[SEERR] Error Code: ${err.code}`);
-    }
-
+    const status = err?.response?.status;
+    const details = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
+    logger.error(`[SEERR] Request failed${status ? ` (HTTP ${status})` : ""}: ${details}`);
     throw err;
+  }
+}
+
+// ----- Guest account for Discord users without a mapping -----
+
+const PERMISSION_REQUEST = 32;
+const PERMISSION_AUTO_APPROVE = 128;
+export const GUEST_EMAIL = "discord@anchorr.invalid";
+export const GUEST_USERNAME = "Discord (Anchorr)";
+
+function seerrCall(method, seerrUrl, apiKey, path, data) {
+  return http.request({
+    method,
+    url: `${normalizeApiUrl(seerrUrl)}${path}`,
+    data,
+    headers: { "X-Api-Key": apiKey },
+    timeout: TIMEOUTS.SEERR_API,
+  });
+}
+
+/**
+ * Returns the guest account id, creating it when missing. The account can only request
+ * (plus auto-approve if asked); the admin tunes quota and permissions in Seerr.
+ * Its password is random and never stored: nobody signs in with it.
+ */
+export async function ensureGuestUser({ seerrUrl, apiKey, guestUserId = null, autoApprove = false }) {
+  if (guestUserId) {
+    try {
+      await seerrCall("get", seerrUrl, apiKey, `/user/${parseInt(guestUserId, 10)}`);
+      return Number(guestUserId);
+    } catch (err) {
+      if (err?.response?.status !== 404) throw err;
+      logger.warn(`[SEERR] Guest user ${guestUserId} no longer exists in Seerr, creating a new one`);
+    }
+  }
+
+  const permissions = PERMISSION_REQUEST | (autoApprove ? PERMISSION_AUTO_APPROVE : 0);
+  try {
+    const { data } = await seerrCall("post", seerrUrl, apiKey, "/user", {
+      email: GUEST_EMAIL,
+      username: GUEST_USERNAME,
+      password: crypto.randomBytes(24).toString("base64url"),
+      permissions,
+    });
+    logger.info(`[SEERR] Created guest user "${GUEST_USERNAME}" (id ${data.id}) for Discord users without a linked account`);
+    return data.id;
+  } catch (err) {
+    if (err?.response?.status !== 409) throw err;
+    // Left over from an earlier install: reuse it
+    const { data } = await seerrCall("get", seerrUrl, apiKey, "/user?take=1000&skip=0");
+    const existing = data?.results?.find((u) => u.email === GUEST_EMAIL);
+    if (!existing) throw err;
+    logger.info(`[SEERR] Reusing existing guest user (id ${existing.id})`);
+    return existing.id;
+  }
+}
+
+/** Turns the guest's AUTO_APPROVE permission on or off and leaves its other permissions alone. */
+export async function setGuestAutoApprove({ seerrUrl, apiKey, guestUserId, autoApprove }) {
+  const id = parseInt(guestUserId, 10);
+  const { data: user } = await seerrCall("get", seerrUrl, apiKey, `/user/${id}`);
+  const current = Number(user.permissions) || 0;
+  const next = autoApprove ? current | PERMISSION_AUTO_APPROVE : current & ~PERMISSION_AUTO_APPROVE;
+  if (next !== current) await seerrCall("put", seerrUrl, apiKey, `/user/${id}`, { permissions: next });
+  return next;
+}
+
+// ----- setup -----
+
+/** Seerr version for a URL + API key (throws on a wrong key or URL). */
+export async function getSeerrVersion(seerrUrl, apiKey) {
+  const { data } = await http.get(`${normalizeApiUrl(seerrUrl)}/settings/about`, {
+    headers: { "X-Api-Key": apiKey },
+    timeout: TIMEOUTS.SEERR_API,
+  });
+  return data?.version ?? null;
+}
+
+/**
+ * Reads Seerr's API key by signing in with a Jellyfin account (Seerr admins sign in this way).
+ * The Seerr session is closed right after; the password is not kept.
+ */
+export async function getApiKeyWithJellyfinLogin(seerrUrl, username, password) {
+  const base = normalizeApiUrl(seerrUrl);
+  const login = await http.post(`${base}/auth/jellyfin`, { username, password }, { timeout: TIMEOUTS.SEERR_API });
+  const cookie = login.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+  if (!cookie) throw new Error("Seerr did not start a session");
+  try {
+    const { data } = await http.get(`${base}/settings/main`, { headers: { Cookie: cookie }, timeout: TIMEOUTS.SEERR_API });
+    if (!data?.apiKey) throw new Error("This Seerr account cannot read the API key");
+    return data.apiKey;
+  } finally {
+    await http.post(`${base}/auth/logout`, undefined, { headers: { Cookie: cookie }, timeout: TIMEOUTS.SEERR_API }).catch(() => {});
   }
 }

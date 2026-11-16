@@ -1,4 +1,5 @@
 import logger from "./logger.js";
+import { settings } from "./settings.js";
 
 /**
  * Build a Jellyfin URL that preserves a potential subpath (e.g., /jellyfin)
@@ -12,7 +13,7 @@ import logger from "./logger.js";
  * @returns {string} Fully-qualified Jellyfin URL
  */
 export function buildJellyfinUrl(appendPath, hash) {
-  const effectiveBaseUrl = process.env.JELLYFIN_BASE_URL;
+  const effectiveBaseUrl = settings.JELLYFIN_BASE_URL;
 
   try {
     const u = new URL(effectiveBaseUrl);

@@ -1,47 +1,14 @@
 import { Router } from "express";
-import axios from "axios";
+import http from "../utils/http.js";
 import { authenticateToken } from "../utils/auth.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
-import { libraryCache } from "../jellyfinWebhook.js";
+import { libraryCache } from "../jellyfin/libraryDetection.js";
 import { jellyfinAuthHeaders } from "../api/jellyfin.js";
 import logger from "../utils/logger.js";
-import { seedLibrary, checkSeedPreconditions } from "../jellyfin/librarySeeder.js";
-import { updateConfig } from "../utils/configFile.js";
+import { settings } from "../utils/settings.js";
 
 const router = Router();
-
-// Resets the LIBRARY_SEEDED flag and re-runs the full library seed scan.
-// Fire-and-forget: the scan can take a while for large libraries, so this
-// responds immediately and the scan continues in the background.
-router.post("/seed/reset", authenticateToken, (_req, res) => {
-  // Checked before touching config so a rejected request reports the real
-  // reason instead of confirming a scan that never starts.
-  const pre = checkSeedPreconditions();
-  if (!pre.ok) {
-    return res.status(409).json({
-      success: false,
-      message: `Cannot start re-seed: ${pre.reason}.`,
-    });
-  }
-
-  if (!updateConfig({ LIBRARY_SEEDED: "false" })) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update config.json.",
-    });
-  }
-  process.env.LIBRARY_SEEDED = "false";
-
-  seedLibrary().catch((err) =>
-    logger.error(`librarySeeder: unexpected rejection from re-seed (${err?.message || err})`)
-  );
-
-  res.json({
-    success: true,
-    message: "Library re-seed started in the background. Check the logs for progress.",
-  });
-});
 
 function isAllowedUrl(url) {
   try {
@@ -70,10 +37,10 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
     const { url } = req.body;
     let { apiKey } = req.body;
     if (isMaskedValue(apiKey)) {
-      if (!isSameConfiguredHost(url, process.env.JELLYFIN_BASE_URL)) {
+      if (!isSameConfiguredHost(url, settings.JELLYFIN_BASE_URL)) {
         return res.status(403).json({ success: false, message: "URL does not match the configured Jellyfin server." });
       }
-      apiKey = process.env.JELLYFIN_API_KEY;
+      apiKey = settings.JELLYFIN_API_KEY;
     }
 
     if (!url || !apiKey) {
@@ -85,7 +52,7 @@ router.post("/jellyfin-libraries", authenticateToken, async (req, res) => {
 
     const safeUrl = new URL(url);
     safeUrl.pathname = safeUrl.pathname.replace(/\/$/, "") + "/Library/VirtualFolders";
-    const response = await axios.get(
+    const response = await http.get(
       safeUrl.href,
       {
         headers: jellyfinAuthHeaders(apiKey),
@@ -125,7 +92,7 @@ router.post("/test-jellyfin", authenticateToken, async (req, res) => {
   try {
     const safeUrl = new URL(url);
     safeUrl.pathname = safeUrl.pathname.replace(/\/$/, "") + "/System/Info/Public";
-    const response = await axios.get(safeUrl.href, { timeout: TIMEOUTS.JELLYFIN_API });
+    const response = await http.get(safeUrl.href, { timeout: TIMEOUTS.JELLYFIN_API });
 
     if (response.data?.ServerName && response.data?.Version) {
       return res.json({
@@ -144,8 +111,8 @@ router.post("/test-jellyfin", authenticateToken, async (req, res) => {
 // Fetch libraries from configured Jellyfin instance
 router.get("/jellyfin/libraries", authenticateToken, async (req, res) => {
   try {
-    const apiKey = process.env.JELLYFIN_API_KEY;
-    const baseUrl = process.env.JELLYFIN_BASE_URL;
+    const apiKey = settings.JELLYFIN_API_KEY;
+    const baseUrl = settings.JELLYFIN_BASE_URL;
 
     if (!apiKey || !baseUrl) {
       return res.status(400).json({
