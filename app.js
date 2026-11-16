@@ -153,7 +153,7 @@ function configureWebServer() {
   });
 
   // Middleware for parsing JSON bodies - MUST be before routes that use req.body
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" })); // config backups with many linked members pass 100 kB
   app.use(cookieParser());
 
   // Rate limiting middleware - DoS protection
