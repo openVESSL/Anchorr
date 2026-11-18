@@ -15,8 +15,16 @@ Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Je
 
 **Before you update**
 
-- Copy your config folder (`config.json` and the state files next to it) to another place. Anchorr backs the folder up to `backup-1.x` inside it before upgrading, and does not start if that fails, but a copy elsewhere also covers a lost volume.
+- Copy your config folder (`config.json` and the state files next to it) to another place. Anchorr makes its own backup on the first start (see below), but only a copy elsewhere also covers a lost volume.
 - Running without Docker? Use Node.js 22.23.4, 24.22.1, 26.12.1 or newer, and run `npm run build` after `npm install`: it builds the new dashboard.
+
+**What happens on the first start**
+
+1. Anchorr copies your config folder to `backup-1.x` inside it. If the copy fails, Anchorr does not start, logs why and changes nothing.
+2. It upgrades `config.json`. Your local account, linked members, channels and other settings stay; the TMDB and OMDb keys are removed.
+3. The Overview shows a checklist of what changed and what still needs a look. Items tick themselves off once they are done, and "Done" hides the card.
+
+To go back to 1.6.5: stop Anchorr, copy the files from `backup-1.x` back into the config folder, delete `backup-1.x` and run version 1.6.5.
 
 **What you can remove**
 
@@ -69,7 +77,6 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 - The tag picker for shows only lists Sonarr tags. A Radarr tag picked for a show used to be dropped from the request.
 - Picking tags for a show without chosen seasons no longer treats it as a movie.
 - Requests from the daily pick use the anime server and quality profile for anime, and ask for a show's seasons explicitly, the same as `/request`.
-- A large import (more than 30 episodes or 10 seasons of one show) is announced once instead of twice.
 - Announcement channels can be picked for posts, not only plain text channels.
 - Turning the daily pick on or changing its channel or interval takes effect at once, and stopping the bot also stops it.
 - The "Detailed logs" switch takes effect at once instead of after a restart.
