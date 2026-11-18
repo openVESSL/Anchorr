@@ -67,7 +67,17 @@ router.post("/config/restore", authenticateToken, async (req, res) => {
   if (!writeConfig(restored)) {
     return res.status(500).json({ success: false, error: "Failed to save configuration file. Check Docker volume permissions and server logs." });
   }
-  loadSettings(); // runs the v1 migrations when the backup is an older format
+  try {
+    // Runs the v1 migrations when the backup is an older format. No 1.x folder backup here:
+    // the current folder is not a 1.x one, and the uploaded file is its own copy.
+    if (!loadSettings({ backupV1: false })) throw new Error("the restored file could not be loaded");
+  } catch (err) {
+    logger.error("Restored config.json, but loading it failed:", err);
+    return res.status(500).json({
+      success: false,
+      error: `The backup was saved but only partly applied: ${err.message}. To return to the previous configuration, put back config.before-restore.json from the config folder and restart Anchorr.`,
+    });
+  }
   logger.info("✅ Configuration restored from a backup");
 
   if (botState.isBotRunning) {

@@ -26,8 +26,9 @@ import saveConfigRouter from "./routes/saveConfigRoutes.js";
 import testRouter from "./routes/testRoutes.js";
 import setupRouter from "./routes/setupRoutes.js";
 import overviewRouter from "./routes/overviewRoutes.js";
+import upgradeRouter from "./routes/upgradeRoutes.js";
 import { startBot } from "./bot/botManager.js";
-import { CONFIG_PATH, loadSettings } from "./utils/configFile.js";
+import { CONFIG_PATH, MigrationBackupError, loadSettings } from "./utils/configFile.js";
 import { settings } from "./utils/settings.js";
 
 // --- Helper Functions ---
@@ -38,7 +39,17 @@ function loadConfig() {
   logger.debug("[LOADCONFIG] File exists:", fs.existsSync(CONFIG_PATH));
 
   // Centralized loader (includes all migrations)
-  const success = loadSettings();
+  let success;
+  try {
+    success = loadSettings();
+  } catch (err) {
+    if (!(err instanceof MigrationBackupError)) throw err;
+    // Starting anyway would serve the setup wizard with an empty config
+    logger.error(`❌ ${err.message}`);
+    // The log files write asynchronously: give them a moment to record the reason
+    setTimeout(() => process.exit(1), 1000);
+    return null; // startServer stops here
+  }
 
   if (success) {
     logger.debug(
@@ -200,6 +211,7 @@ function configureWebServer() {
   app.use("/api", saveConfigRouter);
   app.use("/api", testRouter);
   app.use("/api", overviewRouter);
+  app.use("/api", upgradeRouter);
 
   app.use("/assets", express.static(path.join(__dirname, "assets")));
   app.use("/locales", express.static(path.join(__dirname, "locales")));
@@ -292,7 +304,7 @@ function startServer() {
   // Check volume configuration early
   verifyVolumeConfiguration();
 
-  loadConfig();
+  if (loadConfig() === null) return; // exiting: the 1.x backup failed
   port = settings.WEBHOOK_PORT || 8282;
   // Default to localhost-only for bare-metal safety. Docker sets BIND_HOST=0.0.0.0
   // so that container port mapping works. Never expose the dashboard externally

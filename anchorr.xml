@@ -25,7 +25,7 @@
 - No Jellyfin Webhook plugin, TMDB or OMDb key needed any more
 - Members without a linked Seerr account request through a guest account with its own limits
 - Configuration backup and restore in Settings
-- Existing configurations are upgraded automatically; the original is kept as config.v1.json
+- Existing configurations are upgraded automatically; the 1.x config folder is kept as backup-1.x
 
 Full release notes: https://github.com/openVESSL/Anchorr/blob/main/CHANGELOG.md
   </Changes>

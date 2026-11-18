@@ -12,7 +12,8 @@ export const configSchema = Joi.object({
   BOT_ID: Joi.string().allow("").optional(),
   GUILD_ID: Joi.string().allow("").optional(),
   SEERR_URL: Joi.string().uri().allow("").optional(),
-  SEERR_API_KEY: Joi.string().allow("").optional(),  JELLYFIN_BASE_URL: Joi.string().uri().allow("").optional(),
+  SEERR_API_KEY: Joi.string().allow("").optional(),
+  JELLYFIN_BASE_URL: Joi.string().uri().allow("").optional(),
   JELLYFIN_API_KEY: Joi.string().allow("").optional(),
   JELLYFIN_SERVER_ID: Joi.string().allow("").optional(),
   JELLYFIN_CHANNEL_ID: Joi.string().allow("").optional(),
@@ -69,6 +70,13 @@ export const configSchema = Joi.object({
     .optional(),
   // Seerr account used for Discord users without a mapping (created automatically)
   SEERR_GUEST_USER_ID: Joi.alternatives(Joi.string().pattern(/^\d*$/), Joi.number().integer().min(1)).optional(),
+  // Written by the 1.x upgrade and the checklist's Done button
+  UPGRADE_FROM_V1: Joi.object({
+    at: Joi.string().isoDate().required(),
+    autoApprove: Joi.boolean().required(),
+    mappings: Joi.number().integer().min(0).allow(null).required(),
+  }).optional(),
+  UPGRADE_DISMISSED_AT: Joi.string().isoDate().optional(),
   DAILY_RANDOM_PICK_ENABLED: Joi.string().valid("true", "false").optional(),
   DAILY_RANDOM_PICK_CHANNEL_ID: Joi.string().allow("").optional(),
   DAILY_RANDOM_PICK_INTERVAL: Joi.alternatives(Joi.string().allow(""), Joi.number().integer().min(1)).optional(),
@@ -103,10 +111,16 @@ export const DASHBOARD_PROTECTED_KEYS = [
   "USER_MAPPING_METADATA",
   "WEEKLY_ROUNDUP_LAST_POSTED_AT",
   "CONFIG_VERSION",
+  "UPGRADE_FROM_V1",
+  "UPGRADE_DISMISSED_AT",
 ];
 
 // save-config body: every known config key plus the one-shot startBot flag; unknown keys are dropped.
-export const saveConfigSchema = configSchema.keys({ startBot: Joi.boolean().optional() });
+// The upgrade keys are server-managed: dropped whatever their shape, so a damaged record
+// can never block saving settings.
+export const saveConfigSchema = configSchema
+  .keys({ startBot: Joi.boolean().optional() })
+  .fork(["UPGRADE_FROM_V1", "UPGRADE_DISMISSED_AT"], () => Joi.any().strip());
 
 // --- USER MAPPING VALIDATION ---
 export const userMappingSchema = Joi.object({

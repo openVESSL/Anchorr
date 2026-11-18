@@ -167,6 +167,55 @@ test("a config backup restores, keeps this install's secrets and port, and rejec
   assert.equal((await api("GET", "/api/status")).status, 200, "the session survives, so JWT_SECRET was kept");
 });
 
+test("upgrade checklist: only for installs migrated from 1.x, dismissable, session and JSON required", async () => {
+  assert.equal((await api("GET", "/api/upgrade", undefined, { auth: false })).status, 401);
+  assert.deepEqual((await api("GET", "/api/upgrade")).json, { show: false, items: [] }, "nothing for a 2.0 install");
+
+  // restoring a 1.x backup runs the upgrade, like a first start of 2.0 on a 1.x config
+  const current = (await api("GET", "/api/config/backup")).json;
+  delete current.CONFIG_VERSION;
+  const v1 = {
+    ...current,
+    TMDB_API_KEY: "",
+    SEERR_AUTO_APPROVE: "true",
+    USER_MAPPINGS: [{ discordUserId: "123456789012345678", seerrUserId: "2" }],
+    WEEKLY_ROUNDUP_ENABLED: "true",
+  };
+  assert.equal((await api("POST", "/api/config/restore", v1)).status, 200);
+
+  const { json } = await api("GET", "/api/upgrade");
+  assert.equal(json.show, true);
+  assert.ok(Date.parse(json.upgradedAt));
+  const items = Object.fromEntries(json.items.map((i) => [i.id, i]));
+  assert.deepEqual(
+    json.items.map((i) => i.id),
+    ["jellyfin_linked", "auto_approve", "time_zone", "webhook_plugin", "backup", "removed_keys"],
+    "most important first; no Seerr guest item without Seerr"
+  );
+  assert.equal(items.jellyfin_linked.state, "done", "linked during the first run");
+  assert.equal(items.auto_approve.state, "manual");
+  assert.equal(items.webhook_plugin.state, "todo", "the plugin called earlier in this run");
+  assert.match(items.backup.path, /backup-1\.x$/);
+
+  // a plain HTML form (no JSON) cannot hide it
+  const form = await api("POST", "/api/upgrade/dismiss", undefined, { headers: { "content-type": "application/x-www-form-urlencoded" } });
+  assert.equal(form.status, 415);
+  assert.equal((await api("POST", "/api/upgrade/dismiss", {}, { auth: false })).status, 401);
+
+  assert.equal((await api("POST", "/api/upgrade/dismiss", {})).status, 200);
+  assert.deepEqual((await api("GET", "/api/upgrade")).json, { show: false, items: [] });
+
+  // a restored file cannot carry a broken record
+  const broken = (await api("GET", "/api/config/backup")).json;
+  assert.equal((await api("POST", "/api/config/restore", { ...broken, UPGRADE_FROM_V1: null })).status, 400);
+  assert.equal((await api("POST", "/api/config/restore", { ...broken, UPGRADE_FROM_V1: { at: "x" } })).status, 400);
+
+  // the dashboard cannot bring it back or fake it
+  const saved = await api("POST", "/api/save-config", { UPGRADE_DISMISSED_AT: "", UPGRADE_FROM_V1: { at: "x" } });
+  assert.equal(saved.status, 200, "a damaged record never blocks saving settings");
+  assert.deepEqual((await api("GET", "/api/upgrade")).json, { show: false, items: [] });
+});
+
 test("logout revokes the session", async () => {
   const old = cookie;
   assert.equal((await api("POST", "/api/auth/logout", {})).status, 200);

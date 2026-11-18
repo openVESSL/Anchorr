@@ -5,13 +5,14 @@ import { Link } from "react-router"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/settings"
+import { UpgradeCard } from "@/components/upgrade-card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, ApiError } from "@/lib/api"
 import { useT, type Translate } from "@/lib/i18n"
-import { keys, useOverview, useSetupState, useStatus, type ActivityType, type Overview } from "@/lib/queries"
+import { keys, useOverview, useSetupState, useStatus, useUpgrade, type ActivityType, type Overview } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
 
@@ -40,6 +41,8 @@ export function OverviewPage() {
   const incomplete = setup && (!setup.jellyfin || !setup.seerr || !setup.discord || !setup.discordServer)
   const overview = useOverview()
   const o = overview.data
+  const upgradeQuery = useUpgrade()
+  const upgrade = upgradeQuery.data
 
   async function toggleBot() {
     setBusy(true)
@@ -85,7 +88,16 @@ export function OverviewPage() {
           </AlertDescription>
         </Alert>
       )}
-      {s?.legacyWebhookLastSeen && (
+      {upgrade?.show && <UpgradeCard upgrade={upgrade} />}
+      {upgradeQuery.isError && !upgrade && (
+        <Alert className="mb-4">
+          <AlertTriangle />
+          <AlertTitle>{t("Could not load the upgrade checklist")}</AlertTitle>
+          <AlertDescription>{upgradeQuery.error instanceof ApiError ? upgradeQuery.error.message : t("Something went wrong")}</AlertDescription>
+        </Alert>
+      )}
+      {/* the upgrade checklist already lists the Webhook plugin; wait for it to avoid a flash */}
+      {s?.legacyWebhookLastSeen && !upgradeQuery.isPending && !upgrade?.show && (
         <Alert className="mb-4">
           <AlertTriangle />
           <AlertTitle>{t("The Jellyfin Webhook plugin is no longer needed")}</AlertTitle>
