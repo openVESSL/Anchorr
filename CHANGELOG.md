@@ -60,8 +60,12 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 - Smaller install: axios, lodash.debounce and node-cache were replaced by built-in Node.js features.
 - The Docker image listens on all interfaces by default and builds the dashboard in its own stage.
 - The compose file sets `TZ`, and the Unraid template links the Discord server, the readme and the license and has an optional `TRUST_PROXY` setting.
+
 ### Fixed
 
+- `/search` and `/request` answer with an error when Seerr is unreachable instead of staying on "thinking".
+- A request that Seerr accepted is confirmed even if showing the result fails, instead of being reported as failed.
+- Discord errors are no longer shown to members as Seerr errors.
 - The tag picker for shows only lists Sonarr tags. A Radarr tag picked for a show used to be dropped from the request.
 - Picking tags for a show without chosen seasons no longer treats it as a movie.
 - Requests from the daily pick use the anime server and quality profile for anime, and ask for a show's seasons explicitly, the same as `/request`.
@@ -77,7 +81,7 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 ### Security
 
 - Requests from Discord no longer bypass Seerr approvals, quotas or permission checks, and members can no longer pick a 4K server or quality profile Seerr would not allow them.
-- A fresh install can only be claimed by proving Jellyfin administrator access. The local account can only be added from a signed-in session.
+- Until setup is done, only the Jellyfin step is open without signing in. The local account can only be added from a signed-in session.
 - Failed HTTP requests no longer write API keys (`X-Api-Key`, `Authorization`) into the log files.
 - Calls to Jellyfin, Seerr and Discord follow redirects only to the same address or from http to https on the same host, so a redirect can never carry the API key to another server, port or plain-http address.
 - Settings saved from the dashboard can no longer set arbitrary environment variables such as `NODE_TLS_REJECT_UNAUTHORIZED`.
