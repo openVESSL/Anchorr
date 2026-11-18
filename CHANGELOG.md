@@ -56,7 +56,7 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 - Notifications use Jellyfin's runtime when Seerr has none, which is common for shows.
 - `/api/overview`, `/api/requests/recent` and `/api/requests/:id/approve|decline` for the dashboard. Bot activity is kept in `activity.json` in the config folder (the last 200 events).
 - `/api/status` reports the bot and Jellyfin connection, an old plugin still calling, and a reverse proxy without `TRUST_PROXY`.
-- **Upgrade checklist.** After an upgrade from 1.x, the Overview lists what changed and what still needs a look, and where the 1.x backup is.
+- **Guided upgrade from 1.x.** Before upgrading a 1.x configuration, Anchorr backs up the whole config folder to `backup-1.x` and does not start if that fails. Afterwards the Overview shows a checklist of what changed and what still needs a look, and ticks items off once they are done.
 - **Configuration backup.** Settings can download `config.json` and restore it later or on another install. The install keeps its own sign-in secret and network settings, and the replaced file is kept as `config.before-restore.json`.
 
 ### Changed
