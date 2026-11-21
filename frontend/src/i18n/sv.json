@@ -367,5 +367,8 @@
   "Hide anyway": "Dölj ändå",
   "Saved in {path}. To go back: stop Anchorr, copy those files back into the config folder, delete the backup-1.x folder and run version 1.6.5.": "Sparad i {path}. För att gå tillbaka: stoppa Anchorr, kopiera tillbaka filerna till konfigurationsmappen, ta bort mappen backup-1.x och kör version 1.6.5.",
   "No 1.x backup was found at {path}. Use your own copy of the config folder if you need to go back to 1.x.": "Ingen säkerhetskopia av 1.x hittades i {path}. Använd din egen kopia av konfigurationsmappen om du behöver gå tillbaka till 1.x.",
-  "Could not load the upgrade checklist": "Det gick inte att läsa in uppgraderingslistan"
+  "Could not load the upgrade checklist": "Det gick inte att läsa in uppgraderingslistan",
+  "Links in Discord": "Länkar i Discord",
+  "Public address": "Offentlig adress",
+  "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Används bara för länkar och bilder i Discord, till exempel https://jellyfin.example.com. Lämna tomt för att använda anslutningsadressen."
 }

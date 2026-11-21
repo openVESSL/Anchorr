@@ -367,5 +367,8 @@
   "Hide anyway": "Trotzdem ausblenden",
   "Saved in {path}. To go back: stop Anchorr, copy those files back into the config folder, delete the backup-1.x folder and run version 1.6.5.": "Gespeichert in {path}. Zurück zu 1.x: Anchorr stoppen, die Dateien zurück in den Config-Ordner kopieren, den Ordner backup-1.x löschen und Version 1.6.5 starten.",
   "No 1.x backup was found at {path}. Use your own copy of the config folder if you need to go back to 1.x.": "Unter {path} wurde keine 1.x-Sicherung gefunden. Nutze deine eigene Kopie des Config-Ordners, falls du zu 1.x zurück musst.",
-  "Could not load the upgrade checklist": "Die Upgrade-Checkliste konnte nicht geladen werden"
+  "Could not load the upgrade checklist": "Die Upgrade-Checkliste konnte nicht geladen werden",
+  "Links in Discord": "Links in Discord",
+  "Public address": "Öffentliche Adresse",
+  "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Wird nur für Links und Bilder in Discord verwendet, zum Beispiel https://jellyfin.example.com. Leer lassen, um die Verbindungsadresse zu verwenden."
 }

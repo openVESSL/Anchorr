@@ -367,5 +367,8 @@
   "Hide anyway": "Masquer quand même",
   "Saved in {path}. To go back: stop Anchorr, copy those files back into the config folder, delete the backup-1.x folder and run version 1.6.5.": "Enregistrée dans {path}. Pour revenir en arrière : arrêtez Anchorr, recopiez ces fichiers dans le dossier de configuration, supprimez le dossier backup-1.x et lancez la version 1.6.5.",
   "No 1.x backup was found at {path}. Use your own copy of the config folder if you need to go back to 1.x.": "Aucune sauvegarde 1.x n'a été trouvée dans {path}. Utilisez votre propre copie du dossier de configuration si vous devez revenir à la 1.x.",
-  "Could not load the upgrade checklist": "Impossible de charger la liste de mise à jour"
+  "Could not load the upgrade checklist": "Impossible de charger la liste de mise à jour",
+  "Links in Discord": "Liens dans Discord",
+  "Public address": "Adresse publique",
+  "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Utilisée uniquement pour les liens et les images dans Discord, par exemple https://jellyfin.example.com. Laissez vide pour utiliser l'adresse de connexion."
 }
