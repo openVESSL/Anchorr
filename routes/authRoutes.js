@@ -15,12 +15,15 @@ const signInLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// The dashboard calls this on every page load; a flood guard only, like the rest of /api
+const checkLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHeaders: true, legacyHeaders: false });
+
 router.post("/auth/login", signInLimiter, login);
 router.post("/auth/jellyfin", signInLimiter, loginWithJellyfin);
 // The single local account is added from a signed-in session (audit S4)
 router.post("/auth/register", signInLimiter, authenticateToken, register);
 router.post("/auth/logout", logout);
 // Read-only and called on every page load, so it never counts as an attempt
-router.get("/auth/check", checkAuth);
+router.get("/auth/check", checkLimiter, checkAuth);
 
 export default router;
