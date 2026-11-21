@@ -4,7 +4,7 @@
  */
 import { getDetails, getExtras, getTitleRequests, isMetadataConfigured } from "../api/metadata.js";
 import { recordActivity } from "../utils/activity.js";
-import { getDiscordLinks, isMokaMode, requestersFor } from "../api/moka.js";
+import { getDiscordLinks, isMokaMode, mutedDiscordIds, requestersFor } from "../api/moka.js";
 import { getUserMappings } from "../utils/configFile.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
@@ -198,7 +198,9 @@ export async function processAndSendNotification(
     logger.info(`${testPrefix}Sent notification for: ${post.title}`);
   }
 
-  for (const userId of dm ? requesters : []) {
+  // In Moka, each person chooses whether the bot messages them
+  const muted = dm ? await mutedDiscordIds() : new Set();
+  for (const userId of dm ? requesters.filter((id) => !muted.has(String(id))) : []) {
     try {
       const user = await client.users.fetch(userId);
       await user.send(buildAvailableDm(data, post));

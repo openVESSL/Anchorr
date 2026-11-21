@@ -26,7 +26,13 @@ before(async () => {
       return { status: 401, json: { message: "not signed in" } };
     },
     "GET /api/v1/health": () => ({ json: { status: "ok", version: "0.1.0" } }),
-    "GET /api/v1/anchorr/links": () => [{ user_id: 7, username: "ana", discord_id: "111111111111111111" }],
+    "GET /api/v1/anchorr/links": () => [
+      { user_id: 7, username: "ana", discord_id: "111111111111111111", notify: true },
+      { user_id: 8, username: "bo", discord_id: "222222222222222222", notify: false },
+    ],
+    "GET /api/v1/anchorr/users": () => [{ id: 7, username: "ana", permissions: 36, discord_id: "111111111111111111", discord_notify: true, movie_quota: null, show_quota: null }],
+    "PUT /api/v1/anchorr/users/7": ({ body }) => ({ id: 7, username: "ana", ...body }),
+    "PUT /api/v1/anchorr/users/3": ({ body }) => ({ id: 3, username: "Discord (Anchorr)", ...body }),
     "POST /api/v1/anchorr/connect": ({ headers }) =>
       headers.cookie === "moka_session=admin" ? { api_key: KEY, guest_user_id: 3, public_url: "https://moka.example.com" } : { status: 403, json: {} },
     "GET /api/v1/requests": () => [
@@ -106,6 +112,27 @@ test("connecting Moka takes a Moka administrator; requests then go to Moka, Jell
   assert.equal(config.MOKA_PUBLIC_URL, "https://moka.example.com");
   const counts = (await app.call("GET", "/api/overview")).json.requestCounts;
   assert.deepEqual([counts.total, counts.pending, counts.processing], [2, 1, 1], "the Overview counts Moka's requests");
+});
+
+test("Anchorr's Users page edits Moka's people, only their request settings", async () => {
+  const list = (await app.call("GET", "/api/moka/users")).json;
+  assert.equal(list.users[0].username, "ana");
+  assert.equal(list.guestUserId, 3);
+  const res = await app.call("PUT", "/api/moka/users/7", { discord_notify: false, request_shows: false, permissions: 1, password: "x" });
+  assert.equal(res.status, 200);
+  assert.deepEqual(moka.requests.at(-1).body, { discord_notify: false, request_shows: false }, "rights and passwords never pass");
+  assert.equal(moka.requests.at(-1).headers.authorization, `Bearer ${KEY}`);
+  assert.equal((await app.call("PUT", "/api/moka/users/abc", {})).status, 400);
+});
+
+test("the guest auto-approve switch sets Moka's guest account", async () => {
+  assert.equal((await app.call("POST", "/api/save-config", { SEERR_AUTO_APPROVE: "true" })).status, 200);
+  let sent;
+  for (let i = 0; i < 50 && !sent; i++) {
+    sent = moka.requests.find((r) => r.method === "PUT" && r.path === "/api/v1/anchorr/users/3");
+    if (!sent) await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.deepEqual(sent?.body, { auto_approve_movies: true, auto_approve_shows: true });
 });
 
 test("the dashboard also signs in Moka administrators once Moka is connected", async () => {
@@ -207,15 +234,15 @@ test("a Moka event becomes the usual announcement, with the requester mentioned 
   const event = {
     event: "available", occurred_at: 1_763_700_000,
     title: { id: 9, kind: "movie", tmdb_id: 603, imdb_id: "tt0133093", title: "The Matrix", year: 1999, runtime_minutes: 136, link: "https://moka.example.com/movie/603", episodes: [] },
-    requester_user_ids: [7],
+    requester_user_ids: [7, 8],
   };
   const discord = createFakeDiscord();
   for (const p of toPayloads(event)) await handleJellyfinItem(p, discord.client, new Map(), () => {});
 
   assert.equal(discord.sent.length, 1);
-  assert.equal(discord.sent[0].content, "Requested by <@111111111111111111>");
+  assert.equal(discord.sent[0].content, "Requested by <@111111111111111111> <@222222222222222222>");
   assert.equal(discord.sent[0].embeds[0].url, "https://moka.example.com/movie/603");
-  assert.deepEqual(discord.dms.map((d) => d.userId), ["111111111111111111"]);
+  assert.deepEqual(discord.dms.map((d) => d.userId), ["111111111111111111"], "bo turned the bot's messages off in Moka");
 
   const show = {
     ...event,

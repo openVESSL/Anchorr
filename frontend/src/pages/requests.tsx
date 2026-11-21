@@ -31,19 +31,27 @@ export function RequestsPage() {
       />
 
       <Section title={t("Approval")}>
-        {!moka && (
-          <SwitchRow
-            form={form}
-            name="SEERR_AUTO_APPROVE"
-            label={t("Auto-approve requests from members without a linked account")}
-            help={t('Sets the auto-approve permission of the Seerr user "Discord (Anchorr)". Linked members always follow their own Seerr permissions and quotas.')}
-          />
-        )}
+        <SwitchRow
+          form={form}
+          name="SEERR_AUTO_APPROVE"
+          label={t("Auto-approve requests from members without a linked account")}
+          help={
+            moka
+              ? t('Sets auto-approve for films and shows on the Moka user "Discord (Anchorr)". Linked people follow their own rights and limits in Moka (Users).')
+              : t('Sets the auto-approve permission of the Seerr user "Discord (Anchorr)". Linked members always follow their own Seerr permissions and quotas.')
+          }
+        />
         <SwitchRow form={form} name="PRIVATE_MESSAGE_MODE" label={t("Private replies")} help={t("Search and request results are only visible to the member who used the command.")} />
       </Section>
 
       <RolesSection form={form} />
-      {!moka && <DefaultsSection form={form} />}
+      {moka ? (
+        <Section title={t("Quality")}>
+          <p className="text-muted-foreground text-sm">{t("Moka picks the quality from its own profile, so there is nothing to choose here.")}</p>
+        </Section>
+      ) : (
+        <DefaultsSection form={form} />
+      )}
       <SaveBar form={form} />
     </>
   )

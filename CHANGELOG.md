@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [2.0.1] - 2026-11-21
 
 ### Added
 
 - **Moka (experimental).** Off by default: System > Experimental > Use Moka adds Moka to Connections, next to Jellyfin and Seerr, which stay as they are. Connecting it (signing in as a Moka administrator) sends search, requests (season by season for shows), `/trending` and the daily pick to Moka instead of Seerr while it stays connected. New titles are announced from Jellyfin when it is linked, otherwise from Moka, with "now available" messages and mentions for the people who requested them. Members linked by their Discord ID in Moka request in their own name; others through Moka's guest account. Moka administrators can then sign in to the dashboard.
+- **Per-person settings with Moka.** While Moka is connected, Users shows Moka's people: their Discord ID, whether they may request (and get auto-approved) films and shows, their own limits for films and shows, and whether the bot messages them when a title is ready. Changes are saved in Moka. The guest auto-approve switch under Requests sets Moka's guest account.
 
 ### Changed
 

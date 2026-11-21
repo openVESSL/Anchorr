@@ -2,7 +2,7 @@
 import { Router } from "express";
 import fs from "fs";
 import rateLimit from "express-rate-limit";
-import { isMokaMode } from "../api/moka.js";
+import { isMokaMode, updateMokaUser } from "../api/moka.js";
 import { setGuestAutoApprove } from "../api/seerr.js";
 import { restartBot, startBot } from "../bot/botManager.js";
 import { scheduleDailyRandomPick } from "../bot/dailyPick.js";
@@ -119,8 +119,15 @@ router.post(
 
     loadSettings(); // Reload config into the settings store
 
+    // With Moka, the switch sets Moka's guest account; linked people keep their own rights there
+    if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE && isMokaMode() && settings.MOKA_GUEST_USER_ID) {
+      const on = settings.SEERR_AUTO_APPROVE === "true";
+      updateMokaUser(settings.MOKA_GUEST_USER_ID, { auto_approve_movies: on, auto_approve_shows: on }).catch((err) =>
+        logger.warn(`Could not update the Moka guest account's auto-approve: ${err.message}`)
+      );
+    }
     // The auto-approve switch only governs the guest account; mapped users keep their own Seerr permissions
-    if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE && settings.SEERR_GUEST_USER_ID) {
+    else if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE && settings.SEERR_GUEST_USER_ID) {
       setGuestAutoApprove({
         seerrUrl: settings.SEERR_URL,
         apiKey: settings.SEERR_API_KEY,

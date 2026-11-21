@@ -4,7 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { Logo } from "@/components/logo"
 import { TopBar } from "@/components/top-bar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { useAuth } from "@/lib/queries"
+import { useAuth, useSetupState } from "@/lib/queries"
 import { DailyPickPage } from "@/pages/daily-pick"
 import { DiscordPage } from "@/pages/discord"
 import { ExperimentalPage } from "@/pages/experimental"
@@ -20,6 +20,7 @@ import { RoundupPage } from "@/pages/roundup"
 import { SeerrPage } from "@/pages/seerr"
 import { SetupPage } from "@/pages/setup"
 import { SystemPage } from "@/pages/system"
+import { MokaUsersPage } from "@/pages/moka-users"
 import { UsersPage } from "@/pages/users"
 
 export function App() {
@@ -36,7 +37,7 @@ export function App() {
           <Route path="moka" element={<MokaPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="requests" element={<RequestsPage />} />
-          <Route path="users" element={<UsersPage />} />
+          <Route path="users" element={<UsersRoute />} />
           <Route path="embeds" element={<EmbedsPage />} />
           <Route path="daily-pick" element={<DailyPickPage />} />
           <Route path="roundup" element={<RoundupPage />} />
@@ -79,4 +80,9 @@ function DashboardLayout() {
       </SidebarInset>
     </SidebarProvider>
   )
+}
+
+/** With Moka connected, people and their links live in Moka. */
+function UsersRoute() {
+  return useSetupState().data?.moka ? <MokaUsersPage /> : <UsersPage />
 }

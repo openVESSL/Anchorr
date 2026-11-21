@@ -127,7 +127,8 @@ export async function getDiscordLinks({ fresh = false } = {}) {
     const rows = await moka("GET", "/anchorr/links");
     links = {
       at: Date.now(),
-      list: rows.map((r) => ({ discordUserId: String(r.discord_id), seerrUserId: r.user_id, seerrDisplayName: r.username })),
+      // notify: the person wants the bot's "ready" messages (set per person in Moka)
+      list: rows.map((r) => ({ discordUserId: String(r.discord_id), seerrUserId: r.user_id, seerrDisplayName: r.username, notify: r.notify !== false })),
     };
   } catch (err) {
     logger.warn(`Could not read the Discord links from Moka: ${err.message}`);
@@ -190,4 +191,22 @@ export async function requestersFor(tmdbId, mediaType) {
   return requests
     .filter((r) => r.kind === kind && String(r.tmdb_id) === String(tmdbId) && (r.status === "pending" || r.status === "approved"))
     .map((r) => ({ key: `moka:${kind}:${tmdbId}:${String(r.requested_by).toLowerCase()}`, discordUserId: discordByName.get(String(r.requested_by).toLowerCase()) }));
+}
+
+// ----- people, edited from Anchorr's Users page -----
+
+/** Moka's people, with their Discord link, limits and film/show rights. */
+export const listMokaUsers = () => moka("GET", "/anchorr/users");
+
+/** Sets a person's Discord link, messages, limits or film/show rights; nothing else. */
+export async function updateMokaUser(id, body) {
+  const user = await moka("PUT", `/anchorr/users/${parseInt(id, 10)}`, { data: body });
+  links.at = 0; // the Discord links may have changed
+  return user;
+}
+
+/** Discord members who turned the bot's "ready" messages off in Moka. */
+export async function mutedDiscordIds() {
+  if (!isMokaMode()) return new Set();
+  return new Set((await getDiscordLinks()).filter((l) => !l.notify).map((l) => l.discordUserId));
 }

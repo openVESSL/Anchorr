@@ -12,12 +12,14 @@ import {
   getDiscordLinks,
   isMokaMode,
   jellyfinLinked,
+  listMokaUsers,
   moka,
   mokaEnabled,
   MOKA_ADMIN,
   mokaSignIn,
   mokaSignOut,
   mokaUrl,
+  updateMokaUser,
 } from "../api/moka.js";
 import { restartBot, startJellyfinFeed, stopBot } from "../bot/botManager.js";
 import { botState } from "../bot/botState.js";
@@ -247,6 +249,35 @@ router.delete("/moka/connect", authenticateToken, async (req, res) => {
   logger.info("Moka: disconnected; requests go to Seerr again");
   await applyMokaChange();
   res.json({ success: true });
+});
+
+// People, as Moka has them: Anchorr's Users page edits their Discord link, messages,
+// limits and film/show rights (Moka refuses anything else from the bot)
+router.get("/moka/users", authenticateToken, async (req, res) => {
+  if (!isMokaMode()) return res.status(404).json({ success: false, message: "Moka is not connected" });
+  try {
+    res.json({ users: await listMokaUsers(), guestUserId: Number(settings.MOKA_GUEST_USER_ID) || null });
+  } catch (err) {
+    logger.warn(`Could not read Moka's people: ${err.message}`);
+    res.status(502).json({ success: false, message: "Could not reach Moka" });
+  }
+});
+
+const USER_FIELDS = ["discord_id", "discord_notify", "movie_quota", "show_quota", "clear_movie_quota", "clear_show_quota", "request_movies", "request_shows", "auto_approve_movies", "auto_approve_shows"];
+
+router.put("/moka/users/:id", authenticateToken, async (req, res) => {
+  if (!isMokaMode()) return res.status(404).json({ success: false, message: "Moka is not connected" });
+  if (!/^\d{1,10}$/.test(req.params.id)) return res.status(400).json({ success: false, message: "Unknown person" });
+  const body = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => USER_FIELDS.includes(k)));
+  try {
+    res.json(await updateMokaUser(req.params.id, body));
+  } catch (err) {
+    const status = err?.response?.status;
+    const message = err?.response?.data?.message || "Could not save in Moka";
+    if (status && status < 500) return res.status(status).json({ success: false, message });
+    logger.warn(`Could not update Moka person ${req.params.id}: ${err.message}`);
+    res.status(502).json({ success: false, message: "Could not reach Moka" });
+  }
 });
 
 /** The /request options and where new titles come from change with Moka: restart the bot. */
