@@ -1,18 +1,21 @@
 import logger from "./logger.js";
+import { settings } from "./settings.js";
 
 /**
  * Build a Jellyfin URL that preserves a potential subpath (e.g., /jellyfin)
  * and appends the provided path and optional hash fragment safely.
  *
- * Always uses the configured JELLYFIN_BASE_URL — any webhook-provided ServerUrl
- * must not be passed here, as it can be poisoned via Jellyfin metadata.
+ * Always uses the configured JELLYFIN_PUBLIC_URL, or JELLYFIN_BASE_URL when it is
+ * empty — any webhook-provided ServerUrl must not be passed here, as it can be
+ * poisoned via Jellyfin metadata. Every caller builds a link or image that Discord
+ * opens, so the public address wins over the one Anchorr uses for the API.
  *
  * @param {string} appendPath - Path to append (e.g., "web/index.html")
  * @param {string} [hash] - Optional URL fragment (leading "#" is optional)
  * @returns {string} Fully-qualified Jellyfin URL
  */
 export function buildJellyfinUrl(appendPath, hash) {
-  const effectiveBaseUrl = process.env.JELLYFIN_BASE_URL;
+  const effectiveBaseUrl = settings.JELLYFIN_PUBLIC_URL || settings.JELLYFIN_BASE_URL;
 
   try {
     const u = new URL(effectiveBaseUrl);

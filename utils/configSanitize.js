@@ -3,10 +3,7 @@ export const MASKED_PREFIX = "••••••••";
 export const SENSITIVE_FIELDS = [
   "DISCORD_TOKEN",
   "SEERR_API_KEY",
-  "JELLYFIN_API_KEY",
-  "TMDB_API_KEY",
-  "OMDB_API_KEY",
-];
+  "JELLYFIN_API_KEY",];
 
 export const STRIPPED_FIELDS = ["JWT_SECRET", "WEBHOOK_SECRET"];
 

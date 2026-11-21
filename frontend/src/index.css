@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/inter";
+
+/* Anchorr theme: the four Catppuccin flavors (html[data-flavor], Macchiato by default; [data-flavor-preview]
+   scopes a flavor to a theme preview card) and a
+   chosen accent (html[data-accent]). Latte is light, the other three are dark (html.dark).
+   Palette: Catppuccin, https://catppuccin.com (MIT). */
+
+@custom-variant dark (&:is(.dark *));
+
+:root[data-flavor="mocha"],
+[data-flavor-preview="mocha"] {
+  --ctp-rosewater: #f5e0dc; --ctp-flamingo: #f2cdcd; --ctp-pink: #f5c2e7; --ctp-mauve: #cba6f7;
+  --ctp-red: #f38ba8; --ctp-maroon: #eba0ac; --ctp-peach: #fab387; --ctp-yellow: #f9e2af;
+  --ctp-green: #a6e3a1; --ctp-teal: #94e2d5; --ctp-sky: #89dceb; --ctp-sapphire: #74c7ec;
+  --ctp-blue: #89b4fa; --ctp-lavender: #b4befe; --ctp-text: #cdd6f4; --ctp-subtext1: #bac2de;
+  --ctp-subtext0: #a6adc8; --ctp-overlay2: #9399b2; --ctp-overlay1: #7f849c; --ctp-overlay0: #6c7086;
+  --ctp-surface2: #585b70; --ctp-surface1: #45475a; --ctp-surface0: #313244; --ctp-base: #1e1e2e;
+  --ctp-mantle: #181825; --ctp-crust: #11111b;
+  --on-accent: var(--ctp-crust);
+  color-scheme: dark;
+}
+
+:root,
+:root[data-flavor="macchiato"],
+[data-flavor-preview="macchiato"] {
+  --ctp-rosewater: #f4dbd6; --ctp-flamingo: #f0c6c6; --ctp-pink: #f5bde6; --ctp-mauve: #c6a0f6;
+  --ctp-red: #ed8796; --ctp-maroon: #ee99a0; --ctp-peach: #f5a97f; --ctp-yellow: #eed49f;
+  --ctp-green: #a6da95; --ctp-teal: #8bd5ca; --ctp-sky: #91d7e3; --ctp-sapphire: #7dc4e4;
+  --ctp-blue: #8aadf4; --ctp-lavender: #b7bdf8; --ctp-text: #cad3f5; --ctp-subtext1: #b8c0e0;
+  --ctp-subtext0: #a5adcb; --ctp-overlay2: #939ab7; --ctp-overlay1: #8087a2; --ctp-overlay0: #6e738d;
+  --ctp-surface2: #5b6078; --ctp-surface1: #494d64; --ctp-surface0: #363a4f; --ctp-base: #24273a;
+  --ctp-mantle: #1e2030; --ctp-crust: #181926;
+  --on-accent: var(--ctp-crust);
+  color-scheme: dark;
+}
+
+:root[data-flavor="frappe"],
+[data-flavor-preview="frappe"] {
+  --ctp-rosewater: #f2d5cf; --ctp-flamingo: #eebebe; --ctp-pink: #f4b8e4; --ctp-mauve: #ca9ee6;
+  --ctp-red: #e78284; --ctp-maroon: #ea999c; --ctp-peach: #ef9f76; --ctp-yellow: #e5c890;
+  --ctp-green: #a6d189; --ctp-teal: #81c8be; --ctp-sky: #99d1db; --ctp-sapphire: #85c1dc;
+  --ctp-blue: #8caaee; --ctp-lavender: #babbf1; --ctp-text: #c6d0f5; --ctp-subtext1: #b5bfe2;
+  --ctp-subtext0: #a5adce; --ctp-overlay2: #949cbb; --ctp-overlay1: #838ba7; --ctp-overlay0: #737994;
+  --ctp-surface2: #626880; --ctp-surface1: #51576d; --ctp-surface0: #414559; --ctp-base: #303446;
+  --ctp-mantle: #292c3c; --ctp-crust: #232634;
+  --on-accent: var(--ctp-crust);
+  color-scheme: dark;
+}
+
+:root[data-flavor="latte"],
+[data-flavor-preview="latte"] {
+  --ctp-rosewater: #dc8a78; --ctp-flamingo: #dd7878; --ctp-pink: #ea76cb; --ctp-mauve: #8839ef;
+  --ctp-red: #d20f39; --ctp-maroon: #e64553; --ctp-peach: #fe640b; --ctp-yellow: #df8e1d;
+  --ctp-green: #40a02b; --ctp-teal: #179299; --ctp-sky: #04a5e5; --ctp-sapphire: #209fb5;
+  --ctp-blue: #1e66f5; --ctp-lavender: #7287fd; --ctp-text: #4c4f69; --ctp-subtext1: #5c5f77;
+  --ctp-subtext0: #6c6f85; --ctp-overlay2: #7c7f93; --ctp-overlay1: #8c8fa1; --ctp-overlay0: #9ca0b0;
+  --ctp-surface2: #acb0be; --ctp-surface1: #bcc0cc; --ctp-surface0: #ccd0da; --ctp-base: #eff1f5;
+  --ctp-mantle: #e6e9ef; --ctp-crust: #dce0e8;
+  --on-accent: var(--ctp-base);
+  color-scheme: light;
+}
+
+/* Accent (default mauve) */
+:root { --ctp-accent: var(--ctp-mauve); }
+:root[data-accent="rosewater"] { --ctp-accent: var(--ctp-rosewater); }
+:root[data-accent="flamingo"] { --ctp-accent: var(--ctp-flamingo); }
+:root[data-accent="pink"] { --ctp-accent: var(--ctp-pink); }
+:root[data-accent="red"] { --ctp-accent: var(--ctp-red); }
+:root[data-accent="maroon"] { --ctp-accent: var(--ctp-maroon); }
+:root[data-accent="peach"] { --ctp-accent: var(--ctp-peach); }
+:root[data-accent="yellow"] { --ctp-accent: var(--ctp-yellow); }
+:root[data-accent="green"] { --ctp-accent: var(--ctp-green); }
+:root[data-accent="teal"] { --ctp-accent: var(--ctp-teal); }
+:root[data-accent="sky"] { --ctp-accent: var(--ctp-sky); }
+:root[data-accent="sapphire"] { --ctp-accent: var(--ctp-sapphire); }
+:root[data-accent="blue"] { --ctp-accent: var(--ctp-blue); }
+:root[data-accent="lavender"] { --ctp-accent: var(--ctp-lavender); }
+
+/* shadcn/ui tokens on top of the flavor */
+:root {
+  --radius: 0.75rem;
+  --background: var(--ctp-base);
+  --foreground: var(--ctp-text);
+  --card: var(--ctp-mantle);
+  --card-foreground: var(--ctp-text);
+  --popover: var(--ctp-mantle);
+  --popover-foreground: var(--ctp-text);
+  --primary: var(--ctp-accent);
+  --primary-foreground: var(--on-accent);
+  --secondary: var(--ctp-surface0);
+  --secondary-foreground: var(--ctp-text);
+  --muted: var(--ctp-surface0);
+  --muted-foreground: var(--ctp-subtext0);
+  --accent: var(--ctp-surface0);
+  --accent-foreground: var(--ctp-text);
+  --destructive: var(--ctp-red);
+  --success: var(--ctp-green);
+  --warning: var(--ctp-yellow);
+  --border: var(--ctp-surface0);
+  --input: var(--ctp-surface1);
+  --ring: var(--ctp-accent);
+  --sidebar: var(--ctp-mantle);
+  --sidebar-foreground: var(--ctp-text);
+  --sidebar-primary: var(--ctp-accent);
+  --sidebar-primary-foreground: var(--on-accent);
+  --sidebar-accent: var(--ctp-surface0);
+  --sidebar-accent-foreground: var(--ctp-text);
+  --sidebar-border: var(--ctp-surface0);
+  --sidebar-ring: var(--ctp-accent);
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", "Segoe UI", system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-crust: var(--ctp-crust);
+  --color-mantle: var(--ctp-mantle);
+  --color-surface0: var(--ctp-surface0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--ctp-accent) 35%, transparent);
+  }
+}

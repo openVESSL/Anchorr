@@ -1,5 +1,5 @@
 import { Router } from "express";
-import axios from "axios";
+import http from "../utils/http.js";
 import { authenticateToken } from "../utils/auth.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { TIMEOUTS } from "../lib/constants.js";
@@ -8,6 +8,7 @@ import * as seerrApi from "../api/seerr.js";
 import { getUserMappings } from "../utils/configFile.js";
 import { botState } from "../bot/botState.js";
 import logger from "../utils/logger.js";
+import { settings } from "../utils/settings.js";
 
 const router = Router();
 
@@ -35,8 +36,8 @@ function isSameConfiguredHost(submittedUrl, configuredUrl) {
 router.get("/seerr-users", authenticateToken, async (req, res) => {
   try {
     logger.debug("[SEERR USERS API] Request received");
-    const seerrUrl = process.env.SEERR_URL;
-    const apiKey = process.env.SEERR_API_KEY;
+    const seerrUrl = settings.SEERR_URL;
+    const apiKey = settings.SEERR_API_KEY;
 
     logger.debug("[SEERR USERS API] SEERR_URL:", seerrUrl);
     logger.debug("[SEERR USERS API] API_KEY present:", !!apiKey);
@@ -56,7 +57,7 @@ router.get("/seerr-users", authenticateToken, async (req, res) => {
     let response;
     try {
       logger.info("[SEERR USERS API] Fetching users from Seerr (real-time)...");
-      response = await axios.get(`${baseUrl}/user?take=1000`, {
+      response = await http.get(`${baseUrl}/user?take=1000`, {
         headers: { "X-Api-Key": apiKey },
         timeout: TIMEOUTS.SEERR_API,
       });
@@ -109,26 +110,37 @@ router.get("/seerr-users", authenticateToken, async (req, res) => {
   }
 });
 
-router.post("/test-seerr", authenticateToken, async (req, res) => {
-  const { url, apiKey } = req.body;
+/**
+ * The Seerr API address and key for a check from the dashboard, or null after answering
+ * the request with what is wrong. A masked key means the stored one, which only ever goes
+ * to the configured Seerr.
+ */
+function seerrTarget(req, res) {
+  const { url, apiKey } = req.body || {};
   const isMasked = isMaskedValue(apiKey);
-  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
-    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
+  if (isMasked && !isSameConfiguredHost(url, settings.SEERR_URL)) {
+    res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
+    return null;
   }
-  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
+  const effectiveApiKey = isMasked ? settings.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
-    return res.status(400).json({ success: false, message: "URL and API Key are required." });
+    res.status(400).json({ success: false, message: "URL and API Key are required." });
+    return null;
   }
   if (!isAllowedUrl(url)) {
-    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
+    res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
+    return null;
   }
+  return { base: new URL(getSeerrApiUrl(url)).href.replace(/\/$/, ""), apiKey: effectiveApiKey };
+}
+
+router.post("/test-seerr", authenticateToken, async (req, res) => {
+  const target = seerrTarget(req, res);
+  if (!target) return;
 
   try {
-    const safeUrl = new URL(getSeerrApiUrl(url));
-    safeUrl.pathname = safeUrl.pathname.replace(/\/$/, "") + "/settings/about";
-
-    const response = await axios.get(safeUrl.href, {
-      headers: { "X-Api-Key": effectiveApiKey },
+    const response = await http.get(`${target.base}/settings/about`, {
+      headers: { "X-Api-Key": target.apiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
     const version = response.data?.version;
@@ -143,23 +155,11 @@ router.post("/test-seerr", authenticateToken, async (req, res) => {
 });
 
 router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
-  const { url, apiKey } = req.body;
-  const isMasked = isMaskedValue(apiKey);
-  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
-    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
-  }
-  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
-  if (!url || !effectiveApiKey) {
-    return res.status(400).json({ success: false, message: "URL and API Key are required." });
-  }
-  if (!isAllowedUrl(url)) {
-    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
-  }
+  const target = seerrTarget(req, res);
+  if (!target) return;
 
   try {
-    const safeBase = new URL(getSeerrApiUrl(url)).href.replace(/\/$/, "");
-
-    const profiles = await seerrApi.fetchQualityProfiles(safeBase, effectiveApiKey);
+    const profiles = await seerrApi.fetchQualityProfiles(target.base, target.apiKey);
     res.json({ success: true, profiles });
   } catch (error) {
     logger.error("Failed to fetch quality profiles:", error.message);
@@ -168,23 +168,11 @@ router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
 });
 
 router.post("/seerr/servers", authenticateToken, async (req, res) => {
-  const { url, apiKey } = req.body;
-  const isMasked = isMaskedValue(apiKey);
-  if (isMasked && !isSameConfiguredHost(url, process.env.SEERR_URL)) {
-    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
-  }
-  const effectiveApiKey = isMasked ? process.env.SEERR_API_KEY : apiKey;
-  if (!url || !effectiveApiKey) {
-    return res.status(400).json({ success: false, message: "URL and API Key are required." });
-  }
-  if (!isAllowedUrl(url)) {
-    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
-  }
+  const target = seerrTarget(req, res);
+  if (!target) return;
 
   try {
-    const safeBase = new URL(getSeerrApiUrl(url)).href.replace(/\/$/, "");
-
-    const servers = await seerrApi.fetchServers(safeBase, effectiveApiKey);
+    const servers = await seerrApi.fetchServers(target.base, target.apiKey);
     res.json({ success: true, servers });
   } catch (error) {
     logger.error("Failed to fetch servers:", error.message);
@@ -193,8 +181,8 @@ router.post("/seerr/servers", authenticateToken, async (req, res) => {
 });
 
 router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
-  const seerrUrl = process.env.SEERR_URL;
-  const apiKey = process.env.SEERR_API_KEY;
+  const seerrUrl = settings.SEERR_URL;
+  const apiKey = settings.SEERR_API_KEY;
 
   if (!seerrUrl || !apiKey) {
     return res.status(400).json({ success: false, message: "Seerr not configured." });
@@ -203,7 +191,7 @@ router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
   try {
     const baseUrl = getSeerrApiUrl(seerrUrl);
 
-    const usersRes = await axios.get(`${baseUrl}/user?take=1000`, {
+    const usersRes = await http.get(`${baseUrl}/user?take=1000`, {
       headers: { "X-Api-Key": apiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
@@ -221,7 +209,7 @@ router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
       const batch = userData.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
         batch.map(async (user) => {
-          const settingsRes = await axios.get(
+          const settingsRes = await http.get(
             `${baseUrl}/user/${user.id}/settings/notifications`,
             { headers: { "X-Api-Key": apiKey }, timeout: TIMEOUTS.SEERR_API }
           );
@@ -282,8 +270,8 @@ router.get("/seerr/auto-map-preview", authenticateToken, async (_req, res) => {
 });
 
 router.get("/seerr/sync-preview", authenticateToken, async (_req, res) => {
-  const seerrUrl = process.env.SEERR_URL;
-  const apiKey = process.env.SEERR_API_KEY;
+  const seerrUrl = settings.SEERR_URL;
+  const apiKey = settings.SEERR_API_KEY;
 
   if (!seerrUrl || !apiKey) {
     return res.status(400).json({ success: false, message: "Seerr not configured." });
@@ -304,7 +292,7 @@ router.get("/seerr/sync-preview", authenticateToken, async (_req, res) => {
       const batch = existingMappings.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
         batch.map(async (mapping) => {
-          const settingsRes = await axios.get(
+          const settingsRes = await http.get(
             `${baseUrl}/user/${mapping.seerrUserId}/settings/notifications`,
             { headers: { "X-Api-Key": apiKey }, timeout: TIMEOUTS.SEERR_API }
           );

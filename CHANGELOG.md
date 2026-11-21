@@ -7,6 +7,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-11-21
+
+Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Jellyfin and Seerr. The bot's commands and messages work as before. Your configuration is upgraded automatically, and the config folder from 1.x is kept as `backup-1.x`.
+
+### Upgrading from 1.6.x
+
+**Before you update**
+
+- Copy your config folder (`config.json` and the state files next to it) to another place. Anchorr makes its own backup on the first start (see below), but only a copy elsewhere also covers a lost volume.
+- Running without Docker? Use Node.js 22.23.4, 24.22.1, 26.12.1 or newer, and run `npm run build` after `npm install`: it builds the new dashboard.
+
+**What happens on the first start**
+
+1. Anchorr copies your config folder to `backup-1.x` inside it. If the copy fails, Anchorr does not start, logs why and changes nothing.
+2. It upgrades `config.json`. Your local account, linked members, channels and other settings stay; the TMDB and OMDb keys are removed.
+3. The Overview shows a checklist of what changed and what still needs a look. Items tick themselves off once they are done, and "Done" hides the card.
+
+To go back to 1.6.5: stop Anchorr, copy the files from `backup-1.x` back into the config folder, delete `backup-1.x` and run version 1.6.5.
+
+**What you can remove**
+
+- **The Jellyfin Webhook plugin destination.** Anchorr now watches Jellyfin directly and catches up on anything added while it was offline. Calls from the plugin are acknowledged and ignored, and the dashboard reminds you while they keep arriving. Uninstall the plugin if nothing else uses it.
+- **TMDB and OMDb keys.** Search, details, ratings and the daily pick come from Seerr. The keys are removed from the configuration automatically; you can revoke them at TMDB and OMDb.
+- **`JELLYFIN_POLLING_ENABLED`.** Watching Jellyfin is always on. `JELLYFIN_POLLING_INTERVAL` still works and now defaults to one minute.
+
+**What to check after the update**
+
+The Overview shows a checklist for these points after an upgrade from 1.x and ticks them off once they are done.
+
+- **Jellyfin is linked with an API key.** Installs that only used the Webhook plugin have none and announce no new items until Jellyfin is linked on the Jellyfin page.
+- **The Seerr user "Discord (Anchorr)".** Members without a linked account now request as this guest user, created automatically, instead of as the Seerr administrator. Set its quota and permissions in Seerr.
+- **Auto-approve.** The switch now applies to that guest account only. Linked members follow their own Seerr permissions, so give them the Auto-Approve permission in Seerr if you relied on the switch to approve everyone.
+- **Time zone (Docker).** The weekly roundup hour follows the container's time zone. Set `TZ`, for example `TZ=Europe/Berlin`. Unraid sets it for containers created from the template.
+- **API keys in shared logs.** If you ever shared 1.x log files, rotate the Jellyfin and Seerr API keys: failed requests could write them into the logs (see Security).
+
+The previous dashboard is still available at `/legacy` during the 2.0 series.
+
+### Added
+
+- **Guided setup.** Connect Jellyfin, Seerr and Discord in three steps by signing in with a Jellyfin administrator account. Anchorr creates its own Jellyfin API key and reads Seerr's key for you. Pasting keys still works.
+- **Sign in with Jellyfin.** Jellyfin administrators can sign in to the dashboard with their Jellyfin account. The local account stays available.
+- **New dashboard** with a sidebar, a status bar, all four Catppuccin flavors (Macchiato by default, each with a live preview in Settings) plus an accent color, and English, German, French and Swedish.
+- **Discord setup checks the token**, fills in the bot id, builds the invite link with the right permissions and warns when Server Members Intent is off.
+- **No plugin needed for notifications.** Anchorr checks Jellyfin for new items every minute (one small request) and catches up on anything added while it was offline. Like the plugin, items wait until Jellyfin has identified them.
+- **Overview of what is happening**: the connected Jellyfin server and version, the Seerr version and request counts, the latest requests with approve and decline, and recent bot activity (notifications, requests from Discord, daily pick, weekly roundup).
+- **Guest account for unlinked members**, so everyone in your server can request out of the box within limits you control in Seerr.
+- Notifications use Jellyfin's runtime when Seerr has none, which is common for shows.
+- `/api/overview`, `/api/requests/recent` and `/api/requests/:id/approve|decline` for the dashboard. Bot activity is kept in `activity.json` in the config folder (the last 200 events).
+- `/api/status` reports the bot and Jellyfin connection, an old plugin still calling, and a reverse proxy without `TRUST_PROXY`.
+- **Guided upgrade from 1.x.** Before upgrading a 1.x configuration, Anchorr backs up the whole config folder to `backup-1.x` and does not start if that fails. Afterwards the Overview shows a checklist of what changed and what still needs a look, and ticks items off once they are done.
+- **Public Jellyfin address** ([#154](https://github.com/openVESSL/Anchorr/issues/154)). An optional address on the Jellyfin page, used only for links and images in Discord, so members outside your home network can open them. Anchorr keeps talking to Jellyfin through the connection address. When it is empty, links use the connection address as before.
+- **"Now available" for requests made in Seerr** ([#107](https://github.com/openVESSL/Anchorr/issues/107)). Members with a linked account get the direct message also for titles they requested in Seerr itself, not only from Discord. Anchorr asks Seerr who requested a title when it is announced, and tells each request only once.
+- **Mention requesters in the announcement** ([#137](https://github.com/openVESSL/Anchorr/pull/137)). An optional switch under Notifications tags whoever requested a title, from Discord or in Seerr with a linked account, in the post announcing it. Off by default. Thanks to @kylepitcock for the idea and the first version.
+- **Configuration backup.** Settings can download `config.json` and restore it later or on another install. The install keeps its own sign-in secret and network settings, and the replaced file is kept as `config.before-restore.json`.
+
+### Changed
+
+- Metadata comes from Seerr: movies keep their IMDb rating, shows (which have no IMDb score in Seerr) show the TMDB score.
+- Titles, overviews and genres in search, requests, notifications and the daily pick follow the bot language instead of always being English. TMDB falls back to English where a translation is missing.
+- New-item posts, the "now available" DM, search and request results, buttons, the season picker, the daily pick and the bot's replies are translated into the bot language (English, German, French, Swedish). Before, only the weekly roundup and error messages were.
+- The configuration lives in memory instead of process environment variables, and saving from the dashboard only accepts known settings.
+- Smaller install: axios, lodash.debounce and node-cache were replaced by built-in Node.js features.
+- The Docker image listens on all interfaces by default and builds the dashboard in its own stage.
+- The compose file sets `TZ`, and the Unraid template links the Discord server, the readme and the license and has an optional `TRUST_PROXY` setting.
+
+### Fixed
+
+- `/search` and `/request` answer with an error when Seerr is unreachable instead of staying on "thinking".
+- A request that Seerr accepted is confirmed even if showing the result fails, instead of being reported as failed.
+- Discord errors are no longer shown to members as Seerr errors.
+- The tag picker for shows only lists Sonarr tags. A Radarr tag picked for a show used to be dropped from the request.
+- Picking tags for a show without chosen seasons no longer treats it as a movie.
+- Requests from the daily pick use the anime server and quality profile for anime, and ask for a show's seasons explicitly, the same as `/request`.
+- Announcement channels can be picked for posts, not only plain text channels.
+- Turning the daily pick on or changing its channel or interval takes effect at once, and stopping the bot also stops it.
+- The "Detailed logs" switch takes effect at once instead of after a restart.
+- Starting or restarting the bot quickly no longer leaves a second bot connected, which caused double replies.
+- Each new item no longer fetches the list of Jellyfin libraries again.
+- Test notifications from the dashboard are no longer stored in the notification history.
+- A plain `docker run` without `BIND_HOST` now reaches the dashboard through the published port.
+- Test notifications from the dashboard no longer send the "now available" message to members who really requested that title, and no longer clear their request.
+- Saving settings while `config.json` cannot be read (for example after a hand edit with a typo) no longer replaces it with an almost empty file. Nothing is saved and the dashboard says why.
+- Setup says when Seerr has not finished its own setup yet, instead of "Could not reach Seerr at this address". A fresh install no longer logs that its config was upgraded.
+
+### Security
+
+- A linked member whose Seerr user id is empty or not a number requests as the guest account. Seerr would otherwise run such a request as its administrator.
+- Requests from Discord no longer bypass Seerr approvals, quotas or permission checks, and members can no longer pick a 4K server or quality profile Seerr would not allow them.
+- Until setup is done, only the Jellyfin step is open without signing in. The local account can only be added from a signed-in session.
+- Failed HTTP requests no longer write API keys (`X-Api-Key`, `Authorization`) into the log files.
+- Calls to Jellyfin, Seerr and Discord follow redirects only to the same address or from http to https on the same host, so a redirect can never carry the API key to another server, port or plain-http address.
+- Settings saved from the dashboard can no longer set arbitrary environment variables such as `NODE_TLS_REJECT_UNAUTHORIZED`.
+- Failed sign-ins lock per address and username, so nobody can lock the administrator out from elsewhere.
+- Signing out is remembered across restarts.
+- The public health check no longer reveals the version or bot name.
+- The Jellyfin API key is sent in a header instead of the WebSocket URL.
+- The dashboard loads nothing from other origins and allows no inline scripts.
+- Docker images built from a working copy no longer pick up local files such as `logs/`, `config/` or `.env`, and the dashboard and dependencies are always the ones built inside the image.
+- In the Docker image the application files are read-only for the app user; the config directory is created with private permissions on native installs.
+
+### Removed
+
+- TMDB and OMDb integration, the Jellyfin library seed and daily prune scans, and the `/api/seed/reset` endpoint.
+
+---
+
 ## [1.6.5] - 2026-11-15
 
 > **⚠️ Behaviour change for role lists:** If you use a role allowlist or blocklist, the bot can no longer be used via DM, since roles only exist on your server. Without role lists, nothing changes.

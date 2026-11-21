@@ -4,6 +4,9 @@ import crypto from "crypto";
 import logger from "./logger.js";
 import { readConfig, updateConfig } from "./configFile.js";
 import { getUsers, saveUser as saveUserToConfig } from "./userStore.js";
+import { PersistentMap } from "./persistentMap.js";
+import { settings } from "./settings.js";
+import { signIn, signOut } from "../api/jellyfinAdmin.js";
 
 const AUTH_TOKEN_EXPIRATION = "7d";
 const AUTH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -14,7 +17,8 @@ const LOCKOUT_DURATION_MS = 10 * 60 * 1000; // 10 min lockout
 const BASE_DELAY_MS = 300;              // progressive delay per failure: attempt * 300ms
 const MAX_DELAY_MS = 4000;             // cap at 4s
 
-// username → { count: number, lockedUntil: number, timerId: NodeJS.Timeout|null }
+// "ip|username" → { count, lockedUntil, timerId }. Keyed by client too, so failures from
+// one address cannot lock the admin out everywhere.
 const failedAttempts = new Map();
 
 function getAttemptEntry(username) {
@@ -97,10 +101,12 @@ function getOrGenerateJwtSecret() {
 // Initialize JWT_SECRET once at module load (CRITICAL: must be constant for token verification)
 const JWT_SECRET = getOrGenerateJwtSecret();
 
-// In-memory set of revoked token JTIs (cleared on restart, which also invalidates all tokens if secret rotates)
-const revokedTokens = new Set();
-// Maximum time (in ms) to keep a revoked token JTI in memory, to avoid unbounded TTLs
-const MAX_REVOKE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+// Revoked token JTIs, kept on disk until the token would have expired anyway,
+// so a logged-out session stays logged out after a restart
+const MAX_REVOKE_TTL_MS = AUTH_TOKEN_MAX_AGE_MS;
+const revokedTokens = new PersistentMap("revoked-sessions", MAX_REVOKE_TTL_MS, {
+  validateValue: (v) => v === true,
+});
 
 function revokeToken(token) {
   try {
@@ -119,13 +125,8 @@ function revokeToken(token) {
     if (ttlFromExpMs <= 0) {
       return;
     }
-    const ttl = Math.min(ttlFromExpMs, MAX_REVOKE_TTL_MS);
-    revokedTokens.add(decoded.jti);
-    // Auto-cleanup: remove JTI after bounded TTL (.unref so timers don't block process exit)
-    const timeout = setTimeout(() => revokedTokens.delete(decoded.jti), ttl);
-    if (typeof timeout.unref === "function") {
-      timeout.unref();
-    }
+    revokedTokens.set(decoded.jti, true, Math.min(ttlFromExpMs, MAX_REVOKE_TTL_MS));
+    revokedTokens.flush();
   } catch (_) {
     // Ignore invalid or unverifiable tokens; they cannot be revoked
   }
@@ -152,14 +153,27 @@ export const authenticateToken = (req, res, next) => {
     if (!user || typeof user !== "object") {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
-    // Legacy tokens without JTI remain valid until expiry; JTI tokens enforce revocation
-    if (user.jti && isTokenRevoked(user.jti)) {
+    // Every session token carries a jti so it can be revoked
+    if (!user.jti || isTokenRevoked(user.jti)) {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
     req.user = user;
     next();
   });
 };
+
+/** Starts a dashboard session (HttpOnly cookie). */
+export function issueSession(req, res, { id, username, method = "local" }) {
+  const token = jwt.sign({ id, username, method, jti: crypto.randomUUID() }, JWT_SECRET, {
+    expiresIn: AUTH_TOKEN_EXPIRATION,
+  });
+  res.cookie("auth_token", token, {
+    httpOnly: true,
+    secure: req.secure,
+    sameSite: "strict",
+    maxAge: AUTH_TOKEN_MAX_AGE_MS,
+  });
+}
 
 export const login = async (req, res) => {
   const { username, password } = req.body;
@@ -170,8 +184,10 @@ export const login = async (req, res) => {
       .json({ success: false, message: "Username and password are required" });
   }
 
+  const attemptKey = `${req.ip}|${username}`;
+
   // Check lockout before doing anything else
-  const secondsRemaining = checkLockout(username);
+  const secondsRemaining = checkLockout(attemptKey);
   if (secondsRemaining > 0) {
     logger.warn(`🔒 Login blocked for "${username}" — account locked (${secondsRemaining}s remaining, from ${req.ip})`);
     return res.status(429).json({
@@ -190,8 +206,8 @@ export const login = async (req, res) => {
     : await bcrypt.compare(password, dummyHash).then(() => false);
 
   if (!user || !validPassword) {
-    await progressiveDelay(username);
-    const { count } = recordFailure(username);
+    await progressiveDelay(attemptKey);
+    const { count } = recordFailure(attemptKey);
     const attemptsLeft = MAX_FAILED_ATTEMPTS - count;
     if (attemptsLeft <= 0) {
       logger.warn(`🔒 Account "${username}" locked after ${MAX_FAILED_ATTEMPTS} failed attempts (from ${req.ip})`);
@@ -206,24 +222,54 @@ export const login = async (req, res) => {
       .json({ success: false, message: "Invalid credentials" });
   }
 
-  clearFailures(username);
+  clearFailures(attemptKey);
 
-  const token = jwt.sign({ id: user.id, username: user.username, jti: crypto.randomUUID() }, JWT_SECRET, {
-    expiresIn: AUTH_TOKEN_EXPIRATION,
-  });
-
-  res.cookie("auth_token", token, {
-    httpOnly: true,
-    secure: req.secure,
-    sameSite: "strict",
-    maxAge: AUTH_TOKEN_MAX_AGE_MS,
-  });
+  issueSession(req, res, { id: user.id, username: user.username });
 
   res.json({
     success: true,
     message: "Logged in successfully",
     username: user.username,
   });
+};
+
+/** Dashboard sign-in with a Jellyfin administrator account. */
+export const loginWithJellyfin = async (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: "Username and password are required" });
+  }
+  if (!settings.JELLYFIN_BASE_URL) {
+    return res.status(400).json({ success: false, message: "Jellyfin is not set up yet" });
+  }
+
+  const attemptKey = `${req.ip}|jellyfin:${username}`;
+  const secondsRemaining = checkLockout(attemptKey);
+  if (secondsRemaining > 0) {
+    return res.status(429).json({ success: false, message: `Too many failed attempts. Try again in ${secondsRemaining} seconds.` });
+  }
+
+  let session;
+  try {
+    session = await signIn(settings.JELLYFIN_BASE_URL, username, password);
+  } catch (err) {
+    if (err.response?.status === 401) {
+      await progressiveDelay(attemptKey);
+      recordFailure(attemptKey);
+      logger.warn(`⚠️ Failed Jellyfin sign-in for "${username}" (from ${req.ip})`);
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+    logger.error(`Jellyfin sign-in failed: ${err.message}`);
+    return res.status(502).json({ success: false, message: "Could not reach Jellyfin" });
+  }
+  await signOut(settings.JELLYFIN_BASE_URL, session.token);
+
+  if (!session.isAdmin) {
+    return res.status(403).json({ success: false, message: "Only Jellyfin administrators can manage Anchorr" });
+  }
+  clearFailures(attemptKey);
+  issueSession(req, res, { id: `jellyfin:${session.userId}`, username: session.username, method: "jellyfin" });
+  res.json({ success: true, message: "Logged in successfully", username: session.username });
 };
 
 export const register = async (req, res) => {
@@ -237,7 +283,8 @@ export const register = async (req, res) => {
 
   const users = getUsers();
 
-  // For now, only allow registration if no users exist (Single User Mode / First Run)
+  // One local account, created from a signed-in session (Jellyfin admin) so nobody can
+  // claim a fresh install just by reaching the dashboard first (audit S4)
   if (users.length > 0) {
     return res.status(403).json({
       success: false,
@@ -252,18 +299,7 @@ export const register = async (req, res) => {
     const newUser = saveUserToConfig(username, hashedPassword);
 
     // Auto-login after register
-    const token = jwt.sign(
-      { id: newUser.id, username: newUser.username, jti: crypto.randomUUID() },
-      JWT_SECRET,
-      { expiresIn: AUTH_TOKEN_EXPIRATION }
-    );
-
-    res.cookie("auth_token", token, {
-      httpOnly: true,
-      secure: req.secure,
-      sameSite: "strict",
-      maxAge: AUTH_TOKEN_MAX_AGE_MS,
-    });
+    issueSession(req, res, { id: newUser.id, username: newUser.username });
 
     res.json({
       success: true,
@@ -288,30 +324,39 @@ export const logout = (req, res) => {
   res.json({ success: true, message: "Logged out successfully" });
 };
 
+// Which sign-in methods the login screen should offer
+function loginOptions(users) {
+  const jellyfinReady = Boolean(settings.JELLYFIN_BASE_URL && settings.JELLYFIN_API_KEY);
+  return {
+    hasUsers: users.length > 0,
+    jellyfinLogin: jellyfinReady,
+    needsSetup: !jellyfinReady && users.length === 0,
+  };
+}
+
 export const checkAuth = (req, res) => {
   const token = req.cookies.auth_token;
   if (!token) {
     // Check if any users exist to determine if we should show register or login
     const users = getUsers();
-    return res.json({ isAuthenticated: false, hasUsers: users.length > 0 });
+    return res.json({ isAuthenticated: false, ...loginOptions(users) });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       const users = getUsers();
-      return res.json({ isAuthenticated: false, hasUsers: users.length > 0 });
+      return res.json({ isAuthenticated: false, ...loginOptions(users) });
     }
     // Mirror authenticateToken's revocation behavior: accept legacy tokens without JTI,
     // and reject only tokens with a JTI that has been revoked
     if (!user || typeof user !== "object") {
       const users = getUsers();
-      return res.json({ isAuthenticated: false, hasUsers: users.length > 0 });
+      return res.json({ isAuthenticated: false, ...loginOptions(users) });
     }
-    // Legacy tokens without JTI remain valid until expiry; JTI tokens enforce revocation
-    if (user.jti && isTokenRevoked(user.jti)) {
+    if (!user.jti || isTokenRevoked(user.jti)) {
       const users = getUsers();
-      return res.json({ isAuthenticated: false, hasUsers: users.length > 0 });
+      return res.json({ isAuthenticated: false, ...loginOptions(users) });
     }
-    res.json({ isAuthenticated: true, user });
+    res.json({ isAuthenticated: true, user, ...loginOptions(getUsers()) });
   });
 };

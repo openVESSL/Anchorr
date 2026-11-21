@@ -1,4 +1,4 @@
-import axios from "axios";
+import http, { HttpError } from "../utils/http.js";
 import { createRequire } from "module";
 import logger from "../utils/logger.js";
 
@@ -21,9 +21,13 @@ export function jellyfinAuthHeaders(apiKey) {
       "Jellyfin API key contains characters that are invalid in an Authorization header (quotes, comma, backslash or control characters)"
     );
   }
-  return {
-    Authorization: `MediaBrowser Client="Anchorr", Device="Anchorr", DeviceId="anchorr-bot", Version="${APP_VERSION}", Token="${key}"`,
-  };
+  return jellyfinClientHeaders(key);
+}
+
+/** Jellyfin client identification, with a token when there is one (login requests have none). */
+export function jellyfinClientHeaders(token = null) {
+  const client = `MediaBrowser Client="Anchorr", Device="Anchorr", DeviceId="anchorr-bot", Version="${APP_VERSION}"`;
+  return { Authorization: token ? `${client}, Token="${token}"` : client };
 }
 
 /**
@@ -38,7 +42,7 @@ export async function fetchLibraries(apiKey, baseUrl) {
     const basePathNoSlash = safeBase.pathname.replace(/\/$/, "");
     safeBase.pathname = basePathNoSlash + "/Library/VirtualFolders";
     const url = safeBase.href;
-    const response = await axios.get(url, {
+    const response = await http.get(url, {
       headers: jellyfinAuthHeaders(apiKey),
       timeout: 5000,
     });
@@ -56,7 +60,7 @@ export async function fetchLibraries(apiKey, baseUrl) {
         const itemsUrlObj = new URL(baseUrl);
         itemsUrlObj.pathname = basePathNoSlash + "/Items";
         const itemsUrl = itemsUrlObj.href;
-        const itemsResponse = await axios.get(itemsUrl, {
+        const itemsResponse = await http.get(itemsUrl, {
           headers: jellyfinAuthHeaders(apiKey),
           params: {
             Ids: vf.ItemId,
@@ -131,7 +135,7 @@ export async function findItemByTmdbId(tmdbId, mediaType, apiKey, baseUrl) {
     const safeBase = new URL(baseUrl);
     safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
     const url = safeBase.href;
-    const response = await axios.get(url, {
+    const response = await http.get(url, {
       headers: jellyfinAuthHeaders(apiKey),
       params: {
         Recursive: true,
@@ -180,7 +184,7 @@ export async function findLibraryByAncestors(
       ""
     )}/Items/${itemId}/Ancestors`;
 
-    const response = await axios.get(ancestorsUrl, {
+    const response = await http.get(ancestorsUrl, {
       headers: jellyfinAuthHeaders(apiKey),
       timeout: 5000,
     });
@@ -259,7 +263,7 @@ export async function findLibraryByAncestors(
 
         try {
           const libItemsUrl = `${baseUrl.replace(/\/$/, "")}/Items`;
-          const libResponse = await axios.get(libItemsUrl, {
+          const libResponse = await http.get(libItemsUrl, {
             headers: jellyfinAuthHeaders(apiKey),
             params: {
               ParentId: library.ItemId,
@@ -292,150 +296,6 @@ export async function findLibraryByAncestors(
   }
 }
 
-/**
- * Find library ID for an item by traversing up the parent chain
- * @param {string} itemId - Item ID to find library for
- * @param {string} apiKey - Jellyfin API key
- * @param {string} baseUrl - Jellyfin base URL
- * @param {Map} libraryMap - Map of library CollectionId -> library object
- * @returns {Promise<string|null>} Library ItemId (for config matching) or null
- */
-export async function findLibraryId(
-  itemId,
-  apiKey,
-  baseUrl,
-  libraryMap,
-  depth = 0
-) {
-  // Prevent infinite recursion
-  if (depth > 5) {
-    logger.debug(`Max recursion depth reached for item ${itemId}`);
-    return null;
-  }
-
-  try {
-    logger.info(`[Depth ${depth}] Finding library for item: ${itemId}`);
-
-    // Use the /Items endpoint without userId to avoid 400 errors
-    const url = `${baseUrl.replace(/\/$/, "")}/Items`;
-    const response = await axios.get(url, {
-      headers: jellyfinAuthHeaders(apiKey),
-      params: {
-        Ids: itemId,
-        Fields: "ParentId,Path", // Request Path to help identify library
-      },
-      timeout: 5000,
-    });
-
-    // Response is {Items: [...]}
-    const items = response.data?.Items || [];
-    if (items.length === 0) {
-      logger.info(`No item found for ID: ${itemId}`);
-      return null;
-    }
-
-    const item = items[0];
-    logger.info(
-      `[Depth ${depth}] Item ${itemId} has ParentId: ${item.ParentId}`
-    );
-    if (item.Path) {
-      logger.debug(`[Depth ${depth}] Item path: ${item.Path}`);
-    }
-
-    // Check if current item's ParentId matches any library's CollectionId
-    if (item.ParentId) {
-      for (const [collectionId, library] of libraryMap.entries()) {
-        if (
-          item.ParentId === collectionId ||
-          item.ParentId === library.ItemId
-        ) {
-          logger.info(
-            `✅ Found library: ${library.Name} (ItemId: ${library.ItemId}) for item ${itemId}`
-          );
-          return library.ItemId; // Return ItemId for config matching
-        }
-      }
-    }
-
-    // Check if item itself is a library
-    for (const [collectionId, library] of libraryMap.entries()) {
-      if (itemId === collectionId || itemId === library.ItemId) {
-        logger.info(`✅ Item ${itemId} is itself library: ${library.Name}`);
-        return library.ItemId;
-      }
-    }
-
-    // If item has no parent, check if it's actually a library
-    if (!item.ParentId || item.ParentId === null) {
-      // Check if this item is a library
-      for (const [collectionId, library] of libraryMap.entries()) {
-        if (itemId === collectionId || itemId === library.ItemId) {
-          logger.info(
-            `✅ Item ${itemId} has no parent and is library: ${library.Name}`
-          );
-          return library.ItemId;
-        }
-      }
-
-      logger.warn(
-        `⚠️ Item ${itemId} has no parent but is NOT a library. This might be a folder or collection.`
-      );
-      logger.warn(
-        `   Known libraries: ${Array.from(libraryMap.values())
-          .map((lib) => `${lib.Name} (${lib.ItemId})`)
-          .join(", ")}`
-      );
-
-      // REVERSE LOOKUP: Check if any library has THIS item as its parent
-      // This handles cases where libraries are nested inside collections/folders
-      logger.info(`   Checking if any library is a child of this folder...`);
-      for (const [collectionId, library] of libraryMap.entries()) {
-        try {
-          const libResponse = await axios.get(url, {
-            headers: jellyfinAuthHeaders(apiKey),
-            params: { Ids: library.ItemId, Fields: "ParentId" },
-            timeout: 5000,
-          });
-          const libItems = libResponse.data?.Items || [];
-          if (libItems.length > 0 && libItems[0].ParentId === itemId) {
-            logger.info(
-              `   ✅ Library ${library.Name} has this folder as parent! Returning library: ${library.ItemId}`
-            );
-            return library.ItemId;
-          }
-        } catch (err) {
-          logger.debug(
-            `   Failed to check library ${library.Name}: ${err.message}`
-          );
-        }
-      }
-
-      return null;
-    }
-
-    // Recursively check parent
-    if (item.ParentId) {
-      logger.info(`[Depth ${depth}] Checking parent: ${item.ParentId}`);
-      return await findLibraryId(
-        item.ParentId,
-        apiKey,
-        baseUrl,
-        libraryMap,
-        depth + 1
-      );
-    }
-
-    logger.info(`No parent found for item ${itemId}`);
-    return null;
-  } catch (err) {
-    logger.warn(
-      `Failed to find library for item ${itemId}:`,
-      err?.message || err
-    );
-    return null;
-  }
-}
-
 const FETCH_RECENTLY_ADDED_MAX_TOTAL = 5000;
 
 /**
@@ -457,7 +317,8 @@ export async function fetchRecentlyAdded(
   limit = 50,
   minDateCreated,
   parentId,
-  maxTotal = FETCH_RECENTLY_ADDED_MAX_TOTAL
+  maxTotal = FETCH_RECENTLY_ADDED_MAX_TOTAL,
+  { createdAfter = minDateCreated } = {}
 ) {
   try {
     const safeBase = new URL(baseUrl);
@@ -479,7 +340,7 @@ export async function fetchRecentlyAdded(
     }
 
     if (!minDateCreated) {
-      const response = await axios.get(url, {
+      const response = await http.get(url, {
         headers: jellyfinAuthHeaders(apiKey),
         params: baseParams,
         timeout: 10000,
@@ -491,7 +352,8 @@ export async function fetchRecentlyAdded(
       return { items, complete: true, truncated: false };
     }
 
-    const cutoffMs = new Date(minDateCreated).getTime();
+    // Paging stops at the first item created before this (the list is sorted by DateCreated)
+    const cutoffMs = new Date(createdAfter).getTime();
     const collected = [];
     let startIndex = 0;
     let stopReason = "loop-exit";
@@ -501,7 +363,7 @@ export async function fetchRecentlyAdded(
       const params = { ...baseParams, StartIndex: startIndex };
       let page;
       try {
-        const response = await axios.get(url, {
+        const response = await http.get(url, {
           headers: jellyfinAuthHeaders(apiKey),
           params,
           timeout: 10000,
@@ -517,7 +379,7 @@ export async function fetchRecentlyAdded(
         }
         page = body.Items;
       } catch (err) {
-        if (!err?.isAxiosError) throw err;
+        if (!(err instanceof HttpError)) throw err;
         logger.warn(
           `fetchRecentlyAdded: page at StartIndex=${startIndex} failed (${err?.message || err}); returning ${collected.length} items collected so far (incomplete)`
         );
@@ -570,163 +432,4 @@ export async function fetchRecentlyAdded(
     );
     throw err;
   }
-}
-
-const FETCH_ALL_ITEMS_PAGE_SIZE = 200;
-
-/**
- * Fetch every Movie/Series/Season/Episode under a library (ParentId),
- * paginated via StartIndex/Limit with no upper cap on total items.
- * Used for the one-time library seed scan and the daily prune scan —
- * unlike fetchRecentlyAdded, this must see the *entire* library, not
- * just recently added items.
- *
- * Returns { items: object[], complete: boolean }; complete is false if a
- * page fetch failed partway through.
- */
-export async function fetchAllLibraryItems(apiKey, baseUrl, parentId) {
-  const safeBase = new URL(baseUrl);
-  safeBase.pathname = safeBase.pathname.replace(/\/$/, "") + "/Items";
-  const url = safeBase.href;
-  const baseParams = {
-    // ProductionYear is requested explicitly: buildIdentityKey uses it for
-    // TMDB-less movies, so the pruner must be able to rebuild the same key.
-    Fields: "ProviderIds,SeriesName,SeasonName,IndexNumber,ParentIndexNumber,AncestorIds,ProductionYear",
-    IncludeItemTypes: "Movie,Series,Season,Episode",
-    Recursive: true,
-    SortBy: "SortName",
-    SortOrder: "Ascending",
-    Limit: FETCH_ALL_ITEMS_PAGE_SIZE,
-    ParentId: parentId,
-  };
-
-  const collected = [];
-  let startIndex = 0;
-  let complete = true;
-  while (true) {
-    const params = { ...baseParams, StartIndex: startIndex };
-    let page;
-    try {
-      const response = await axios.get(url, {
-        headers: jellyfinAuthHeaders(apiKey),
-        params,
-        timeout: 15000,
-      });
-      const body = response.data;
-      if (!body || !Array.isArray(body.Items)) {
-        logger.warn(
-          `fetchAllLibraryItems: unexpected response shape from Jellyfin (parent ${parentId}, StartIndex=${startIndex}) — treating as incomplete`
-        );
-        complete = false;
-        break;
-      }
-      page = body.Items;
-    } catch (err) {
-      if (!err?.isAxiosError) throw err;
-      logger.warn(
-        `fetchAllLibraryItems: page at StartIndex=${startIndex} (parent ${parentId}) failed (${err?.message || err}); returning ${collected.length} items collected so far (incomplete)`
-      );
-      complete = false;
-      break;
-    }
-    if (page.length === 0) break;
-    collected.push(...page);
-    if (page.length < FETCH_ALL_ITEMS_PAGE_SIZE) break;
-    startIndex += FETCH_ALL_ITEMS_PAGE_SIZE;
-  }
-
-  logger.debug(
-    `fetchAllLibraryItems: fetched ${collected.length} items for parent ${parentId} (complete: ${complete})`
-  );
-  return { items: collected, complete };
-}
-
-/**
- * Fetch detailed information about a specific item
- * @param {string} itemId - Jellyfin item ID
- * @param {string} apiKey - Jellyfin API key
- * @param {string} baseUrl - Jellyfin base URL
- * @returns {Promise<Object|null>} Item details or null if failed
- */
-export async function fetchItemDetails(itemId, apiKey, baseUrl) {
-  try {
-    const url = `${baseUrl.replace(/\/$/, "")}/Items/${itemId}`;
-    const response = await axios.get(url, {
-      headers: jellyfinAuthHeaders(apiKey),
-      timeout: 5000,
-    });
-
-    return response.data;
-  } catch (err) {
-    logger.warn(
-      `Failed to fetch item details for ${itemId}:`,
-      err?.message || err
-    );
-    return null;
-  }
-}
-
-/**
- * Transform Jellyfin item to webhook-compatible format
- * @param {Object} item - Jellyfin item object
- * @param {string} baseUrl - Jellyfin base URL
- * @param {string} serverId - Jellyfin server ID
- * @returns {Object} Webhook-compatible data object
- */
-export function transformToWebhookFormat(item, baseUrl, serverId) {
-  const data = {
-    ItemType: item.Type,
-    ItemId: item.Id,
-    Name: item.Name,
-    Year: item.ProductionYear,
-    Overview: item.Overview,
-    Genres: item.Genres || [],
-    ServerUrl: baseUrl,
-    ServerId: serverId,
-  };
-
-  // Add TMDB ID if available
-  if (item.ProviderIds?.Tmdb) {
-    data.Provider_tmdb = item.ProviderIds.Tmdb;
-  }
-
-  // Add IMDb ID if available
-  if (item.ProviderIds?.Imdb) {
-    data.Provider_imdb = item.ProviderIds.Imdb;
-  }
-
-  // Add runtime in ticks (convert to minutes for display)
-  if (item.RunTimeTicks) {
-    data.RunTime = Math.round(item.RunTimeTicks / 600000000); // Convert ticks to minutes
-  }
-
-  // For TV shows, add series-specific data
-  if (item.Type === "Series") {
-    data.SeriesId = item.Id;
-    data.SeriesName = item.Name;
-  } else if (item.Type === "Season") {
-    data.SeriesId = item.SeriesId;
-    data.SeriesName = item.SeriesName;
-    data.SeasonId = item.Id;
-    data.IndexNumber = item.IndexNumber;
-  } else if (item.Type === "Episode") {
-    data.SeriesId = item.SeriesId;
-    data.SeriesName = item.SeriesName;
-    data.SeasonId = item.SeasonId;
-    data.IndexNumber = item.IndexNumber;
-    data.ParentIndexNumber = item.ParentIndexNumber;
-  }
-
-  // Add library ID - use ParentIds[0] if available (most reliable), otherwise fallback to ParentId
-  if (
-    item.ParentIds &&
-    Array.isArray(item.ParentIds) &&
-    item.ParentIds.length > 0
-  ) {
-    data.LibraryId = item.ParentIds[0]; // First ParentId is the library
-  } else {
-    data.LibraryId = item.ParentId;
-  }
-
-  return data;
 }

@@ -13,9 +13,8 @@ export const configSchema = Joi.object({
   GUILD_ID: Joi.string().allow("").optional(),
   SEERR_URL: Joi.string().uri().allow("").optional(),
   SEERR_API_KEY: Joi.string().allow("").optional(),
-  TMDB_API_KEY: Joi.string().allow("").optional(),
-  OMDB_API_KEY: Joi.string().allow("").optional(),
   JELLYFIN_BASE_URL: Joi.string().uri().allow("").optional(),
+  JELLYFIN_PUBLIC_URL: Joi.string().uri({ scheme: ["http", "https"] }).allow("").optional(),
   JELLYFIN_API_KEY: Joi.string().allow("").optional(),
   JELLYFIN_SERVER_ID: Joi.string().allow("").optional(),
   JELLYFIN_CHANNEL_ID: Joi.string().allow("").optional(),
@@ -47,6 +46,7 @@ export const configSchema = Joi.object({
   ).optional(), // Allow up to 10 minutes
   AUTO_START_BOT: Joi.string().valid("true", "false").optional(),
   NOTIFY_ON_AVAILABLE: Joi.string().valid("true", "false").optional(),
+  NOTIFY_TAG_REQUESTERS: Joi.string().valid("true", "false").optional(),
   PRIVATE_MESSAGE_MODE: Joi.string().valid("true", "false").optional(),
   SEERR_AUTO_APPROVE: Joi.string().valid("true", "false").optional(),
   DEBUG: Joi.string().valid("true", "false").optional(),
@@ -70,7 +70,59 @@ export const configSchema = Joi.object({
     .pattern(/^\d{17,20}$/)
     .allow("")
     .optional(),
+  // Seerr account used for Discord users without a mapping (created automatically)
+  SEERR_GUEST_USER_ID: Joi.alternatives(Joi.string().pattern(/^\d*$/), Joi.number().integer().min(1)).optional(),
+  // Written by the 1.x upgrade and the checklist's Done button
+  UPGRADE_FROM_V1: Joi.object({
+    at: Joi.string().isoDate().required(),
+    autoApprove: Joi.boolean().required(),
+    mappings: Joi.number().integer().min(0).allow(null).required(),
+  }).optional(),
+  UPGRADE_DISMISSED_AT: Joi.string().isoDate().optional(),
+  DAILY_RANDOM_PICK_ENABLED: Joi.string().valid("true", "false").optional(),
+  DAILY_RANDOM_PICK_CHANNEL_ID: Joi.string().allow("").optional(),
+  DAILY_RANDOM_PICK_INTERVAL: Joi.alternatives(Joi.string().allow(""), Joi.number().integer().min(1)).optional(),
+  ...Object.fromEntries(
+    ["MOVIE", "TV", "ANIME", "ANIME_MOVIE"].flatMap((kind) => [
+      [`DEFAULT_QUALITY_PROFILE_${kind}`, Joi.string().allow("").optional()],
+      [`DEFAULT_SERVER_${kind}`, Joi.string().allow("").optional()],
+    ])
+  ),
+  ...Object.fromEntries(
+    ["MOVIE", "SERIES", "SEASON", "EPISODE_SINGLE", "EPISODE_FEW", "EPISODE_MANY", "SEARCH", "SUCCESS"].map(
+      (kind) => [`EMBED_COLOR_${kind}`, Joi.string().allow("").optional()]
+    )
+  ),
+  ...Object.fromEntries(
+    [
+      "BACKDROP", "OVERVIEW_MOVIES", "OVERVIEW_EPISODES", "GENRE", "RUNTIME", "RATING",
+      "BUTTON_LETTERBOXD", "BUTTON_IMDB", "BUTTON_WATCH",
+    ].map((kind) => [`EMBED_SHOW_${kind}`, Joi.string().valid("true", "false").optional()])
+  ),
 });
+
+// Keys the dashboard may never set: deployment settings and server-managed state.
+// save-config keeps whatever config.json already has for them.
+export const DASHBOARD_PROTECTED_KEYS = [
+  "WEBHOOK_PORT",
+  "BIND_HOST",
+  "WEBHOOK_SECRET",
+  "JWT_SECRET",
+  "USERS",
+  "USER_MAPPINGS",
+  "USER_MAPPING_METADATA",
+  "WEEKLY_ROUNDUP_LAST_POSTED_AT",
+  "CONFIG_VERSION",
+  "UPGRADE_FROM_V1",
+  "UPGRADE_DISMISSED_AT",
+];
+
+// save-config body: every known config key plus the one-shot startBot flag; unknown keys are dropped.
+// The upgrade keys are server-managed: dropped whatever their shape, so a damaged record
+// can never block saving settings.
+export const saveConfigSchema = configSchema
+  .keys({ startBot: Joi.boolean().optional() })
+  .fork(["UPGRADE_FROM_V1", "UPGRADE_DISMISSED_AT"], () => Joi.any().strip());
 
 // --- USER MAPPING VALIDATION ---
 export const userMappingSchema = Joi.object({
@@ -114,12 +166,12 @@ export const tmdbIdSchema = Joi.object({
  * @param {Joi.Schema} schema - Joi validation schema
  * @returns {Function} Express middleware function
  */
-export function validateBody(schema) {
+export function validateBody(schema, { stripUnknown = false } = {}) {
   return (req, res, next) => {
     const { error, value } = schema.validate(req.body, {
       abortEarly: false, // Get all errors, not just first
-      stripUnknown: false, // Keep unknown fields for debugging
-      allowUnknown: true, // Allow unknown fields
+      stripUnknown, // true drops keys the schema does not know
+      allowUnknown: true,
     });
 
     if (error) {

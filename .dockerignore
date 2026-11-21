@@ -1,17 +1,20 @@
+# Installed inside the image; the host's copies would overwrite the production ones
 node_modules
-npm-debug.log
-.git
-.gitignore
+frontend/node_modules
+frontend/dist
+
+# Local data: configuration with secrets, state and logs never belong in the image
+config
+logs
+anchorr-data
 .env
-config.json
-README.md
-CHANGELOG.md
-CONTRIBUTING.md
-DOCKER_BUILD.md
-LICENSE
+*.log
+
+# Repository and editor files
+.git
 .github
 .claude
-.DS_Store
-*.log
-logs/
-config/
+.vscode
+.idea
+coverage
+test
