@@ -169,16 +169,13 @@ The bot comes online and the commands are ready. Everything else, such as the an
 
 You can paste API keys instead of signing in at the Jellyfin and Seerr steps if you prefer.
 
-## With Moka
+## With Moka (experimental)
 
-[Moka](https://github.com/openVESSL/Moka) can take Seerr's place: open **Connections > Moka** in the dashboard (or choose it in the first setup), enter Moka's address and sign in with a Moka administrator account. Moka creates the bot's own account and a guest account; your password is not stored.
+[Moka](https://github.com/openVESSL/Moka) can take Seerr's place for requests. It is off by default and nothing changes until you turn it on: **System > Experimental > Use Moka** adds Moka to Connections, next to Jellyfin and Seerr. There, enter Moka's address and sign in with a Moka administrator account; Moka creates the bot's own account and a guest account, and your password is not stored.
 
-- Search, requests (season by season for shows), `/trending` and the daily pick then go through Moka. Seerr is no longer needed.
-- New titles are announced from Jellyfin when it is linked, with its watch links, so people who watch in Jellyfin keep their buttons. Without Jellyfin, they are announced from Moka.
+- While Moka is connected, search, requests (season by season for shows), `/trending` and the daily pick go through Moka, and Seerr is not used. Disconnect Moka, or turn it off again, to go back to Seerr.
+- New titles are announced from Jellyfin when it is linked, with its watch links. Without Jellyfin, Moka announces them.
 - Members link their Discord account by their Discord ID under **Users** in Moka and then request in their own name, with their own limits. Everyone else requests through Moka's guest account.
-- Moka administrators can sign in to the dashboard.
-
-Moka can also set Anchorr up from its side (**Connections > Discord bot** in Moka, with just the bot token) when Anchorr runs with `MOKA_URL` pointing at Moka, for example `MOKA_URL=http://moka:8484` in the same compose file.
 
 ## Commands
 

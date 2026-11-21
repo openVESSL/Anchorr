@@ -13,6 +13,7 @@ import {
   isMokaMode,
   jellyfinLinked,
   moka,
+  mokaEnabled,
   MOKA_ADMIN,
   mokaSignIn,
   mokaSignOut,
@@ -21,11 +22,10 @@ import {
 import { restartBot, startJellyfinFeed, stopBot } from "../bot/botManager.js";
 import { botState } from "../bot/botState.js";
 import { dispatchMokaEvent } from "../jellyfin/mokaFeed.js";
-import { authenticateToken, issueSession } from "../utils/auth.js";
+import { authenticateToken } from "../utils/auth.js";
 import { updateConfig } from "../utils/configFile.js";
 import http from "../utils/http.js";
 import logger from "../utils/logger.js";
-import { getUsers } from "../utils/userStore.js";
 import { settings } from "../utils/settings.js";
 
 const router = Router();
@@ -130,6 +130,8 @@ router.post("/moka/pair", onlyFromEnvMoka, pairLimiter, async (req, res) => {
   const guild = [guild_id, settings.GUILD_ID].find((id) => id && inGuild(String(id))) || (status.guilds.length === 1 ? status.guilds[0].id : "");
 
   const saved = updateConfig({
+    // Moka named in the environment setting Anchorr up is a deliberate choice: turn it on
+    EXPERIMENTAL_MOKA: "true",
     MOKA_URL: envMokaUrl(),
     MOKA_API_KEY: key,
     MOKA_GUEST_USER_ID: guest_user_id ? String(guest_user_id) : "",
@@ -175,12 +177,15 @@ router.post("/moka/events", fromMoka, (req, res) => {
 
 // ----- from the dashboard -----
 
-const isFirstRun = () => !settings.JELLYFIN_API_KEY && !isMokaMode() && getUsers().length === 0;
-// Like the Jellyfin step: proving Moka administrator access claims a fresh install
-const firstRunOrSignedIn = (req, res, next) => (isFirstRun() ? next() : authenticateToken(req, res, next));
+// Moka is offered only once it is turned on under Experimental
+function onlyWhenEnabled(req, res, next) {
+  if (!mokaEnabled()) return res.status(404).json({ success: false, message: "Turn on Moka under Experimental first" });
+  next();
+}
 
 router.get("/moka", authenticateToken, (req, res) => {
   res.json({
+    enabled: mokaEnabled(),
     connected: isMokaMode(),
     url: mokaUrl() || null,
     publicUrl: settings.MOKA_PUBLIC_URL || null,
@@ -188,7 +193,7 @@ router.get("/moka", authenticateToken, (req, res) => {
   });
 });
 
-router.post("/moka/connect", pairLimiter, firstRunOrSignedIn, async (req, res) => {
+router.post("/moka/connect", pairLimiter, authenticateToken, onlyWhenEnabled, async (req, res) => {
   const { username, password } = req.body || {};
   const base = httpUrlOrEmpty(req.body?.url);
   if (!base) return res.status(400).json({ success: false, message: "Enter the Moka address, starting with http:// or https://" });
@@ -221,7 +226,6 @@ router.post("/moka/connect", pairLimiter, firstRunOrSignedIn, async (req, res) =
     await mokaSignOut(base, session.cookie);
   }
 
-  const claiming = isFirstRun();
   const saved = updateConfig({
     MOKA_URL: base,
     MOKA_API_KEY: keys.api_key,
@@ -229,11 +233,10 @@ router.post("/moka/connect", pairLimiter, firstRunOrSignedIn, async (req, res) =
     MOKA_PUBLIC_URL: keys.public_url || publicUrl || "",
   });
   if (!saved) return res.status(500).json({ success: false, message: "Could not save the configuration. Check the config volume permissions." });
-  if (claiming) issueSession(req, res, { id: `moka:${session.me.id}`, username: session.me.username, method: "moka" });
   logger.info(`Moka: connected to ${base}; requests now go to Moka`);
   await getDiscordLinks({ fresh: true });
   await applyMokaChange();
-  res.json({ success: true, signedIn: claiming, announcesFrom: announcesFromMoka() ? "moka" : "jellyfin" });
+  res.json({ success: true, announcesFrom: announcesFromMoka() ? "moka" : "jellyfin" });
 });
 
 router.delete("/moka/connect", authenticateToken, async (req, res) => {

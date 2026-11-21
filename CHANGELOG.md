@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Moka as a connection.** Connections > Moka (or the first setup) connects Moka by signing in as a Moka administrator. Search, requests (season by season for shows), `/trending` and the daily pick then go through Moka instead of Seerr. New titles are announced from Jellyfin when it is linked, otherwise from Moka, with "now available" messages and mentions for the people who requested them. Members linked by their Discord ID in Moka request in their own name; others through Moka's guest account. Moka administrators can sign in to the dashboard, and Moka can set Anchorr up from its side when `MOKA_URL` names it.
+- **Moka (experimental).** Off by default: System > Experimental > Use Moka adds Moka to Connections, next to Jellyfin and Seerr, which stay as they are. Connecting it (signing in as a Moka administrator) sends search, requests (season by season for shows), `/trending` and the daily pick to Moka instead of Seerr while it stays connected. New titles are announced from Jellyfin when it is linked, otherwise from Moka, with "now available" messages and mentions for the people who requested them. Members linked by their Discord ID in Moka request in their own name; others through Moka's guest account. Moka administrators can then sign in to the dashboard.
 
 ### Changed
 

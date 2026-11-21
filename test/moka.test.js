@@ -46,6 +46,11 @@ before(async () => {
         ? { json: { id: 1, username: body.username, permissions: body.username === "admin" ? 1 : 4 }, headers: { "set-cookie": `moka_session=${body.username}; Path=/; HttpOnly` } }
         : { status: 401, json: { message: "wrong credentials" } },
     "POST /api/v1/auth/logout": () => ({}),
+    // the same fake also stands in for Jellyfin, so the install can be claimed the usual way
+    "GET /System/Info/Public": () => ({ ServerName: "Home", Version: "12.4.0", Id: "srv-1" }),
+    "POST /Users/AuthenticateByName": () => ({ AccessToken: "tok", User: { Id: "u1", Name: "jf-admin", Policy: { IsAdministrator: true } }, ServerId: "srv-1" }),
+    "GET /Auth/Keys": () => ({ Items: [{ AppName: "Anchorr", AccessToken: "jf-key", IsActive: true, DateCreated: "2026-01-01" }] }),
+    "POST /Sessions/Logout": () => ({ status: 204 }),
   });
   discordApi = await startFakeServer({
     "GET /users/@me": ({ headers }) => (headers.authorization === "Bot good-token" ? { id: "bot-1", username: "Popcorn" } : { status: 401, json: {} }),
@@ -68,31 +73,37 @@ const asMoka = { authorization: `Bearer ${KEY}` };
 
 // ----- connecting from the dashboard (tests in order) -----
 
-test("a fresh Anchorr is the same program: the usual setup, and Moka cannot set it up from its side", async () => {
+test("a fresh Anchorr is the same program: the usual setup, no Moka, and Moka cannot set it up", async () => {
   const state = (await call("GET", "/api/setup/state")).json;
   assert.equal(state.needsSetup, true);
   assert.equal("moka" in state, false);
   assert.equal((await call("POST", "/api/moka/pair", { api_key: KEY, discord_token: "good-token" })).status, 404);
+  assert.equal((await call("POST", "/api/moka/connect", { url: moka.url, username: "admin", password: "right" })).status, 401, "connecting needs a session");
 });
 
-test("connecting Moka takes a Moka administrator, and claims a fresh install", async () => {
-  const body = { url: `${moka.url}/`, publicUrl: "", username: "admin", password: "wrong" };
-  assert.equal((await call("POST", "/api/moka/connect", body)).status, 401);
-  assert.equal((await call("POST", "/api/moka/connect", { ...body, username: "ana", password: "right" })).status, 403);
-  const ok = await call("POST", "/api/moka/connect", { ...body, password: "right" });
-  assert.equal(ok.status, 200);
-  assert.equal(ok.json.signedIn, true);
-  assert.equal(ok.json.announcesFrom, "moka", "without Jellyfin, new titles come from Moka");
-  app.cookie = ok.token;
+test("Moka is offered only after turning it on under Experimental", async () => {
+  const claim = await call("POST", "/api/setup/jellyfin", { url: moka.url, username: "jf-admin", password: "pw" });
+  assert.equal(claim.status, 200);
+  app.cookie = claim.token;
+  const body = { url: `${moka.url}/`, publicUrl: "", username: "admin", password: "right" };
+  assert.equal((await app.call("POST", "/api/moka/connect", body)).status, 404, "off by default");
+  assert.notEqual((await app.call("GET", "/api/config")).json.EXPERIMENTAL_MOKA, "true");
+  assert.equal((await app.call("POST", "/api/save-config", { EXPERIMENTAL_MOKA: "true" })).status, 200);
+  assert.deepEqual((await app.call("GET", "/api/moka")).json, { enabled: true, connected: false, url: null, publicUrl: null, announcesFrom: "jellyfin" });
+});
 
-  const state = (await call("GET", "/api/setup/state")).json;
-  assert.deepEqual([state.moka, state.needsSetup], [true, false]);
+test("connecting Moka takes a Moka administrator; requests then go to Moka, Jellyfin keeps announcing", async () => {
+  const body = { url: `${moka.url}/`, publicUrl: "", username: "admin", password: "wrong" };
+  assert.equal((await app.call("POST", "/api/moka/connect", body)).status, 401);
+  assert.equal((await app.call("POST", "/api/moka/connect", { ...body, username: "ana", password: "right" })).status, 403);
+  const ok = await app.call("POST", "/api/moka/connect", { ...body, password: "right" });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.announcesFrom, "jellyfin", "Jellyfin is linked: it announces");
+
+  assert.equal((await call("GET", "/api/setup/state")).json.moka, true);
   const config = (await app.call("GET", "/api/config")).json;
   assert.equal("MOKA_API_KEY" in config, false, "Moka's key never reaches the dashboard");
   assert.equal(config.MOKA_PUBLIC_URL, "https://moka.example.com");
-  assert.deepEqual((await app.call("GET", "/api/moka")).json, {
-    connected: true, url: moka.url, publicUrl: "https://moka.example.com", announcesFrom: "moka",
-  });
   const counts = (await app.call("GET", "/api/overview")).json.requestCounts;
   assert.deepEqual([counts.total, counts.pending, counts.processing], [2, 1, 1], "the Overview counts Moka's requests");
 });
@@ -102,6 +113,14 @@ test("the dashboard also signs in Moka administrators once Moka is connected", a
   assert.equal((await call("POST", "/api/auth/moka", { username: "admin", password: "wrong" })).status, 401);
   assert.equal((await call("POST", "/api/auth/moka", { username: "ana", password: "right" })).status, 403);
   assert.equal((await call("POST", "/api/auth/moka", { username: "admin", password: "right" })).status, 200);
+});
+
+test("turning Moka off under Experimental sends requests back to Seerr, keeping the connection", async () => {
+  assert.equal((await app.call("POST", "/api/save-config", { EXPERIMENTAL_MOKA: "false" })).status, 200);
+  assert.equal("moka" in (await call("GET", "/api/setup/state")).json, false);
+  assert.equal((await call("GET", "/api/auth/check")).json.mokaLogin, undefined);
+  assert.equal((await app.call("POST", "/api/save-config", { EXPERIMENTAL_MOKA: "true" })).status, 200);
+  assert.equal((await call("GET", "/api/setup/state")).json.moka, true, "on again: still connected");
 });
 
 test("disconnecting Moka sends requests back to Seerr", async () => {
@@ -141,7 +160,7 @@ test("turning the bot off in Moka forgets the key", async () => {
 // ----- the bot's calls to Moka (in this process) -----
 
 test("requests go to Moka as the linked member's user, or as the guest, with seasons", async (t) => {
-  t.after(applyConfig({ MOKA_URL: moka.url, MOKA_API_KEY: KEY, MOKA_GUEST_USER_ID: "3" }));
+  t.after(applyConfig({ EXPERIMENTAL_MOKA: "true", MOKA_URL: moka.url, MOKA_API_KEY: KEY, MOKA_GUEST_USER_ID: "3" }));
   const { sendRequest } = await import("../api/seerr.js");
   const { getDiscordLinks } = await import("../api/moka.js");
   await getDiscordLinks({ fresh: true });
@@ -162,7 +181,7 @@ test("requests go to Moka as the linked member's user, or as the guest, with sea
 });
 
 test("search mixes Moka's films and shows; details say when Moka already has a title", async (t) => {
-  t.after(applyConfig({ MOKA_URL: moka.url, MOKA_API_KEY: KEY }));
+  t.after(applyConfig({ EXPERIMENTAL_MOKA: "true", MOKA_URL: moka.url, MOKA_API_KEY: KEY }));
   const metadata = await import("../api/metadata.js");
   const { checkMediaStatus } = await import("../api/seerr.js");
   const found = await metadata.searchTitles("matrix moka");
@@ -179,7 +198,7 @@ test("a Moka event becomes the usual announcement, with the requester mentioned 
   t.after(() => mock.timers.reset());
   t.after(
     applyConfig({
-      MOKA_URL: moka.url, MOKA_API_KEY: KEY, LANGUAGE: "en", JELLYFIN_CHANNEL_ID: "chan-default",
+      EXPERIMENTAL_MOKA: "true", MOKA_URL: moka.url, MOKA_API_KEY: KEY, LANGUAGE: "en", JELLYFIN_CHANNEL_ID: "chan-default",
       NOTIFY_ON_AVAILABLE: "true", NOTIFY_TAG_REQUESTERS: "true",
     })
   );
@@ -214,7 +233,7 @@ test("with Jellyfin linked too, Jellyfin announces and Moka's requesters still g
   t.after(() => mock.timers.reset());
   t.after(
     applyConfig({
-      MOKA_URL: moka.url, MOKA_API_KEY: KEY, LANGUAGE: "en", JELLYFIN_CHANNEL_ID: "chan-default",
+      EXPERIMENTAL_MOKA: "true", MOKA_URL: moka.url, MOKA_API_KEY: KEY, LANGUAGE: "en", JELLYFIN_CHANNEL_ID: "chan-default",
       JELLYFIN_BASE_URL: "https://jf.example.com", JELLYFIN_API_KEY: "jf-key",
       NOTIFY_ON_AVAILABLE: "true", NOTIFY_TAG_REQUESTERS: "false",
     })

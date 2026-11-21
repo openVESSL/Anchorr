@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Clapperboard,
   Dices,
+  FlaskConical,
   Inbox,
   LayoutDashboard,
   Library,
@@ -30,4 +31,5 @@ export const PAGE_ICONS: Record<string, LucideIcon> = {
   "/roundup": CalendarDays,
   "/system": Settings,
   "/logs": ScrollText,
+  "/experimental": FlaskConical,
 }

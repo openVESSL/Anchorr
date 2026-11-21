@@ -2,6 +2,7 @@
 import { Router } from "express";
 import fs from "fs";
 import rateLimit from "express-rate-limit";
+import { isMokaMode } from "../api/moka.js";
 import { setGuestAutoApprove } from "../api/seerr.js";
 import { restartBot, startBot } from "../bot/botManager.js";
 import { scheduleDailyRandomPick } from "../bot/dailyPick.js";
@@ -39,6 +40,7 @@ router.post(
     const oldAutoApprove = settings.SEERR_AUTO_APPROVE;
     const DAILY_PICK_KEYS = ["DAILY_RANDOM_PICK_ENABLED", "DAILY_RANDOM_PICK_CHANNEL_ID", "DAILY_RANDOM_PICK_INTERVAL"];
     const oldDailyPick = DAILY_PICK_KEYS.map((k) => settings[k]).join("|");
+    const oldMoka = isMokaMode();
 
     // Normalize SEERR_URL to remove /api/v1 suffix if present
     if (
@@ -134,10 +136,12 @@ router.post(
     // If bot is running and critical settings changed, restart the bot logic
     const jellyfinApiKeyChanged =
       oldJellyfinApiKey !== settings.JELLYFIN_API_KEY;
+    // Turning Moka on or off (when connected) changes /request and where new titles come from
     const needsRestart =
       oldToken !== settings.DISCORD_TOKEN ||
       oldGuildId !== settings.GUILD_ID ||
-      jellyfinApiKeyChanged;
+      jellyfinApiKeyChanged ||
+      oldMoka !== isMokaMode();
 
     // A restart schedules the daily pick itself; otherwise apply its new settings now
     if (botState.isBotRunning && !needsRestart && DAILY_PICK_KEYS.map((k) => settings[k]).join("|") !== oldDailyPick) {

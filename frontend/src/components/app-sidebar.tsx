@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useT } from "@/lib/i18n"
 import { PAGE_ICONS } from "@/lib/nav"
-import { useOverview, useSetupState } from "@/lib/queries"
+import { useConfig, useOverview, useSetupState } from "@/lib/queries"
 
 interface Item {
   to: string
@@ -33,6 +33,8 @@ export function AppSidebar() {
   const setup = useSetupState().data
   const overview = useOverview().data
   const moka = Boolean(setup?.moka)
+  // Moka is listed only once it is turned on under Experimental
+  const mokaOffered = useConfig().data?.EXPERIMENTAL_MOKA === "true"
 
   const groups: { label?: string; items: Item[] }[] = [
     { items: [{ to: "/", label: t("Overview") }] },
@@ -40,9 +42,8 @@ export function AppSidebar() {
       label: t("Connections"),
       items: [
         { to: "/jellyfin", label: "Jellyfin", done: setup?.jellyfin, down: Boolean(setup?.jellyfin && overview && !overview.jellyfin) },
-        // with Moka connected, Seerr is not needed
-        ...(moka && !setup?.seerr ? [] : [{ to: "/seerr", label: "Seerr", done: setup?.seerr, down: Boolean(setup?.seerr && overview && !overview.seerr) }]),
-        { to: "/moka", label: "Moka", done: moka, down: Boolean(moka && overview && !overview.moka) },
+        { to: "/seerr", label: "Seerr", done: setup?.seerr, down: Boolean(setup?.seerr && overview && !overview.seerr) },
+        ...(mokaOffered ? [{ to: "/moka", label: "Moka", done: moka, down: Boolean(moka && overview && !overview.moka) }] : []),
         { to: "/discord", label: "Discord", done: setup?.discord && setup?.discordServer },
       ],
     },
@@ -51,8 +52,7 @@ export function AppSidebar() {
       items: [
         { to: "/notifications", label: t("Notifications") },
         { to: "/requests", label: t("Requests") },
-        // with Moka, people are linked by their Discord ID in Moka
-        ...(moka ? [] : [{ to: "/users", label: t("Users") }]),
+        { to: "/users", label: t("Users") },
         { to: "/embeds", label: t("Appearance") },
         { to: "/daily-pick", label: t("Daily pick") },
         { to: "/roundup", label: t("Weekly roundup") },
@@ -63,6 +63,7 @@ export function AppSidebar() {
       items: [
         { to: "/system", label: t("Settings") },
         { to: "/logs", label: t("Logs") },
+        { to: "/experimental", label: t("Experimental") },
       ],
     },
   ]

@@ -16,7 +16,8 @@ import { useT } from "@/lib/i18n"
 import { keys, useAuth, useSetupState } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
-type Step = "jellyfin" | "seerr" | "moka" | "discord" | "done"
+type Step = "jellyfin" | "seerr" | "discord" | "done"
+const STEPS: Step[] = ["jellyfin", "seerr", "discord", "done"]
 
 export function SetupPage() {
   const { t } = useT()
@@ -26,19 +27,11 @@ export function SetupPage() {
   const [step, setStep] = useState<Step | null>(null)
   // Kept only in this page's memory so the Seerr step can reuse the Jellyfin sign-in
   const [jellyfinLogin, setJellyfinLogin] = useState<{ username: string; password: string } | null>(null)
-  // Moka in place of Seerr (and of Jellyfin, when Jellyfin is skipped)
-  const [useMoka, setUseMoka] = useState(false)
-  const viaMoka = useMoka || Boolean(state.data?.moka)
-  const STEPS: Step[] = viaMoka
-    ? state.data?.jellyfin || step === "jellyfin"
-      ? ["jellyfin", "moka", "discord", "done"]
-      : ["moka", "discord", "done"]
-    : ["jellyfin", "seerr", "discord", "done"]
 
   useEffect(() => {
     if (step || !state.data) return
-    if (!state.data.jellyfin && !state.data.moka) setStep("jellyfin")
-    else if (!state.data.seerr && !state.data.moka) setStep("seerr")
+    if (!state.data.jellyfin) setStep("jellyfin")
+    else if (!state.data.seerr) setStep("seerr")
     else if (!state.data.discord || !state.data.discordServer) setStep("discord")
     else setStep("done")
   }, [state.data, step])
@@ -50,11 +43,7 @@ export function SetupPage() {
     client.invalidateQueries({ queryKey: keys.auth })
     client.invalidateQueries({ queryKey: keys.setup })
   }
-  const labels: Record<Step, string> = { jellyfin: "Jellyfin", seerr: "Seerr", moka: "Moka", discord: "Discord", done: t("Done") }
-  const toMoka = () => {
-    setUseMoka(true)
-    setStep("moka")
-  }
+  const labels: Record<Step, string> = { jellyfin: "Jellyfin", seerr: "Seerr", discord: "Discord", done: t("Done") }
 
   return (
     <div className="mx-auto flex min-h-svh max-w-xl flex-col px-4 py-10">
@@ -82,42 +71,27 @@ export function SetupPage() {
       </ol>
 
       {step === "jellyfin" && (
-        <>
-          <JellyfinStep
-            onDone={(login) => {
-              setJellyfinLogin(login)
-              refresh()
-              setStep(useMoka ? "moka" : "seerr")
-            }}
-          />
-          <MokaSwitch label={t("Use Moka instead of Jellyfin and Seerr")} onClick={toMoka} />
-        </>
+        <JellyfinStep
+          onDone={(login) => {
+            setJellyfinLogin(login)
+            refresh()
+            setStep("seerr")
+          }}
+        />
       )}
-      {step === "moka" && (
-        <MokaStep
-          onBack={state.data?.jellyfin ? undefined : () => setStep("jellyfin")}
+      {step === "seerr" && (
+        <SeerrStep
+          jellyfinLogin={jellyfinLogin}
+          onBack={() => setStep("jellyfin")}
           onDone={() => {
             refresh()
             setStep("discord")
           }}
         />
       )}
-      {step === "seerr" && (
-        <>
-          <SeerrStep
-            jellyfinLogin={jellyfinLogin}
-            onBack={() => setStep("jellyfin")}
-            onDone={() => {
-              refresh()
-              setStep("discord")
-            }}
-          />
-          <MokaSwitch label={t("Use Moka for requests instead of Seerr")} onClick={toMoka} />
-        </>
-      )}
       {step === "discord" && (
         <DiscordStep
-          onBack={() => setStep(viaMoka ? "moka" : "seerr")}
+          onBack={() => setStep("seerr")}
           onDone={() => {
             refresh()
             setStep("done")
@@ -129,71 +103,7 @@ export function SetupPage() {
   )
 }
 
-function MokaSwitch({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button type="button" className="text-muted-foreground hover:text-foreground mt-3 self-center text-sm underline-offset-4 hover:underline" onClick={onClick}>
-      {label}
-    </button>
-  )
-}
-
-/** Connects Moka by signing in as a Moka admin; Moka creates the bot's own account. */
-export function MokaStep({ onBack, onDone }: { onBack?: () => void; onDone: () => void }) {
-  const { t } = useT()
-  const [url, setUrl] = useState("")
-  const [publicUrl, setPublicUrl] = useState("")
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const { busy, error, run } = useSubmit()
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    if (await run(() => api.post("/moka/connect", { url, publicUrl, username, password }))) onDone()
-  }
-
-  return (
-    <StepCard
-      title={t("Connect Moka")}
-      description={t("Sign in with a Moka administrator account. Moka creates the bot's own account; your password is not stored. Search and requests then go through Moka.")}
-    >
-      <form onSubmit={submit} className="space-y-4">
-        <ErrorAlert message={error} />
-        <div className="space-y-2">
-          <Label htmlFor="moka-url">{t("Moka address")}</Label>
-          <Input id="moka-url" type="url" placeholder="http://192.168.1.10:8484" value={url} onChange={(e) => setUrl(e.target.value)} required autoFocus />
-          <p className="text-muted-foreground text-sm">{t("The address Anchorr uses to reach Moka, for example its LAN address.")}</p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="moka-public">{t("Public address (optional)")}</Label>
-          <Input id="moka-public" type="url" placeholder="https://moka.example.com" value={publicUrl} onChange={(e) => setPublicUrl(e.target.value)} />
-          <p className="text-muted-foreground text-sm">{t("Used for links in Discord. Leave it empty to keep the one set in Moka.")}</p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="moka-user">{t("Username")}</Label>
-          <Input id="moka-user" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="moka-pass">{t("Password")}</Label>
-          <Input id="moka-pass" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {onBack ? (
-            <Button type="button" variant="ghost" onClick={onBack}>
-              {t("Back")}
-            </Button>
-          ) : (
-            <span />
-          )}
-          <Button type="submit" disabled={busy}>
-            {busy ? t("Connecting...") : t("Connect")}
-          </Button>
-        </div>
-      </form>
-    </StepCard>
-  )
-}
-
-function StepCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+export function StepCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
     <Card>
       <CardHeader>
@@ -205,7 +115,7 @@ function StepCard({ title, description, children }: { title: string; description
   )
 }
 
-function ErrorAlert({ message }: { message: string }) {
+export function ErrorAlert({ message }: { message: string }) {
   if (!message) return null
   return (
     <Alert variant="destructive" role="alert">
@@ -214,7 +124,7 @@ function ErrorAlert({ message }: { message: string }) {
   )
 }
 
-function useSubmit() {
+export function useSubmit() {
   const { t } = useT()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")

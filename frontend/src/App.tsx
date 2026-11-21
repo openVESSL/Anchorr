@@ -7,6 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useAuth } from "@/lib/queries"
 import { DailyPickPage } from "@/pages/daily-pick"
 import { DiscordPage } from "@/pages/discord"
+import { ExperimentalPage } from "@/pages/experimental"
 import { EmbedsPage } from "@/pages/embeds"
 import { JellyfinPage } from "@/pages/jellyfin"
 import { LoginPage } from "@/pages/login"
@@ -41,6 +42,7 @@ export function App() {
           <Route path="roundup" element={<RoundupPage />} />
           <Route path="system" element={<SystemPage />} />
           <Route path="logs" element={<LogsPage />} />
+          <Route path="experimental" element={<ExperimentalPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Route>

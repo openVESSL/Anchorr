@@ -41,7 +41,7 @@ export function OverviewPage() {
   // Moka connected: requests go there, Seerr is optional (and so is Jellyfin)
   const mokaMode = Boolean(setup?.moka)
   const incomplete = setup && ((!setup.jellyfin && !mokaMode) || (!setup.seerr && !mokaMode) || !setup.discord || !setup.discordServer)
-  const showSeerr = !mokaMode || Boolean(setup?.seerr)
+
   const overview = useOverview()
   const o = overview.data
   const upgradeQuery = useUpgrade()
@@ -116,7 +116,7 @@ export function OverviewPage() {
         </Alert>
       )}
 
-      <div className={cn("grid gap-4", mokaMode && showSeerr ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3")}>
+      <div className={cn("grid gap-4", mokaMode ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3")}>
         <StatusCard
           title={t("Discord bot")}
           ok={s?.isBotRunning}
@@ -138,15 +138,13 @@ export function OverviewPage() {
           ]}
           link={jellyfin?.url}
         />
-        {showSeerr && (
-          <StatusCard
-            title="Seerr"
-            ok={Boolean(seerr)}
-            value={seerr ? t("Connected") : setup?.seerr ? t("Not reachable") : t("Not set up")}
-            lines={[seerr?.version && t("Version {version}", { version: seerr.version }), mokaMode && t("Requests go to Moka")]}
-            link={seerr?.url}
-          />
-        )}
+        <StatusCard
+          title="Seerr"
+          ok={Boolean(seerr)}
+          value={seerr ? t("Connected") : setup?.seerr ? t("Not reachable") : t("Not set up")}
+          lines={[seerr?.version && t("Version {version}", { version: seerr.version }), mokaMode && t("Not used while Moka is connected")]}
+          link={seerr?.url}
+        />
         {mokaMode && (
           <StatusCard
             title="Moka"

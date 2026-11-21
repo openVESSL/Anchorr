@@ -1,6 +1,7 @@
 /**
- * Moka as a connection, next to Jellyfin, Seerr and Discord. Once connected (from the
- * Moka page of the dashboard, or by Moka itself when MOKA_URL is in the environment), the
+ * Moka as an experimental connection, next to Jellyfin, Seerr and Discord. Turned on under
+ * Experimental and connected (from the Moka page of the dashboard, or by Moka itself when
+ * MOKA_URL is in the environment), the
  * catalog and requests go through Moka instead of Seerr. New titles are announced from
  * Jellyfin when it is linked (people watch there), otherwise from Moka.
  *
@@ -15,8 +16,10 @@ import { settings } from "../utils/settings.js";
 const trimUrl = (url) => String(url || "").replace(/\/+$/, "");
 /** Moka's address as Anchorr reaches it (saved when connecting; MOKA_URL in the environment otherwise). */
 export const mokaUrl = () => trimUrl(settings.MOKA_URL);
-/** Moka is connected: the catalog and requests go through it. */
-export const isMokaMode = () => Boolean(mokaUrl() && settings.MOKA_API_KEY);
+/** Moka is an experimental option: off, Anchorr ignores it even when connected. */
+export const mokaEnabled = () => settings.EXPERIMENTAL_MOKA === "true";
+/** Moka is turned on and connected: the catalog and requests go through it. */
+export const isMokaMode = () => mokaEnabled() && Boolean(mokaUrl() && settings.MOKA_API_KEY);
 export const jellyfinLinked = () => Boolean(settings.JELLYFIN_BASE_URL && settings.JELLYFIN_API_KEY);
 /** New titles come from Moka only without Jellyfin: with it, Jellyfin's watch links win. */
 export const announcesFromMoka = () => isMokaMode() && !jellyfinLinked();

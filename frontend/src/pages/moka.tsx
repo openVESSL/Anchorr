@@ -1,20 +1,88 @@
+// Moka (experimental): a short explanation, then connecting by signing in as a Moka admin.
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
+import { Link } from "react-router"
 import { toast } from "sonner"
 
 import { PageHeader, Section } from "@/components/settings"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { api, ApiError } from "@/lib/api"
 import { useT } from "@/lib/i18n"
 import { keys, useOverview } from "@/lib/queries"
-import { MokaStep } from "@/pages/setup"
+import { ErrorAlert, StepCard, useSubmit } from "@/pages/setup"
 
 interface MokaState {
+  enabled: boolean
   connected: boolean
   url: string | null
   publicUrl: string | null
   announcesFrom: "moka" | "jellyfin" | null
+}
+
+/** Connects Moka by signing in as a Moka admin; Moka creates the bot's own account. */
+function MokaStep({ onDone }: { onDone: () => void }) {
+  const { t } = useT()
+  const [url, setUrl] = useState("")
+  const [publicUrl, setPublicUrl] = useState("")
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const { busy, error, run } = useSubmit()
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (await run(() => api.post("/moka/connect", { url, publicUrl, username, password }))) onDone()
+  }
+
+  return (
+    <StepCard
+      title={t("Connect Moka")}
+      description={t("Sign in with a Moka administrator account. Moka creates the bot's own account; your password is not stored. Search and requests then go through Moka.")}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        <ErrorAlert message={error} />
+        <div className="space-y-2">
+          <Label htmlFor="moka-url">{t("Moka address")}</Label>
+          <Input id="moka-url" type="url" placeholder="http://192.168.1.10:8484" value={url} onChange={(e) => setUrl(e.target.value)} required autoFocus />
+          <p className="text-muted-foreground text-sm">{t("The address Anchorr uses to reach Moka, for example its LAN address.")}</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="moka-public">{t("Public address (optional)")}</Label>
+          <Input id="moka-public" type="url" placeholder="https://moka.example.com" value={publicUrl} onChange={(e) => setPublicUrl(e.target.value)} />
+          <p className="text-muted-foreground text-sm">{t("Used for links in Discord. Leave it empty to keep the one set in Moka.")}</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="moka-user">{t("Username")}</Label>
+          <Input id="moka-user" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="moka-pass">{t("Password")}</Label>
+          <Input id="moka-pass" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={busy}>
+            {busy ? t("Connecting...") : t("Connect")}
+          </Button>
+        </div>
+      </form>
+    </StepCard>
+  )
+}
+
+/** How Anchorr works with Moka, in three lines. */
+function HowItWorks() {
+  const { t } = useT()
+  return (
+    <Section title={t("How it works")}>
+      <ul className="text-muted-foreground list-disc space-y-1.5 pl-5 text-sm">
+        <li>{t("Moka is one server for your catalog, requests and library.")}</li>
+        <li>{t("Once Anchorr is connected to Moka, search and requests from Discord go to Moka, and Seerr is not used while Moka stays connected.")}</li>
+        <li>{t("Jellyfin keeps announcing new titles if it is linked; without it, Moka announces them. Disconnect Moka to go back to Seerr.")}</li>
+      </ul>
+    </Section>
+  )
 }
 
 export function MokaPage() {
@@ -44,10 +112,18 @@ export function MokaPage() {
 
   return (
     <>
-      <PageHeader
-        title="Moka"
-        description={t("Use Moka for search and requests instead of Seerr. New titles are announced from Jellyfin when it is linked, otherwise from Moka.")}
-      />
+      <PageHeader title="Moka" description={t("Experimental. Use Moka for search and requests from Discord.")} />
+      <HowItWorks />
+      {data && !data.enabled && (
+        <Section title={t("Turned off")}>
+          <p className="text-muted-foreground text-sm">
+            {t("Moka is turned off.")}{" "}
+            <Link to="/experimental" className="underline underline-offset-4">
+              {t("Turn it on under Experimental")}
+            </Link>
+          </p>
+        </Section>
+      )}
       {data?.connected && (
         <Section title={t("Connection")}>
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -72,7 +148,7 @@ export function MokaPage() {
           </p>
         </Section>
       )}
-      {(!data?.connected || editing) && (
+      {data?.enabled && (!data.connected || editing) && (
         <MokaStep
           onDone={async () => {
             toast.success(t("Moka connected"))
