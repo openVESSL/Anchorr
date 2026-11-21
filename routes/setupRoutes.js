@@ -3,7 +3,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { getOrCreateApiKey, getPublicServerInfo, isAdminApiKey, signIn, signOut } from "../api/jellyfinAdmin.js";
-import { getApiKeyWithJellyfinLogin, getSeerrVersion } from "../api/seerr.js";
+import { getApiKeyWithJellyfinLogin, getSeerrVersion, isSeerrInitialized } from "../api/seerr.js";
 import { prepareGuestUser } from "../bot/guestUser.js";
 import { restartBot, startJellyfinFeed } from "../bot/botManager.js";
 import { botState } from "../bot/botState.js";
@@ -142,6 +142,9 @@ router.post("/setup/seerr", setupLimiter, authenticateToken, async (req, res) =>
       return res.status(401).json({ success: false, message: "Seerr did not accept these credentials, or the account is not a Seerr admin" });
     }
     logger.warn(`Setup: Seerr check failed: ${err.message}`);
+    if (await isSeerrInitialized(seerrUrl).then((ok) => !ok, () => false)) {
+      return res.status(409).json({ success: false, message: "Seerr is not set up yet. Finish its own setup first, then try again" });
+    }
     return res.status(502).json({ success: false, message: "Could not reach Seerr at this address" });
   }
 

@@ -501,6 +501,12 @@ export async function setGuestAutoApprove({ seerrUrl, apiKey, guestUserId, autoA
 // ----- setup -----
 
 /** Seerr version for a URL + API key (throws on a wrong key or URL). */
+/** False while Seerr's own setup is unfinished; its other endpoints answer 500 until then. */
+export async function isSeerrInitialized(seerrUrl) {
+  const { data } = await http.get(`${normalizeApiUrl(seerrUrl)}/settings/public`, { timeout: TIMEOUTS.SEERR_API });
+  return data?.initialized !== false;
+}
+
 export async function getSeerrVersion(seerrUrl, apiKey) {
   const { data } = await http.get(`${normalizeApiUrl(seerrUrl)}/settings/about`, {
     headers: { "X-Api-Key": apiKey },

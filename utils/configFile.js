@@ -491,7 +491,7 @@ export function loadSettings({ backupV1 = true } = {}) {
     if (upgradeRecord && !config.UPGRADE_FROM_V1) config.UPGRADE_FROM_V1 = upgradeRecord;
     config.CONFIG_VERSION = CURRENT_CONFIG_VERSION;
     if (writeConfig(config)) {
-      logger.info(`✅ Config upgraded to format v${CURRENT_CONFIG_VERSION}${obsolete.length ? ` (removed: ${obsolete.join(", ")})` : ""}`);
+      logger.info(`✅ Config ${upgradeRecord ? "upgraded from 1.x to" : "set to"} format v${CURRENT_CONFIG_VERSION}${obsolete.length ? ` (removed: ${obsolete.join(", ")})` : ""}`);
     } else {
       logger.error("❌ Failed to save config format upgrade");
     }

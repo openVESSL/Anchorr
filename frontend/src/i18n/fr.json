@@ -372,5 +372,6 @@
   "Public address": "Adresse publique",
   "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Utilisée uniquement pour les liens et les images dans Discord, par exemple https://jellyfin.example.com. Laissez vide pour utiliser l'adresse de connexion.",
   "Mention the requester in the announcement": "Mentionner le demandeur dans l'annonce",
-  "Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.": "Mentionne la personne qui l'a demandé, depuis Discord ou dans Seerr avec un compte lié, pour que tout le salon voie qui l'a demandé."
+  "Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.": "Mentionne la personne qui l'a demandé, depuis Discord ou dans Seerr avec un compte lié, pour que tout le salon voie qui l'a demandé.",
+  "Seerr is not set up yet. Finish its own setup first, then try again": "Seerr n'est pas encore configuré. Terminez d'abord sa propre configuration, puis réessayez"
 }

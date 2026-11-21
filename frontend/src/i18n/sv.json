@@ -372,5 +372,6 @@
   "Public address": "Offentlig adress",
   "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Används bara för länkar och bilder i Discord, till exempel https://jellyfin.example.com. Lämna tomt för att använda anslutningsadressen.",
   "Mention the requester in the announcement": "Nämn den som frågade i meddelandet",
-  "Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.": "Taggar den som frågade efter det, från Discord eller i Seerr med ett länkat konto, så att alla i kanalen ser vem som ville ha det."
+  "Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.": "Taggar den som frågade efter det, från Discord eller i Seerr med ett länkat konto, så att alla i kanalen ser vem som ville ha det.",
+  "Seerr is not set up yet. Finish its own setup first, then try again": "Seerr är inte konfigurerat ännu. Slutför först dess egen konfiguration och försök sedan igen"
 }

@@ -87,6 +87,7 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 - Each new item no longer fetches the list of Jellyfin libraries again.
 - Test notifications from the dashboard are no longer stored in the notification history.
 - A plain `docker run` without `BIND_HOST` now reaches the dashboard through the published port.
+- Setup says when Seerr has not finished its own setup yet, instead of "Could not reach Seerr at this address". A fresh install no longer logs that its config was upgraded.
 
 ### Security
 

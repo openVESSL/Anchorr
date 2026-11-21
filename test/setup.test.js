@@ -136,6 +136,17 @@ test("Seerr step: the Jellyfin admin account reads Seerr's key, then the guest a
   assert.equal(config.SEERR_GUEST_USER_ID, "900");
 });
 
+test("Seerr step: a Seerr that has not finished its own setup is named as such", async (t) => {
+  const fresh = await startFakeServer({
+    "GET /api/v1/settings/public": () => ({ initialized: false }),
+    "GET /api/v1/settings/about": () => ({ status: 500, json: { message: "Server not initialized" } }),
+  });
+  t.after(() => fresh.close());
+  const res = await post("/api/setup/seerr", { url: fresh.url, apiKey: "any-key" });
+  assert.equal(res.status, 409);
+  assert.equal(res.json.message, "Seerr is not set up yet. Finish its own setup first, then try again");
+});
+
 test("dashboard sign-in with Jellyfin: admins only", async () => {
   assert.equal((await post("/api/auth/jellyfin", { username: "admin", password: "nope" }, { auth: false })).status, 401);
   assert.equal((await post("/api/auth/jellyfin", { username: "viewer", password: "viewer-pw" }, { auth: false })).status, 403);
