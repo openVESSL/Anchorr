@@ -112,6 +112,31 @@ export async function getDetails(id, mediaType) {
   }
 }
 
+// Seerr request status: 1 pending, 2 approved, 3 declined, 4 failed, 5 completed
+const OPEN_REQUEST_STATUSES = new Set([1, 2]);
+// Seerr can notice the item first and complete the request before Anchorr announces it
+const RECENTLY_COMPLETED_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The title's Seerr requests whose requester should hear it is available: open ones and
+ * ones completed in the last day. Not cached, since a cached list can predate the request.
+ * Empty when Seerr does not know the title, null when Seerr could not be asked.
+ */
+export async function getTitleRequests(id, mediaType, now = Date.now()) {
+  if (!isMetadataConfigured()) return null;
+  try {
+    const data = await seerrGet(`/${mediaType === "movie" ? "movie" : "tv"}/${id}`);
+    return (data?.mediaInfo?.requests || [])
+      .filter((r) => r?.id != null && r.requestedBy?.id != null)
+      .filter((r) => OPEN_REQUEST_STATUSES.has(r.status) || (r.status === 5 && now - Date.parse(r.updatedAt) < RECENTLY_COMPLETED_MS))
+      .map((r) => ({ id: String(r.id), seerrUserId: String(r.requestedBy.id) }));
+  } catch (err) {
+    if (err.response?.status === 404) return [];
+    logger.warn(`Could not read the Seerr requests for ${mediaType} ${id}: ${err.message}`);
+    return null;
+  }
+}
+
 export async function getImdbId(id, mediaType) {
   const details = await getDetails(id, mediaType);
   return details.external_ids.imdb_id;

@@ -182,7 +182,7 @@
   "Send a test": "Envoyer un test",
   "Send a test notification": "Envoyer une notification de test",
   "Send one now": "En envoyer une maintenant",
-  "Sends a direct message to whoever requested it from Discord, even if the channel announcement is off.": "Envoie un message privé à la personne qui l'a demandé depuis Discord, même si l'annonce dans le salon est désactivée.",
+  "Sends a direct message to whoever requested it, from Discord or in Seerr with a linked account, even if the channel announcement is off.": "Envoie un message privé à la personne qui l'a demandé, depuis Discord ou dans Seerr avec un compte lié, même si l'annonce dans le salon est désactivée.",
   "Server Members Intent is off. Turn it on under Bot in the Developer Portal so Anchorr can list your members for user linking.": "Server Members Intent est désactivé. Activez-le sous Bot dans le Developer Portal pour qu'Anchorr puisse lister vos membres à associer.",
   "Server for {kind}": "Serveur pour {kind}",
   "Servers the bot has joined": "Serveurs rejoints par le bot",
@@ -370,5 +370,7 @@
   "Could not load the upgrade checklist": "Impossible de charger la liste de mise à jour",
   "Links in Discord": "Liens dans Discord",
   "Public address": "Adresse publique",
-  "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Utilisée uniquement pour les liens et les images dans Discord, par exemple https://jellyfin.example.com. Laissez vide pour utiliser l'adresse de connexion."
+  "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Utilisée uniquement pour les liens et les images dans Discord, par exemple https://jellyfin.example.com. Laissez vide pour utiliser l'adresse de connexion.",
+  "Mention the requester in the announcement": "Mentionner le demandeur dans l'annonce",
+  "Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.": "Mentionne la personne qui l'a demandé, depuis Discord ou dans Seerr avec un compte lié, pour que tout le salon voie qui l'a demandé."
 }

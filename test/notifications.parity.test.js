@@ -29,6 +29,7 @@ const BASE = {
   JELLYFIN_NOTIFY_EPISODES: undefined,
   JELLYFIN_EPISODE_CHANNEL_ID: undefined,
   NOTIFY_ON_AVAILABLE: undefined,
+  NOTIFY_TAG_REQUESTERS: undefined,
   SEERR_URL: undefined,
   SEERR_API_KEY: undefined,
 };
@@ -405,4 +406,54 @@ test("without Seerr, a movie still shows Jellyfin's runtime", async (t) => {
   const discord = createFakeDiscord();
   await send(movie("movie-runtime", { RunTime: "02:16:00" }), discord);
   assert.equal(discord.sent[0].embeds[0].fields.find((f) => f.name === "Runtime").value, "2h 16m");
+});
+
+test("with Seerr: linked members who requested in Seerr get the DM and the mention, once", async (t) => {
+  const now = Date.now();
+  const request = (id, status, seerrUserId, updatedAt = now) => ({ id, status, requestedBy: { id: seerrUserId }, updatedAt: new Date(updatedAt).toISOString() });
+  const seerr = await startFakeServer({
+    "GET /api/v1/movie/5150": () => ({
+      id: 5150, title: "The Matrix",
+      mediaInfo: {
+        requests: [
+          request(1, 2, 42), // approved
+          request(2, 3, 43), // declined
+          request(3, 5, 44, now - 3 * 24 * 60 * 60 * 1000), // completed long ago
+          request(4, 5, 45, now - 60 * 60 * 1000), // completed an hour ago
+          request(5, 1, 46), // pending, nobody linked
+        ],
+      },
+    }),
+  });
+  t.after(() => seerr.close());
+  const { writeConfig } = await import("../utils/configFile.js");
+  writeConfig({
+    USER_MAPPINGS: [42, 43, 44, 45].map((id) => ({ discordUserId: `discord-${id}`, seerrUserId: id })),
+  });
+  t.after(() => writeConfig({}));
+  configure(t, { SEERR_URL: seerr.url, SEERR_API_KEY: "seerr-key", NOTIFY_ON_AVAILABLE: "true", NOTIFY_TAG_REQUESTERS: "true" });
+
+  const { processAndSendNotification } = await import("../jellyfin/notificationSender.js");
+  const discord = createFakeDiscord();
+  const pending = new Map([["5150-movie", new Set(["discord-42", "user-1"])]]);
+  const item = movie("movie-seerr-requesters", { Provider_tmdb: "5150" });
+  await processAndSendNotification(item, discord.client, pending);
+
+  const expected = ["discord-42", "user-1", "discord-45"];
+  assert.deepEqual(discord.dms.map((d) => d.userId).sort(), [...expected].sort());
+  assert.equal(discord.sent[0].content, `Requested by ${expected.map((id) => `<@${id}>`).join(" ")}`);
+  assert.deepEqual(discord.sent[0].allowedMentions, { users: expected });
+
+  // a later item of the same title does not tell them again
+  await processAndSendNotification(item, discord.client, new Map());
+  assert.equal(discord.dms.length, 3);
+  assert.equal(discord.sent[1].content, undefined);
+});
+
+test("requesters are not mentioned unless that is turned on", async (t) => {
+  configure(t, { NOTIFY_ON_AVAILABLE: "true" });
+  const discord = createFakeDiscord();
+  await send(movie("movie-no-tag", { Provider_tmdb: "5252" }), discord, new Map([["5252-movie", new Set(["user-1"])]]));
+  assert.equal(discord.sent[0].content, undefined);
+  assert.deepEqual(discord.dms.map((d) => d.userId), ["user-1"]);
 });

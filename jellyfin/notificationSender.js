@@ -2,9 +2,12 @@
  * Posts one Jellyfin item (or a batch of its seasons/episodes) to Discord and sends the
  * "now available" DMs to the members who requested it.
  */
-import { getDetails, getExtras, isMetadataConfigured } from "../api/metadata.js";
+import { getDetails, getExtras, getTitleRequests, isMetadataConfigured } from "../api/metadata.js";
 import { recordActivity } from "../utils/activity.js";
+import { getUserMappings } from "../utils/configFile.js";
+import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
+import { PersistentMap } from "../utils/persistentMap.js";
 import { settings } from "../utils/settings.js";
 import { buildAvailableDm, buildItemNotification } from "./notificationEmbed.js";
 import { applySeriesProviderIds, getNotificationTmdbId, isSeriesChild } from "./notificationMetadata.js";
@@ -13,10 +16,16 @@ import { applySeriesProviderIds, getNotificationTmdbId, isSeriesChild } from "./
 const episodeMessages = new Map(); // SeriesId -> { messageId, channelId }
 const EPISODE_MESSAGE_TTL_MS = 6 * 60 * 60 * 1000;
 
-/** Members waiting for this item (NOTIFY_ON_AVAILABLE); their pending request is cleared. */
+// Seerr request ids whose requester was already told, so later episodes don't repeat it
+const announcedRequests = new PersistentMap("announced-requests", 100 * 365 * 24 * 60 * 60 * 1000);
+
+const mediaTypeOf = (itemType) => (itemType === "Movie" ? "movie" : ["Series", "Season", "Episode"].includes(itemType) ? "tv" : null);
+
+/** Members waiting for this item (requested from Discord); their pending request is cleared. */
 function takeRequesters(data, tmdbId, pendingRequests, onPendingRequestsChanged) {
-  if (settings.NOTIFY_ON_AVAILABLE !== "true" || !tmdbId || !pendingRequests) return [];
-  const key = data.ItemType === "Movie" ? `${tmdbId}-movie` : ["Series", "Season", "Episode"].includes(data.ItemType) ? `${tmdbId}-tv` : null;
+  if (!tmdbId || !pendingRequests) return [];
+  const mediaType = mediaTypeOf(data.ItemType);
+  const key = mediaType && `${tmdbId}-${mediaType}`;
   if (!key || !pendingRequests.has(key)) {
     logger.debug(`No matching pending requests found for ${tmdbId}`);
     return [];
@@ -26,6 +35,18 @@ function takeRequesters(data, tmdbId, pendingRequests, onPendingRequestsChanged)
   onPendingRequestsChanged?.();
   logger.info(`Found ${users.length} users to notify for ${data.ItemType === "Movie" ? "movie" : "TV show"} ${tmdbId}`);
   return users;
+}
+
+/** Linked members whose Seerr request (made anywhere, also in Seerr itself) this item fulfils. */
+async function seerrRequesters(data, tmdbId) {
+  const mediaType = mediaTypeOf(data.ItemType);
+  if (!tmdbId || !mediaType) return { requestIds: [], userIds: [] };
+  const fresh = ((await getTitleRequests(parseInt(tmdbId, 10), mediaType)) || []).filter((r) => !announcedRequests.has(r.id));
+  const discordIdBySeerrId = new Map(getUserMappings().map((m) => [String(m.seerrUserId), String(m.discordUserId)]));
+  return {
+    requestIds: fresh.map((r) => r.id),
+    userIds: fresh.map((r) => discordIdBySeerrId.get(r.seerrUserId)).filter(Boolean),
+  };
 }
 
 async function fetchMetadata(tmdbId, itemType) {
@@ -61,7 +82,7 @@ function announcementChannel(data, libraryChannelId) {
   return kind?.channel || libraryChannelId || settings.JELLYFIN_CHANNEL_ID;
 }
 
-async function postToChannel(client, channelId, data, post, { batch, isTest }) {
+async function postToChannel(client, channelId, data, post, { batch, isTest, mention }) {
   let channel;
   try {
     channel = await client.channels.fetch(channelId);
@@ -78,6 +99,8 @@ async function postToChannel(client, channelId, data, post, { batch, isTest }) {
       const existingChannel = await client.channels.fetch(existing.channelId);
       const message = await existingChannel.messages.fetch(existing.messageId);
       await message.edit({ embeds: [post.embed], components });
+      // an edit pings nobody
+      if (mention) await existingChannel.send(mention);
       logger.info(`Updated existing message for: ${post.title} (${batch.episodeCount} episodes total)`);
       return;
     } catch (err) {
@@ -87,7 +110,7 @@ async function postToChannel(client, channelId, data, post, { batch, isTest }) {
 
   let sent;
   try {
-    sent = await channel.send({ embeds: [post.embed], ...(post.buttons && { components }) });
+    sent = await channel.send({ embeds: [post.embed], ...(post.buttons && { components }), ...mention });
   } catch (error) {
     logger.error(`Failed to send Discord message:`, error);
     throw new Error(`Failed to send Discord notification: ${error.message}`);
@@ -122,7 +145,14 @@ export async function processAndSendNotification(
   const testPrefix = isTest ? "[TEST NOTIFICATION] " : "";
   logger.info(`${testPrefix}New item: ItemType=${data.ItemType}, Name=${data.Name}, tmdbId=${tmdbId}, Provider_imdb=${data.Provider_imdb}`);
 
-  const requesters = takeRequesters(data, tmdbId, pendingRequests, onPendingRequestsChanged);
+  const dm = settings.NOTIFY_ON_AVAILABLE === "true";
+  const tag = settings.NOTIFY_TAG_REQUESTERS === "true";
+  const pending = dm || tag ? takeRequesters(data, tmdbId, pendingRequests, onPendingRequestsChanged) : [];
+  const fromSeerr = (dm || tag) && !isTest ? await seerrRequesters(data, tmdbId) : { requestIds: [], userIds: [] };
+  const requesters = [...new Set([...pending, ...fromSeerr.userIds])];
+  const mention = tag && requesters.length
+    ? { content: t("notifications.requested_by", { users: requesters.map((id) => `<@${id}>`).join(" ") }), allowedMentions: { users: requesters } }
+    : null;
   const { details, omdb } = await fetchMetadata(tmdbId, data.ItemType);
   // Seerr's IMDb id first, then Jellyfin's
   const imdbId = details?.external_ids?.imdb_id || (isSeriesChild(data.ItemType) ? data.SeriesProvider_imdb : data.Provider_imdb);
@@ -134,11 +164,11 @@ export async function processAndSendNotification(
   } else if (!channelId) {
     logger.error(`❌ No Discord channel configured for ${data.ItemType} "${data.Name}" — set JELLYFIN_CHANNEL_ID or configure a library channel in the dashboard`);
   } else {
-    await postToChannel(client, channelId, data, post, { batch, isTest });
+    await postToChannel(client, channelId, data, post, { batch, isTest, mention });
     logger.info(`${testPrefix}Sent notification for: ${post.title}`);
   }
 
-  for (const userId of requesters) {
+  for (const userId of dm ? requesters : []) {
     try {
       const user = await client.users.fetch(userId);
       await user.send(buildAvailableDm(data, post));
@@ -147,4 +177,5 @@ export async function processAndSendNotification(
       logger.error(`Failed to send DM to user ${userId}:`, err?.message || err);
     }
   }
+  for (const id of fromSeerr.requestIds) announcedRequests.set(id, true);
 }

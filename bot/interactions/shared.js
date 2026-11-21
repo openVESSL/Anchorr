@@ -146,7 +146,7 @@ export async function requestFromDiscord(interaction, { tmdbId, mediaType, detai
   recordActivity("request", { title: details?.title || details?.name, detail: mediaType, user: interaction.user.username });
   logger.info(`[REQUEST] Discord User ${interaction.user.id} requested ${mediaType} ${tmdbId}${isAnime ? " [anime]" : ""}`);
 
-  if (settings.NOTIFY_ON_AVAILABLE === "true") {
+  if (settings.NOTIFY_ON_AVAILABLE === "true" || settings.NOTIFY_TAG_REQUESTERS === "true") {
     const key = `${tmdbId}-${mediaType}`;
     if (!pendingRequests.has(key)) pendingRequests.set(key, new Set());
     pendingRequests.get(key).add(interaction.user.id);
