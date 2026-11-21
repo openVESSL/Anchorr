@@ -317,7 +317,8 @@ export async function fetchRecentlyAdded(
   limit = 50,
   minDateCreated,
   parentId,
-  maxTotal = FETCH_RECENTLY_ADDED_MAX_TOTAL
+  maxTotal = FETCH_RECENTLY_ADDED_MAX_TOTAL,
+  { createdAfter = minDateCreated } = {}
 ) {
   try {
     const safeBase = new URL(baseUrl);
@@ -351,7 +352,8 @@ export async function fetchRecentlyAdded(
       return { items, complete: true, truncated: false };
     }
 
-    const cutoffMs = new Date(minDateCreated).getTime();
+    // Paging stops at the first item created before this (the list is sorted by DateCreated)
+    const cutoffMs = new Date(createdAfter).getTime();
     const collected = [];
     let startIndex = 0;
     let stopReason = "loop-exit";

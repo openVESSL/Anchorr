@@ -1,5 +1,8 @@
 // Parity net for the dashboard HTTP API: the real app.js in a child process, over HTTP.
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test, { after, before } from "node:test";
 
 import { startApp } from "./helpers/app.js";
@@ -7,6 +10,7 @@ import { startFakeServer } from "./helpers/http.js";
 
 let app;
 let jellyfin;
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "anchorr-api-"));
 before(async () => {
   // Minimal Jellyfin so the first run can be claimed by an administrator (audit S4)
   jellyfin = await startFakeServer({
@@ -18,7 +22,7 @@ before(async () => {
     "GET /Auth/Keys": () => ({ Items: [{ AppName: "Anchorr", AccessToken: "jf-key", IsActive: true, DateCreated: "2026-01-01" }] }),
     "POST /Sessions/Logout": () => ({ status: 204 }),
   });
-  app = await startApp();
+  app = await startApp({ ANCHORR_TEST_DATA_DIR: dataDir });
 });
 after(async () => {
   app?.stop();
@@ -100,6 +104,17 @@ test("saved secrets come back masked; resending the mask keeps them, an empty st
 
   await api("POST", "/api/save-config", { SEERR_API_KEY: "" });
   assert.equal((await api("GET", "/api/config")).json.SEERR_API_KEY, "");
+});
+
+test("Seerr checks never send the stored key to another server", async () => {
+  await api("POST", "/api/save-config", { SEERR_URL: "http://seerr.example.com", SEERR_API_KEY: "seerr-secret-1234" });
+  for (const route of ["/api/test-seerr", "/api/seerr/quality-profiles", "/api/seerr/servers"]) {
+    const other = await api("POST", route, { url: "http://evil.example.com", apiKey: "••••••••1234" });
+    assert.equal(other.status, 403, `${route}: masked key, other host`);
+    assert.equal((await api("POST", route, { url: "ftp://seerr.example.com", apiKey: "plain-key" })).status, 400, `${route}: not http(s)`);
+    assert.equal((await api("POST", route, { url: "http://seerr.example.com" })).status, 400, `${route}: no key`);
+  }
+  await api("POST", "/api/save-config", { SEERR_API_KEY: "" });
 });
 
 test("save keeps every dashboard field but drops unknown and protected keys (audit S5)", async () => {
@@ -214,6 +229,31 @@ test("upgrade checklist: only for installs migrated from 1.x, dismissable, sessi
   const saved = await api("POST", "/api/save-config", { UPGRADE_DISMISSED_AT: "", UPGRADE_FROM_V1: { at: "x" } });
   assert.equal(saved.status, 200, "a damaged record never blocks saving settings");
   assert.deepEqual((await api("GET", "/api/upgrade")).json, { show: false, items: [] });
+});
+
+test("logs: the error and full log are served, nothing else", async () => {
+  for (const kind of ["error", "all"]) {
+    const res = await api("GET", `/api/logs/${kind}`);
+    assert.equal(res.status, 200, kind);
+    assert.ok(Array.isArray(res.json.entries));
+  }
+  for (const kind of ["other", "constructor", "..%2Fconfig"]) {
+    assert.equal((await api("GET", `/api/logs/${kind}`)).status, 404, kind);
+  }
+});
+
+test("saving never overwrites a config.json that cannot be read", async () => {
+  const file = path.join(dataDir, "config.json");
+  const good = fs.readFileSync(file, "utf-8");
+  const broken = good.replace(/}\s*$/, ",}"); // a hand edit with a trailing comma
+  fs.writeFileSync(file, broken);
+  try {
+    const res = await api("POST", "/api/save-config", { LANGUAGE: "en" });
+    assert.equal(res.status, 500);
+    assert.equal(fs.readFileSync(file, "utf-8"), broken, "the file is left as it was");
+  } finally {
+    fs.writeFileSync(file, good);
+  }
 });
 
 test("logout revokes the session", async () => {

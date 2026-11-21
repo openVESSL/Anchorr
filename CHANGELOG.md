@@ -87,10 +87,13 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 - Each new item no longer fetches the list of Jellyfin libraries again.
 - Test notifications from the dashboard are no longer stored in the notification history.
 - A plain `docker run` without `BIND_HOST` now reaches the dashboard through the published port.
+- Test notifications from the dashboard no longer send the "now available" message to members who really requested that title, and no longer clear their request.
+- Saving settings while `config.json` cannot be read (for example after a hand edit with a typo) no longer replaces it with an almost empty file. Nothing is saved and the dashboard says why.
 - Setup says when Seerr has not finished its own setup yet, instead of "Could not reach Seerr at this address". A fresh install no longer logs that its config was upgraded.
 
 ### Security
 
+- A linked member whose Seerr user id is empty or not a number requests as the guest account. Seerr would otherwise run such a request as its administrator.
 - Requests from Discord no longer bypass Seerr approvals, quotas or permission checks, and members can no longer pick a 4K server or quality profile Seerr would not allow them.
 - Until setup is done, only the Jellyfin step is open without signing in. The local account can only be added from a signed-in session.
 - Failed HTTP requests no longer write API keys (`X-Api-Key`, `Authorization`) into the log files.

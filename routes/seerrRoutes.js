@@ -110,26 +110,37 @@ router.get("/seerr-users", authenticateToken, async (req, res) => {
   }
 });
 
-router.post("/test-seerr", authenticateToken, async (req, res) => {
-  const { url, apiKey } = req.body;
+/**
+ * The Seerr API address and key for a check from the dashboard, or null after answering
+ * the request with what is wrong. A masked key means the stored one, which only ever goes
+ * to the configured Seerr.
+ */
+function seerrTarget(req, res) {
+  const { url, apiKey } = req.body || {};
   const isMasked = isMaskedValue(apiKey);
   if (isMasked && !isSameConfiguredHost(url, settings.SEERR_URL)) {
-    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
+    res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
+    return null;
   }
   const effectiveApiKey = isMasked ? settings.SEERR_API_KEY : apiKey;
   if (!url || !effectiveApiKey) {
-    return res.status(400).json({ success: false, message: "URL and API Key are required." });
+    res.status(400).json({ success: false, message: "URL and API Key are required." });
+    return null;
   }
   if (!isAllowedUrl(url)) {
-    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
+    res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
+    return null;
   }
+  return { base: new URL(getSeerrApiUrl(url)).href.replace(/\/$/, ""), apiKey: effectiveApiKey };
+}
+
+router.post("/test-seerr", authenticateToken, async (req, res) => {
+  const target = seerrTarget(req, res);
+  if (!target) return;
 
   try {
-    const safeUrl = new URL(getSeerrApiUrl(url));
-    safeUrl.pathname = safeUrl.pathname.replace(/\/$/, "") + "/settings/about";
-
-    const response = await http.get(safeUrl.href, {
-      headers: { "X-Api-Key": effectiveApiKey },
+    const response = await http.get(`${target.base}/settings/about`, {
+      headers: { "X-Api-Key": target.apiKey },
       timeout: TIMEOUTS.SEERR_API,
     });
     const version = response.data?.version;
@@ -144,23 +155,11 @@ router.post("/test-seerr", authenticateToken, async (req, res) => {
 });
 
 router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
-  const { url, apiKey } = req.body;
-  const isMasked = isMaskedValue(apiKey);
-  if (isMasked && !isSameConfiguredHost(url, settings.SEERR_URL)) {
-    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
-  }
-  const effectiveApiKey = isMasked ? settings.SEERR_API_KEY : apiKey;
-  if (!url || !effectiveApiKey) {
-    return res.status(400).json({ success: false, message: "URL and API Key are required." });
-  }
-  if (!isAllowedUrl(url)) {
-    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
-  }
+  const target = seerrTarget(req, res);
+  if (!target) return;
 
   try {
-    const safeBase = new URL(getSeerrApiUrl(url)).href.replace(/\/$/, "");
-
-    const profiles = await seerrApi.fetchQualityProfiles(safeBase, effectiveApiKey);
+    const profiles = await seerrApi.fetchQualityProfiles(target.base, target.apiKey);
     res.json({ success: true, profiles });
   } catch (error) {
     logger.error("Failed to fetch quality profiles:", error.message);
@@ -169,23 +168,11 @@ router.post("/seerr/quality-profiles", authenticateToken, async (req, res) => {
 });
 
 router.post("/seerr/servers", authenticateToken, async (req, res) => {
-  const { url, apiKey } = req.body;
-  const isMasked = isMaskedValue(apiKey);
-  if (isMasked && !isSameConfiguredHost(url, settings.SEERR_URL)) {
-    return res.status(403).json({ success: false, message: "URL does not match the configured Seerr server." });
-  }
-  const effectiveApiKey = isMasked ? settings.SEERR_API_KEY : apiKey;
-  if (!url || !effectiveApiKey) {
-    return res.status(400).json({ success: false, message: "URL and API Key are required." });
-  }
-  if (!isAllowedUrl(url)) {
-    return res.status(400).json({ success: false, message: "Invalid URL. Must be http or https." });
-  }
+  const target = seerrTarget(req, res);
+  if (!target) return;
 
   try {
-    const safeBase = new URL(getSeerrApiUrl(url)).href.replace(/\/$/, "");
-
-    const servers = await seerrApi.fetchServers(safeBase, effectiveApiKey);
+    const servers = await seerrApi.fetchServers(target.base, target.apiKey);
     res.json({ success: true, servers });
   } catch (error) {
     logger.error("Failed to fetch servers:", error.message);

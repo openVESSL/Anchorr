@@ -54,6 +54,18 @@ test("unmapped user without a guest account: nothing is sent", async () => {
   assert.equal(seerr.requests.length, before);
 });
 
+test("a link without a valid Seerr user id never runs as Seerr's admin", async () => {
+  for (const seerrUserId of ["", "abc", 0, "1; drop"]) {
+    const mappings = [{ discordUserId: "d-broken", seerrUserId }];
+    const req = await request({ tmdbId: "603", mediaType: "movie", discordUserId: "d-broken", userMappings: mappings });
+    assert.equal(req.headers["x-api-user"], "77", `seerrUserId ${JSON.stringify(seerrUserId)} falls back to the guest`);
+  }
+  await assert.rejects(
+    sendRequest({ seerrUrl: seerr.url, apiKey: "k", tmdbId: "1", mediaType: "movie", discordUserId: "d-broken", userMappings: [{ discordUserId: "d-broken", seerrUserId: "" }], guestUserId: "" }),
+    NoSeerrUserError
+  );
+});
+
 test("server and profile are passed through; Seerr decides if the user may pick them", async () => {
   const req = await request({ tmdbId: "603", mediaType: "movie", discordUserId: "d-stranger", serverId: "1", profileId: "7" });
   assert.deepEqual(req.body, { mediaType: "movie", mediaId: 603, serverId: 1, profileId: 7 });

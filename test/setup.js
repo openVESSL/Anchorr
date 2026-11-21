@@ -8,7 +8,8 @@ import os from "node:os";
 import path from "node:path";
 
 process.env.NODE_ENV = "test";
-process.env.ANCHORR_CONFIG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "anchorr-test-"));
+// ANCHORR_TEST_DATA_DIR: a test that starts app.js picks the folder, to look at its files
+process.env.ANCHORR_CONFIG_DIR = process.env.ANCHORR_TEST_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), "anchorr-test-"));
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 

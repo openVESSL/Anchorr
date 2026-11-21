@@ -147,7 +147,8 @@ export async function processAndSendNotification(
 
   const dm = settings.NOTIFY_ON_AVAILABLE === "true";
   const tag = settings.NOTIFY_TAG_REQUESTERS === "true";
-  const pending = dm || tag ? takeRequesters(data, tmdbId, pendingRequests, onPendingRequestsChanged) : [];
+  // Test posts use real titles: they must not tell (or forget) anyone who really requested one
+  const pending = (dm || tag) && !isTest ? takeRequesters(data, tmdbId, pendingRequests, onPendingRequestsChanged) : [];
   const fromSeerr = (dm || tag) && !isTest ? await seerrRequesters(data, tmdbId) : { requestIds: [], userIds: [] };
   const requesters = [...new Set([...pending, ...fromSeerr.userIds])];
   const mention = tag && requesters.length

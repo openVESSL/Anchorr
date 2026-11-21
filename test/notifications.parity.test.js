@@ -450,6 +450,18 @@ test("with Seerr: linked members who requested in Seerr get the DM and the menti
   assert.equal(discord.sent[1].content, undefined);
 });
 
+test("a test notification leaves real requesters alone", async (t) => {
+  configure(t, { NOTIFY_ON_AVAILABLE: "true", NOTIFY_TAG_REQUESTERS: "true" });
+  const discord = createFakeDiscord();
+  const pending = new Map([["157336-movie", new Set(["user-1"])]]);
+  await send(movie("test-movie-1", { Provider_tmdb: "157336" }), discord, pending);
+
+  assert.equal(discord.sent.length, 1);
+  assert.equal(discord.sent[0].content, undefined);
+  assert.equal(discord.dms.length, 0);
+  assert.deepEqual([...pending.get("157336-movie")], ["user-1"], "the real request still waits");
+});
+
 test("requesters are not mentioned unless that is turned on", async (t) => {
   configure(t, { NOTIFY_ON_AVAILABLE: "true" });
   const discord = createFakeDiscord();

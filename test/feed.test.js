@@ -119,7 +119,7 @@ test("items without metadata wait, then go out anyway after a few tries", async 
   assert.equal(dispatched.length, 1);
 });
 
-test("catch-up poll: first start announces nothing old, later polls send only newer items at once", async (t) => {
+test("catch-up poll: first start announces nothing old, later polls send new items at once", async (t) => {
   const state = memoryState();
   const dispatched = [];
   const feed = new JellyfinFeed({ dispatch: async (p) => dispatched.push(p.ItemId), state });
@@ -132,12 +132,18 @@ test("catch-up poll: first start announces nothing old, later polls send only ne
   assert.equal(feed.pending.size, 0);
 
   state.set("cursor", "2026-11-15T09:00:00.000Z");
-  recent = [MOVIE, { ...MOVIE, Id: "old", DateCreated: "2026-11-15T08:00:00.0000000Z" }];
-  items = { m1: MOVIE };
+  // Jellyfin dates an item by its file: a download started at 08:00 and imported now is new
+  const downloadedEarlier = { ...MOVIE, Id: "earlier", DateCreated: "2026-11-15T08:00:00.0000000Z" };
+  // a library item from long ago that was only saved again (metadata refresh) is not
+  const refreshed = { ...MOVIE, Id: "refreshed", DateCreated: "2025-01-01T00:00:00.0000000Z" };
+  recent = [MOVIE, downloadedEarlier, refreshed];
+  items = { m1: MOVIE, earlier: downloadedEarlier, refreshed };
+  const before = Date.now();
   await feed.poll();
-  assert.deepEqual(dispatched, ["m1"], "identified items do not wait for the queue timer");
+  assert.deepEqual(dispatched.sort(), ["earlier", "m1"], "identified items do not wait for the queue timer");
   assert.equal(feed.pending.size, 0);
-  assert.equal(state.get("cursor"), "2026-11-15T10:00:00.000Z");
+  const cursor = Date.parse(state.get("cursor"));
+  assert.ok(cursor >= before - 60_000 && cursor <= Date.now(), "the cursor moves to this poll, minus a small overlap");
 });
 
 test("after a restart the first poll looks back, so items still waiting for metadata are not lost", async (t) => {
@@ -150,11 +156,13 @@ test("after a restart the first poll looks back, so items still waiting for meta
   recent = [MOVIE];
   items = { m1: MOVIE };
 
+  const savedSince = () => jellyfin.requests.filter((r) => r.query.has("MinDateLastSaved")).at(-1).query.get("MinDateLastSaved");
   await feed.poll();
   assert.deepEqual(dispatched, ["m1"]);
-  feed.recentlyDispatched.clear();
+  assert.ok(Date.parse(savedSince()) < Date.parse("2026-11-15T10:00:00.000Z"), "the first poll looks back past the cursor");
+  const cursor = state.get("cursor");
   await feed.poll();
-  assert.deepEqual(dispatched, ["m1"], "later polls of the same run start at the cursor");
+  assert.equal(Date.parse(savedSince()), Date.parse(cursor), "later polls of the same run start at the cursor");
 });
 
 test("a LibraryChanged message with unreadable data is ignored", async (t) => {

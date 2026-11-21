@@ -1,12 +1,13 @@
 // Saving the dashboard configuration (and restarting the bot when needed).
 import { Router } from "express";
+import fs from "fs";
 import rateLimit from "express-rate-limit";
 import { setGuestAutoApprove } from "../api/seerr.js";
 import { restartBot, startBot } from "../bot/botManager.js";
 import { scheduleDailyRandomPick } from "../bot/dailyPick.js";
 import { botState } from "../bot/botState.js";
 import { authenticateToken } from "../utils/auth.js";
-import { loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
+import { CONFIG_PATH, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { SENSITIVE_FIELDS, isMaskedValue } from "../utils/configSanitize.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
@@ -52,7 +53,16 @@ router.post(
 
     try {
       // Load existing config to preserve USER_MAPPINGS and other non-form fields
-      const existingConfig = readConfig() || {};
+      const onDisk = readConfig();
+      // Unreadable is not empty: writing now would drop the accounts, links and tokens in it
+      if (!onDisk && fs.existsSync(CONFIG_PATH)) {
+        logger.error("save-config: config.json exists but could not be read; nothing was saved");
+        return res.status(500).json({
+          success: false,
+          error: "config.json could not be read, so nothing was saved. Fix or restore the file, then try again.",
+        });
+      }
+      const existingConfig = onDisk || {};
 
       // Merge with existing config, preserving USER_MAPPINGS and other fields not in the form
       const finalConfig = {

@@ -51,53 +51,25 @@ function parseLogFile(filePath, limit = 1000) {
   }
 }
 
-router.get("/logs/error", authenticateToken, (req, res) => {
+// The newest daily file of each log (logger.js rotates them as <prefix>-<date>.log)
+const LOG_PREFIXES = { error: "error", all: "combined" };
+
+router.get("/logs/:kind", authenticateToken, (req, res) => {
+  const prefix = Object.hasOwn(LOG_PREFIXES, req.params.kind) ? LOG_PREFIXES[req.params.kind] : null;
+  if (!prefix) return res.status(404).json({ success: false, message: "Unknown log" });
   const logsDir = path.join(process.cwd(), "logs");
-  let errorLogPath = path.join(logsDir, "error.log");
+  let logPath = path.join(logsDir, `${prefix}.log`);
 
   try {
-    const files = fs.readdirSync(logsDir);
-    const errorFiles = files.filter(
-      (f) => f.startsWith("error-") && f.endsWith(".log")
-    );
-    if (errorFiles.length > 0) {
-      errorFiles.sort().reverse();
-      errorLogPath = path.join(logsDir, errorFiles[0]);
-    }
+    const files = fs.readdirSync(logsDir).filter((f) => f.startsWith(`${prefix}-`) && f.endsWith(".log"));
+    if (files.length > 0) logPath = path.join(logsDir, files.sort().at(-1));
   } catch (e) {
-    logger.warn(`Failed to enumerate log directory for error logs: ${e.message} — using default path`);
+    logger.warn(`Failed to enumerate log directory for ${req.params.kind} logs: ${e.message} — using default path`);
   }
 
-  const { entries, truncated } = parseLogFile(errorLogPath);
+  const { entries, truncated } = parseLogFile(logPath);
   res.json({
-    file: path.basename(errorLogPath),
-    count: entries.length,
-    total: truncated ? "1000+" : entries.length,
-    truncated,
-    entries,
-  });
-});
-
-router.get("/logs/all", authenticateToken, (req, res) => {
-  const logsDir = path.join(process.cwd(), "logs");
-  let combinedLogPath = path.join(logsDir, "combined.log");
-
-  try {
-    const files = fs.readdirSync(logsDir);
-    const combinedFiles = files.filter(
-      (f) => f.startsWith("combined-") && f.endsWith(".log")
-    );
-    if (combinedFiles.length > 0) {
-      combinedFiles.sort().reverse();
-      combinedLogPath = path.join(logsDir, combinedFiles[0]);
-    }
-  } catch (e) {
-    logger.warn(`Failed to enumerate log directory for combined logs: ${e.message} — using default path`);
-  }
-
-  const { entries, truncated } = parseLogFile(combinedLogPath);
-  res.json({
-    file: path.basename(combinedLogPath),
+    file: path.basename(logPath),
     count: entries.length,
     total: truncated ? "1000+" : entries.length,
     truncated,

@@ -32,6 +32,13 @@ const NEVER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const CURSOR_KEY = "cursor";
 // Items still waiting for metadata live only in memory: after a restart, look back this far
 const RESTART_LOOKBACK_MS = METADATA_WAIT_MS * MAX_METADATA_ATTEMPTS + POLL_INTERVAL_MS;
+// Jellyfin's DateCreated is the file's creation time (often when the download started), not
+// when the item reached the library. It only tells old items that were saved again (metadata
+// refresh) from new ones, so it gets a wide margin.
+// shortcut: a file created more than 7 days before it reaches Jellyfin is not announced; remember seen item ids if that matters.
+const CREATED_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+// Each poll overlaps the previous one a little, for clock differences between the two hosts
+const POLL_OVERLAP_MS = 60_000;
 
 const pad = (n) => String(n).padStart(2, "0");
 
@@ -315,27 +322,30 @@ export class JellyfinFeed {
       return;
     }
     try {
+      const startedAt = Date.now();
       const cursorMs = Date.parse(cursor);
-      // Already announced items found again are dropped by the notification dedup
+      // Items saved since the cursor; already announced ones found again are dropped by the dedup
       const sinceMs = this.caughtUp ? cursorMs : cursorMs - RESTART_LOOKBACK_MS;
+      const createdAfterMs = sinceMs - CREATED_GRACE_MS;
       const { items, complete } = await fetchRecentlyAdded(
         settings.JELLYFIN_API_KEY,
         settings.JELLYFIN_BASE_URL,
         200,
-        new Date(sinceMs).toISOString()
+        new Date(sinceMs).toISOString(),
+        undefined,
+        undefined,
+        { createdAfter: new Date(createdAfterMs).toISOString() }
       );
       this.caughtUp = true;
-      let newest = cursorMs;
       let found = false;
       for (const item of items) {
-        const created = Date.parse(item.DateCreated);
-        if (!NOTIFY_TYPES.has(item.Type) || !(created > sinceMs)) continue;
+        if (!NOTIFY_TYPES.has(item.Type) || !(Date.parse(item.DateCreated) > createdAfterMs)) continue;
         this.enqueue(item.Id);
         found = true;
-        newest = Math.max(newest, created);
       }
-      if (complete && newest > cursorMs) {
-        this.state.set(CURSOR_KEY, new Date(newest).toISOString());
+      const next = startedAt - POLL_OVERLAP_MS;
+      if (complete && next > cursorMs) {
+        this.state.set(CURSOR_KEY, new Date(next).toISOString());
         this.state.flush();
       }
       // Already identified items go out now; the others wait for Jellyfin as usual

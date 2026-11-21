@@ -357,6 +357,8 @@ export class NoSeerrUserError extends Error {
   }
 }
 
+const isSeerrUserId = (id) => /^\d+$/.test(String(id ?? "")) && Number(id) > 0;
+
 function findMappedSeerrUserId(discordUserId, userMappings) {
   let mappings = userMappings;
   if (typeof mappings === "string") {
@@ -396,10 +398,15 @@ export async function sendRequest({
   userMappings = {},
   guestUserId = null,
 }) {
-  const mappedUserId = discordUserId ? findMappedSeerrUserId(discordUserId, userMappings) : null;
+  let mappedUserId = discordUserId ? findMappedSeerrUserId(discordUserId, userMappings) : null;
+  // Seerr runs a request with an empty or non-numeric x-api-user as its admin (user 1)
+  if (mappedUserId !== null && !isSeerrUserId(mappedUserId)) {
+    logger.warn(`[SEERR] Ignoring the link of Discord user ${discordUserId}: "${mappedUserId}" is not a Seerr user id`);
+    mappedUserId = null;
+  }
   // guestUserId may be a resolver, only called when the user has no mapping
   const guest = mappedUserId === null && typeof guestUserId === "function" ? await guestUserId() : guestUserId;
-  const seerrUserId = mappedUserId ?? (typeof guest === "function" ? null : guest || null);
+  const seerrUserId = mappedUserId ?? (isSeerrUserId(guest) ? guest : null);
   if (seerrUserId === null) throw new NoSeerrUserError(discordUserId);
 
   const payload = {
