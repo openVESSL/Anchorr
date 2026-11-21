@@ -58,6 +58,8 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 - `/api/status` reports the bot and Jellyfin connection, an old plugin still calling, and a reverse proxy without `TRUST_PROXY`.
 - **Guided upgrade from 1.x.** Before upgrading a 1.x configuration, Anchorr backs up the whole config folder to `backup-1.x` and does not start if that fails. Afterwards the Overview shows a checklist of what changed and what still needs a look, and ticks items off once they are done.
 - **Public Jellyfin address** ([#154](https://github.com/openVESSL/Anchorr/issues/154)). An optional address on the Jellyfin page, used only for links and images in Discord, so members outside your home network can open them. Anchorr keeps talking to Jellyfin through the connection address. When it is empty, links use the connection address as before.
+- **"Now available" for requests made in Seerr** ([#107](https://github.com/openVESSL/Anchorr/issues/107)). Members with a linked account get the direct message also for titles they requested in Seerr itself, not only from Discord. Anchorr asks Seerr who requested a title when it is announced, and tells each request only once.
+- **Mention requesters in the announcement** ([#137](https://github.com/openVESSL/Anchorr/pull/137)). An optional switch under Notifications tags whoever requested a title, from Discord or in Seerr with a linked account, in the post announcing it. Off by default. Thanks to @kylepitcock for the idea and the first version.
 - **Configuration backup.** Settings can download `config.json` and restore it later or on another install. The install keeps its own sign-in secret and network settings, and the replaced file is kept as `config.before-restore.json`.
 
 ### Changed

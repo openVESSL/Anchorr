@@ -24,6 +24,7 @@ export function NotificationsPage() {
     JELLYFIN_EPISODE_CHANNEL_ID: "",
     WEBHOOK_DEBOUNCE_MS: "15000",
     NOTIFY_ON_AVAILABLE: "false",
+    NOTIFY_TAG_REQUESTERS: "false",
     JELLYFIN_NOTIFICATION_LIBRARIES: {},
   })
   const seconds = Math.round(Number(form.values.WEBHOOK_DEBOUNCE_MS || 15000) / 1000)
@@ -65,7 +66,13 @@ export function NotificationsPage() {
           form={form}
           name="NOTIFY_ON_AVAILABLE"
           label={t("Message the requester when it is available")}
-          help={t("Sends a direct message to whoever requested it from Discord, even if the channel announcement is off.")}
+          help={t("Sends a direct message to whoever requested it, from Discord or in Seerr with a linked account, even if the channel announcement is off.")}
+        />
+        <SwitchRow
+          form={form}
+          name="NOTIFY_TAG_REQUESTERS"
+          label={t("Mention the requester in the announcement")}
+          help={t("Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.")}
         />
       </Section>
 

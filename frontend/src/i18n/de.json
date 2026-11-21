@@ -182,7 +182,7 @@
   "Send a test": "Test senden",
   "Send a test notification": "Testbenachrichtigung senden",
   "Send one now": "Jetzt einen senden",
-  "Sends a direct message to whoever requested it from Discord, even if the channel announcement is off.": "Sendet eine Direktnachricht an alle, die es über Discord angefragt haben, auch wenn die Ankündigung im Kanal aus ist.",
+  "Sends a direct message to whoever requested it, from Discord or in Seerr with a linked account, even if the channel announcement is off.": "Sendet eine Direktnachricht an alle, die es angefragt haben, über Discord oder in Seerr mit verknüpftem Konto, auch wenn die Ankündigung im Kanal aus ist.",
   "Server Members Intent is off. Turn it on under Bot in the Developer Portal so Anchorr can list your members for user linking.": "Server Members Intent ist aus. Schalte ihn unter Bot im Developer Portal ein, damit Anchorr deine Mitglieder zum Verknüpfen auflisten kann.",
   "Server for {kind}": "Server für {kind}",
   "Servers the bot has joined": "Server, denen der Bot beigetreten ist",
@@ -370,5 +370,7 @@
   "Could not load the upgrade checklist": "Die Upgrade-Checkliste konnte nicht geladen werden",
   "Links in Discord": "Links in Discord",
   "Public address": "Öffentliche Adresse",
-  "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Wird nur für Links und Bilder in Discord verwendet, zum Beispiel https://jellyfin.example.com. Leer lassen, um die Verbindungsadresse zu verwenden."
+  "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Wird nur für Links und Bilder in Discord verwendet, zum Beispiel https://jellyfin.example.com. Leer lassen, um die Verbindungsadresse zu verwenden.",
+  "Mention the requester in the announcement": "Anfragende in der Ankündigung erwähnen",
+  "Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.": "Erwähnt alle, die es angefragt haben, über Discord oder in Seerr mit verknüpftem Konto, sodass alle im Kanal sehen, wer es wollte."
 }

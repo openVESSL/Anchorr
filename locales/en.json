@@ -450,7 +450,8 @@
     "unknown_episode": "Unknown Episode",
     "available_author": "✅ Your request is now available!",
     "available_description": "{title} is now available on Jellyfin!",
-    "available_fallback_title": "Your requested content"
+    "available_fallback_title": "Your requested content",
+    "requested_by": "Requested by {users}"
   },
   "embeds": {
     "movie_found": "🎬 Movie found:",
