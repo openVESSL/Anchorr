@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Anchorr is now licensed under the GNU General Public License v3.0 or later instead of the Unlicense. Versions up to and including 2.0.0 stay under the Unlicense.
+
+---
+
 ## [2.0.0] - 2026-11-21
 
 Anchorr 2.0 is a rebuild of the setup, the dashboard and how Anchorr talks to Jellyfin and Seerr. The bot's commands and messages work as before. Your configuration is upgraded automatically, and the config folder from 1.x is kept as `backup-1.x`.

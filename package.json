@@ -13,7 +13,7 @@
   "type": "module",
   "keywords": [],
   "author": "",
-  "license": "Unlicense",
+  "license": "GPL-3.0-or-later",
   "description": "Discord bot for requesting media through Seerr and announcing new Jellyfin content",
   "dependencies": {
     "bcryptjs": "^3.0.3",

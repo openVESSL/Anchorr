@@ -259,4 +259,6 @@ Contributions are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md). If Anchorr 
 
 ## License
 
-Released into the public domain under the [Unlicense](./LICENSE).
+Anchorr is free software under the [GNU General Public License v3.0 or later](./LICENSE). You may use, change and share it, also commercially, as long as you keep the credits and share your changes under the same license.
+
+Versions up to and including 2.0.0 were released into the public domain under the Unlicense.
