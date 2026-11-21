@@ -400,6 +400,8 @@
     "unknown_series": "Okänd serie",
     "season_fallback": "Säsong {n}",
     "library_fallback": "Bibliotek",
+    "moka_movies": "Filmer",
+    "moka_shows": "Serier",
     "library_names_unavailable": "biblioteksnamn är inte tillgängliga",
     "items_truncated": "äldsta posterna avkortade",
     "section_movies": "Filmer",

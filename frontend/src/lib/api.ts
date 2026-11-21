@@ -43,6 +43,8 @@ export interface AuthCheck {
   hasUsers: boolean
   jellyfinLogin: boolean
   needsSetup: boolean
+  /** Connected through Moka: the "Jellyfin" sign-in signs in with Moka */
+  mokaMode?: boolean
 }
 
 export interface SetupState {
@@ -52,6 +54,9 @@ export interface SetupState {
   discord: boolean
   discordServer: boolean
   localAccount: boolean
+  mokaMode?: boolean
+  /** Moka has handed over its key and the bot token */
+  moka?: boolean
 }
 
 export interface Status {

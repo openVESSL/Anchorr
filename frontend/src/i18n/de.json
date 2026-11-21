@@ -373,5 +373,13 @@
   "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Wird nur für Links und Bilder in Discord verwendet, zum Beispiel https://jellyfin.example.com. Leer lassen, um die Verbindungsadresse zu verwenden.",
   "Mention the requester in the announcement": "Anfragende in der Ankündigung erwähnen",
   "Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.": "Erwähnt alle, die es angefragt haben, über Discord oder in Seerr mit verknüpftem Konto, sodass alle im Kanal sehen, wer es wollte.",
-  "Seerr is not set up yet. Finish its own setup first, then try again": "Seerr ist noch nicht eingerichtet. Schließe zuerst die Einrichtung von Seerr ab und versuche es dann erneut"
+  "Seerr is not set up yet. Finish its own setup first, then try again": "Seerr ist noch nicht eingerichtet. Schließe zuerst die Einrichtung von Seerr ab und versuche es dann erneut",
+  "Waiting for Moka": "Warten auf Moka",
+  "This Anchorr is set up by Moka. In Moka, open Connections, turn on the Discord bot, paste your bot token and save.": "Dieses Anchorr wird von Moka eingerichtet. Öffne in Moka die Verbindungen, schalte den Discord-Bot ein, füge den Bot-Token ein und speichere.",
+  "This page moves on by itself once Moka has connected.": "Diese Seite geht von selbst weiter, sobald Moka verbunden ist.",
+  "Use your Moka administrator account.": "Melde dich mit deinem Moka-Administratorkonto an.",
+  "Use a Moka account instead": "Stattdessen ein Moka-Konto verwenden",
+  "Library, requests and linked people come from Moka.": "Bibliothek, Anfragen und verknüpfte Personen kommen aus Moka.",
+  "Requests in Moka": "Anfragen in Moka",
+  "Who may request from Discord. Approval, limits and quality are set in Moka.": "Wer über Discord anfragen darf. Freigabe, Limits und Qualität werden in Moka eingestellt."
 }

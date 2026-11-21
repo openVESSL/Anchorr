@@ -53,7 +53,11 @@ export function LoginPage() {
           <Logo className="mb-2 size-12" />
           <CardTitle className="text-xl">{t("Sign in to Anchorr")}</CardTitle>
           <CardDescription>
-            {active === "jellyfin" ? t("Use your Jellyfin administrator account.") : t("Use your Anchorr account.")}
+            {active === "jellyfin"
+              ? auth.data?.mokaMode
+                ? t("Use your Moka administrator account.")
+                : t("Use your Jellyfin administrator account.")
+              : t("Use your Anchorr account.")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -83,7 +87,11 @@ export function LoginPage() {
                   setError("")
                 }}
               >
-                {active === "jellyfin" ? t("Use the Anchorr account instead") : t("Use a Jellyfin account instead")}
+                {active === "jellyfin"
+                  ? t("Use the Anchorr account instead")
+                  : auth.data?.mokaMode
+                    ? t("Use a Moka account instead")
+                    : t("Use a Jellyfin account instead")}
               </button>
             )}
           </form>

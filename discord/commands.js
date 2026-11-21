@@ -4,6 +4,7 @@
  */
 
 import { SlashCommandBuilder } from "discord.js";
+import { isMokaMode } from "../api/moka.js";
 
 /**
  * Get all command definitions
@@ -68,7 +69,12 @@ export function getCommands() {
           .setRequired(true)
           .setAutocomplete(true)
       ),
-  ].map((c) => c.toJSON());
+  ]
+    .map((c) => c.toJSON())
+    .map((c) =>
+      // Moka picks the server, profile and tags itself: /request takes only the title
+      isMokaMode() && c.name === "request" ? { ...c, options: c.options.filter((o) => o.name === "title") } : c
+    );
 }
 
 /**

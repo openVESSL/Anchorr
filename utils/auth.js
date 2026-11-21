@@ -7,6 +7,8 @@ import { getUsers, saveUser as saveUserToConfig } from "./userStore.js";
 import { PersistentMap } from "./persistentMap.js";
 import { settings } from "./settings.js";
 import { signIn, signOut } from "../api/jellyfinAdmin.js";
+import { isMokaMode, isMokaPaired, mokaUrl } from "../api/moka.js";
+import http from "./http.js";
 
 const AUTH_TOKEN_EXPIRATION = "7d";
 const AUTH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -233,12 +235,48 @@ export const login = async (req, res) => {
   });
 };
 
-/** Dashboard sign-in with a Jellyfin administrator account. */
+const MOKA_ADMIN = 1;
+
+/** Dashboard sign-in with a Moka administrator account (Moka mode). */
+async function loginWithMoka(req, res, username, password) {
+  if (!isMokaPaired()) return res.status(400).json({ success: false, message: "Turn on the Discord bot in Moka first" });
+  const attemptKey = `${req.ip}|moka:${username}`;
+  const secondsRemaining = checkLockout(attemptKey);
+  if (secondsRemaining > 0) {
+    return res.status(429).json({ success: false, message: `Too many failed attempts. Try again in ${secondsRemaining} seconds.` });
+  }
+  let login;
+  try {
+    login = await http.post(`${mokaUrl()}/api/v1/auth/login`, { username, password }, { timeout: 10_000 });
+  } catch (err) {
+    if (err.response?.status === 401) {
+      await progressiveDelay(attemptKey);
+      recordFailure(attemptKey);
+      logger.warn(`⚠️ Failed Moka sign-in for "${username}" (from ${req.ip})`);
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+    if (err.response?.status === 429) return res.status(429).json({ success: false, message: "Moka asks to wait before trying again" });
+    logger.error(`Moka sign-in failed: ${err.message}`);
+    return res.status(502).json({ success: false, message: "Could not reach Moka" });
+  }
+  // Only the answer matters: end the Moka session right away
+  const cookie = login.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+  if (cookie) await http.post(`${mokaUrl()}/api/v1/auth/logout`, undefined, { headers: { Cookie: cookie }, timeout: 10_000 }).catch(() => {});
+  if (!(Number(login.data?.permissions) & MOKA_ADMIN)) {
+    return res.status(403).json({ success: false, message: "Only Moka administrators can manage Anchorr" });
+  }
+  clearFailures(attemptKey);
+  issueSession(req, res, { id: `moka:${login.data.id}`, username: login.data.username, method: "moka" });
+  res.json({ success: true, message: "Logged in successfully", username: login.data.username });
+}
+
+/** Dashboard sign-in with a Jellyfin administrator account, or a Moka one in Moka mode. */
 export const loginWithJellyfin = async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ success: false, message: "Username and password are required" });
   }
+  if (isMokaMode()) return loginWithMoka(req, res, username, password);
   if (!settings.JELLYFIN_BASE_URL) {
     return res.status(400).json({ success: false, message: "Jellyfin is not set up yet" });
   }
@@ -326,11 +364,13 @@ export const logout = (req, res) => {
 
 // Which sign-in methods the login screen should offer
 function loginOptions(users) {
-  const jellyfinReady = Boolean(settings.JELLYFIN_BASE_URL && settings.JELLYFIN_API_KEY);
+  // In Moka mode the "Jellyfin" sign-in signs in with Moka
+  const ready = isMokaMode() ? isMokaPaired() : Boolean(settings.JELLYFIN_BASE_URL && settings.JELLYFIN_API_KEY);
   return {
     hasUsers: users.length > 0,
-    jellyfinLogin: jellyfinReady,
-    needsSetup: !jellyfinReady && users.length === 0,
+    jellyfinLogin: ready,
+    ...(isMokaMode() && { mokaMode: true }),
+    needsSetup: !ready && users.length === 0,
   };
 }
 

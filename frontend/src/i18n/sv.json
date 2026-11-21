@@ -373,5 +373,13 @@
   "Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.": "Används bara för länkar och bilder i Discord, till exempel https://jellyfin.example.com. Lämna tomt för att använda anslutningsadressen.",
   "Mention the requester in the announcement": "Nämn den som frågade i meddelandet",
   "Tags whoever requested it, from Discord or in Seerr with a linked account, so everyone in the channel sees who asked for it.": "Taggar den som frågade efter det, från Discord eller i Seerr med ett länkat konto, så att alla i kanalen ser vem som ville ha det.",
-  "Seerr is not set up yet. Finish its own setup first, then try again": "Seerr är inte konfigurerat ännu. Slutför först dess egen konfiguration och försök sedan igen"
+  "Seerr is not set up yet. Finish its own setup first, then try again": "Seerr är inte konfigurerat ännu. Slutför först dess egen konfiguration och försök sedan igen",
+  "Waiting for Moka": "Väntar på Moka",
+  "This Anchorr is set up by Moka. In Moka, open Connections, turn on the Discord bot, paste your bot token and save.": "Det här Anchorr konfigureras av Moka. Öppna Anslutningar i Moka, slå på Discord-boten, klistra in bot-token och spara.",
+  "This page moves on by itself once Moka has connected.": "Sidan går vidare av sig själv när Moka har anslutit.",
+  "Use your Moka administrator account.": "Använd ditt Moka-administratörskonto.",
+  "Use a Moka account instead": "Använd ett Moka-konto i stället",
+  "Library, requests and linked people come from Moka.": "Bibliotek, förfrågningar och länkade personer kommer från Moka.",
+  "Requests in Moka": "Förfrågningar i Moka",
+  "Who may request from Discord. Approval, limits and quality are set in Moka.": "Vem som får göra förfrågningar från Discord. Godkännande, gränser och kvalitet ställs in i Moka."
 }

@@ -38,7 +38,8 @@ export function OverviewPage() {
   const client = useQueryClient()
   const [busy, setBusy] = useState(false)
   const s = status.data
-  const incomplete = setup && (!setup.jellyfin || !setup.seerr || !setup.discord || !setup.discordServer)
+  const mokaMode = Boolean(setup?.mokaMode)
+  const incomplete = setup && (mokaMode ? !setup.moka : !setup.jellyfin || !setup.seerr || !setup.discord || !setup.discordServer)
   const overview = useOverview()
   const o = overview.data
   const upgradeQuery = useUpgrade()
@@ -61,6 +62,7 @@ export function OverviewPage() {
   const discord = o?.discord
   const jellyfin = o?.jellyfin
   const seerr = o?.seerr
+  const moka = o?.moka
 
   return (
     <>
@@ -124,6 +126,18 @@ export function OverviewPage() {
               : []
           }
         />
+        {mokaMode ? (
+          <div className="md:col-span-2">
+            <StatusCard
+              title="Moka"
+              ok={Boolean(moka?.paired)}
+              value={moka ? (moka.paired ? t("Connected") : t("Waiting for Moka")) : t("Not reachable")}
+              lines={[moka?.version && t("Version {version}", { version: moka.version }), t("Library, requests and linked people come from Moka.")]}
+              link={moka?.url}
+            />
+          </div>
+        ) : (
+          <>
         <StatusCard
           title="Jellyfin"
           ok={s?.jellyfinConnected}
@@ -141,17 +155,21 @@ export function OverviewPage() {
           lines={[seerr?.version && t("Version {version}", { version: seerr.version })]}
           link={seerr?.url}
         />
+          </>
+        )}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label={t("Pending requests")} value={o?.requestCounts?.pending} loading={overview.isPending} />
-        <Stat label={t("Requests in Seerr")} value={o?.requestCounts?.total} loading={overview.isPending} />
+        <Stat label={mokaMode ? t("Requests in Moka") : t("Requests in Seerr")} value={o?.requestCounts?.total} loading={overview.isPending} />
         <Stat label={t("Notifications, last 7 days")} value={o ? (o.activity.week.notification ?? 0) : undefined} loading={overview.isPending} />
         <Stat label={t("Discord requests, last 7 days")} value={o ? (o.activity.week.request ?? 0) : undefined} loading={overview.isPending} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-3">{setup?.seerr && <RecentRequests seerrUrl={seerr?.url} />}</div>
+        <div className="lg:col-span-3">
+          {(setup?.seerr || setup?.moka) && <RecentRequests seerrUrl={mokaMode ? moka?.url : seerr?.url} moka={mokaMode} />}
+        </div>
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>{t("Recent activity")}</CardTitle>
@@ -194,7 +212,7 @@ function activityTitle(e: Overview["activity"]["recent"][number], t: Translate) 
   return e.title ?? t("Untitled")
 }
 
-function RecentRequests({ seerrUrl }: { seerrUrl?: string }) {
+function RecentRequests({ seerrUrl, moka = false }: { seerrUrl?: string; moka?: boolean }) {
   const { t } = useT()
   const client = useQueryClient()
   const [pending, setPending] = useState<number | null>(null)
@@ -234,7 +252,9 @@ function RecentRequests({ seerrUrl }: { seerrUrl?: string }) {
           <ul className="divide-y">
             {requests.data.results.map((r) => {
               const state = requestState(r, t)
-              const href = seerrUrl && r.tmdbId ? `${seerrUrl}/${r.type}/${r.tmdbId}` : undefined
+              // Moka's show pages live under /show
+              const path = moka && r.type === "tv" ? "show" : r.type
+              const href = seerrUrl && r.tmdbId ? `${seerrUrl}/${path}/${r.tmdbId}` : undefined
               return (
                 <li key={r.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                   {r.poster ? (

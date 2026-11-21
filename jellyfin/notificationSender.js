@@ -4,6 +4,7 @@
  */
 import { getDetails, getExtras, getTitleRequests, isMetadataConfigured } from "../api/metadata.js";
 import { recordActivity } from "../utils/activity.js";
+import { getDiscordLinks } from "../api/moka.js";
 import { getUserMappings } from "../utils/configFile.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
@@ -37,8 +38,22 @@ function takeRequesters(data, tmdbId, pendingRequests, onPendingRequestsChanged)
   return users;
 }
 
+/** Linked members whose Moka request this item fulfils; Moka names them in its event. */
+async function mokaRequesters(data) {
+  const ids = (data.MokaRequesterIds || []).map(String);
+  if (ids.length === 0) return { requestIds: [], userIds: [] };
+  const discordIdByMokaId = new Map((await getDiscordLinks()).map((l) => [String(l.seerrUserId), l.discordUserId]));
+  // once per person and title: later episodes of a show do not repeat it
+  const fresh = ids.filter((id) => !announcedRequests.has(`moka:${data.MokaTitleId}:${id}`));
+  return {
+    requestIds: fresh.map((id) => `moka:${data.MokaTitleId}:${id}`),
+    userIds: fresh.map((id) => discordIdByMokaId.get(id)).filter(Boolean),
+  };
+}
+
 /** Linked members whose Seerr request (made anywhere, also in Seerr itself) this item fulfils. */
 async function seerrRequesters(data, tmdbId) {
+  if (data.FromMoka) return mokaRequesters(data);
   const mediaType = mediaTypeOf(data.ItemType);
   if (!tmdbId || !mediaType) return { requestIds: [], userIds: [] };
   const fresh = ((await getTitleRequests(parseInt(tmdbId, 10), mediaType)) || []).filter((r) => !announcedRequests.has(r.id));

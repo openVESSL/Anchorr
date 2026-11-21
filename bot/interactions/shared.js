@@ -160,7 +160,8 @@ export function getSeerrErrorMessage(err) {
   if (err.response) {
     const status = err.response.status;
     const msg = err.response.data?.message || "";
-    if (/quota/i.test(msg)) return t("seerr_request_errors.quota", { msg });
+    // Seerr says "quota", Moka "request limit reached"
+    if (/quota|limit reached/i.test(msg)) return t("seerr_request_errors.quota", { msg });
     if (status === 401 || status === 403) return t("seerr_request_errors.auth");
     if (status >= 500) return t("seerr_request_errors.server_error");
     if (msg) return t("seerr_request_errors.generic", { msg });

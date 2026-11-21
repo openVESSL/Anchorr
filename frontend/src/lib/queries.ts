@@ -41,6 +41,8 @@ export type ActivityType = "notification" | "request" | "daily-pick" | "roundup"
 export interface Overview {
   jellyfin: { serverName: string; version: string; watching: boolean; url: string } | null
   seerr: { version: string | null; url: string } | null
+  /** Moka mode: Moka in place of Jellyfin and Seerr */
+  moka?: { version: string | null; url: string; paired: boolean } | null
   discord: { botTag: string; botAvatar: string; serverName: string | null; serverIcon: string | null; memberCount: number | null; ping: number | null } | null
   requestCounts: { total: number; movie: number; tv: number; pending: number; approved: number; declined: number; processing: number; available: number } | null
   activity: {

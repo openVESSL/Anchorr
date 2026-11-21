@@ -26,7 +26,9 @@ export function cleanTitle(title) {
     .trim();
 }
 
-const watchUrl = (data) => buildJellyfinUrl("web/index.html", `!/details?id=${data.ItemId}&serverId=${data.ServerId}`);
+// Moka sends the title's page; without a public Moka address there is no watch link
+const watchUrl = (data) =>
+  data.FromMoka ? data.MokaLink || "" : buildJellyfinUrl("web/index.html", `!/details?id=${data.ItemId}&serverId=${data.ServerId}`);
 const linkButton = (label, url) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(url);
 
 /** "HH:MM" from Jellyfin or metadata, or null when nobody knows. */
@@ -161,7 +163,9 @@ export function buildItemNotification(data, { details, omdb, imdbId, batch }) {
   }
   const backdrop = backdropPath
     ? `${TMDB_IMAGES}/w1280${backdropPath}`
-    : buildJellyfinUrl(`Items/${getBackdropItemId(data)}/Images/Backdrop`);
+    : data.FromMoka
+      ? null
+      : buildJellyfinUrl(`Items/${getBackdropItemId(data)}/Images/Backdrop`);
   if (shown("EMBED_SHOW_BACKDROP") && isValidUrl(backdrop)) embed.setImage(backdrop);
 
   // Series poster for a single episode
@@ -181,7 +185,7 @@ export function buildItemNotification(data, { details, omdb, imdbId, batch }) {
   }
   if (shown("EMBED_SHOW_BUTTON_WATCH")) {
     if (isDiscordLinkableUrl(watchUrl(data))) buttons.push(linkButton(t("buttons.watch_now"), watchUrl(data)));
-    else logger.warn(`Invalid watch URL generated: ${watchUrl(data)}. Skipping watch button.`);
+    else if (!data.FromMoka) logger.warn(`Invalid watch URL generated: ${watchUrl(data)}. Skipping watch button.`);
   }
 
   return {

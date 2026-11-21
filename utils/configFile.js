@@ -17,6 +17,7 @@ const SENSITIVE_FIELDS = new Set([
   "JELLYFIN_API_KEY",
   "WEBHOOK_SECRET",
   "JWT_SECRET",
+  "MOKA_API_KEY",
 ]);
 
 const B64_PREFIX = "b64:";

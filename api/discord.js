@@ -36,3 +36,16 @@ export function inviteUrl(botId) {
   const params = new URLSearchParams({ client_id: botId, scope: "bot applications.commands", permissions: BOT_PERMISSIONS });
   return `https://discord.com/oauth2/authorize?${params.toString().replace(/\+/g, "%20")}`;
 }
+
+// Discord rate-limits these lookups; the dashboard and Moka ask often (page loads, refocus)
+const DISCORD_CACHE_MS = 30_000;
+let discordCache = null;
+
+/** The bot behind a token and the servers it is in, kept for half a minute. */
+export async function discordStatus(token, { fresh = false } = {}) {
+  if (!fresh && discordCache?.token === token && Date.now() - discordCache.at < DISCORD_CACHE_MS) return discordCache.status;
+  const bot = await verifyBotToken(token);
+  const status = { bot, guilds: await listBotGuilds(token) };
+  discordCache = { token, at: Date.now(), status };
+  return status;
+}

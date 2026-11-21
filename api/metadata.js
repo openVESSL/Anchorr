@@ -10,11 +10,13 @@ import logger from "../utils/logger.js";
 import { TIMEOUTS } from "../lib/constants.js";
 import { getSeerrApiUrl } from "../utils/seerrUrl.js";
 import { settings } from "../utils/settings.js";
+import * as mokaApi from "./moka.js";
 
 // Titles, overviews and genres follow the bot language; TMDB falls back to English per field.
 const language = () => settings.LANGUAGE || "en";
 
 export function isMetadataConfigured() {
+  if (mokaApi.isMokaMode()) return mokaApi.isMokaPaired();
   return Boolean(settings.SEERR_URL && settings.SEERR_API_KEY);
 }
 
@@ -74,8 +76,9 @@ export async function searchTitles(query) {
   const cached = cache.search(query);
   if (cached) return cached;
   try {
-    const data = await seerrGet("/search", { query, page: 1 });
-    const results = (data.results || []).map((r) => toTmdbItem(r));
+    const results = mokaApi.isMokaMode()
+      ? await mokaApi.searchTitles(query)
+      : ((await seerrGet("/search", { query, page: 1 })).results || []).map((r) => toTmdbItem(r));
     cache.search(query, results);
     return results;
   } catch (err) {
@@ -88,8 +91,9 @@ export async function getTrending() {
   const cached = cache.trending();
   if (cached) return cached;
   try {
-    const data = await seerrGet("/discover/trending", { page: 1 });
-    const results = (data.results || []).map((r) => toTmdbItem(r));
+    const results = mokaApi.isMokaMode()
+      ? await mokaApi.getTrending()
+      : ((await seerrGet("/discover/trending", { page: 1 })).results || []).map((r) => toTmdbItem(r));
     cache.trending(results);
     return results;
   } catch (err) {
@@ -102,8 +106,9 @@ export async function getDetails(id, mediaType) {
   const cached = cache.details(id, mediaType);
   if (cached) return cached;
   try {
-    const data = await seerrGet(`/${mediaType === "movie" ? "movie" : "tv"}/${id}`);
-    const details = toTmdbDetails(data, mediaType === "movie" ? "movie" : "tv");
+    const details = mokaApi.isMokaMode()
+      ? await mokaApi.getDetails(id, mediaType)
+      : toTmdbDetails(await seerrGet(`/${mediaType === "movie" ? "movie" : "tv"}/${id}`), mediaType === "movie" ? "movie" : "tv");
     cache.details(id, mediaType, details);
     return details;
   } catch (err) {
@@ -153,7 +158,8 @@ export async function getExtras(id, mediaType) {
   try {
     const details = await getDetails(id, mediaType);
     let imdbScore = null;
-    if (mediaType === "movie") {
+    // Moka has no IMDb score; the TMDB score below is used instead
+    if (mediaType === "movie" && !mokaApi.isMokaMode()) {
       try {
         // this endpoint rejects the language parameter (400)
         imdbScore = (await seerrGet(`/movie/${id}/ratingscombined`, { language: undefined }))?.imdb?.criticsScore ?? null;
@@ -189,7 +195,16 @@ const randomInt = (max) => Math.floor(Math.random() * max);
 const randomType = () => (Math.random() < 0.5 ? "movie" : "tv");
 const discoverPath = (type) => (type === "movie" ? "/discover/movies" : "/discover/tv");
 
-async function discover(path, mediaType, params) {
+// Moka's lists stand in for Seerr's discover filters
+const MOKA_LISTS = { upcoming: { movie: "upcoming", tv: "popular" }, variety: { movie: "popular", tv: "popular" }, niche: { movie: "top_rated", tv: "top_rated" } };
+
+async function discover(path, mediaType, params, strategy) {
+  if (mokaApi.isMokaMode()) {
+    return mokaApi.discover(mediaType, MOKA_LISTS[strategy][mediaType], params.page || 1).catch((err) => {
+      logger.debug(`Moka ${strategy} list failed: ${err.message}`);
+      return [];
+    });
+  }
   try {
     const data = await seerrGet(path, params);
     return (data.results || []).map((r) => toTmdbItem(r, mediaType));
@@ -208,7 +223,7 @@ const STRATEGIES = {
   },
   upcoming() {
     const type = randomType();
-    return discover(`${discoverPath(type)}/upcoming`, type, { page: randomInt(3) + 1 });
+    return discover(`${discoverPath(type)}/upcoming`, type, { page: randomInt(3) + 1 }, "upcoming");
   },
   variety() {
     const genres = [28, 12, 14, 18, 27, 35, 37, 53, 80, 99, 878, 10402, 9648, 10749, 10751, 10752];
@@ -217,7 +232,7 @@ const STRATEGIES = {
       genre: genres[randomInt(genres.length)],
       voteCountGte: 100,
       page: randomInt(5) + 1,
-    });
+    }, "variety");
   },
   niche() {
     const type = randomType();
@@ -227,7 +242,7 @@ const STRATEGIES = {
       voteCountGte: 200,
       voteCountLte: 5000,
       page: randomInt(10) + 1,
-    });
+    }, "niche");
   },
 };
 

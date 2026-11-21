@@ -3,9 +3,11 @@ export const MASKED_PREFIX = "••••••••";
 export const SENSITIVE_FIELDS = [
   "DISCORD_TOKEN",
   "SEERR_API_KEY",
-  "JELLYFIN_API_KEY",];
+  "JELLYFIN_API_KEY",
+];
 
-export const STRIPPED_FIELDS = ["JWT_SECRET", "WEBHOOK_SECRET"];
+// MOKA_API_KEY: handed over by Moka, never shown or set from the dashboard
+export const STRIPPED_FIELDS = ["JWT_SECRET", "WEBHOOK_SECRET", "MOKA_API_KEY"];
 
 export function maskSecret(value) {
   if (!value || typeof value !== "string") return "";

@@ -5,6 +5,7 @@
 
 import crypto from "node:crypto";
 import http from "../utils/http.js";
+import * as mokaApi from "./moka.js";
 import logger from "../utils/logger.js";
 import { TIMEOUTS, CACHE_TTL } from "../lib/constants.js";
 import { getSeerrApiUrl } from "../utils/seerrUrl.js";
@@ -141,6 +142,7 @@ export async function checkMediaStatus(
   seerrUrl,
   apiKey
 ) {
+  if (mokaApi.isMokaMode()) return mokaApi.mediaStatus(tmdbId, mediaType);
   const apiUrl = normalizeApiUrl(seerrUrl);
   try {
     const url =
@@ -234,6 +236,8 @@ export async function checkMediaStatus(
  * @returns {Promise<Array>} Tags
  */
 export async function fetchTags(seerrUrl, apiKey) {
+  // Moka picks servers, profiles and tags itself
+  if (mokaApi.isMokaMode()) return [];
   const now = Date.now();
 
   // Return cached tags if still valid
@@ -276,6 +280,8 @@ export async function fetchTags(seerrUrl, apiKey) {
  * @returns {Promise<Array>} Servers list
  */
 export async function fetchServers(seerrUrl, apiKey) {
+  // Moka picks servers, profiles and tags itself
+  if (mokaApi.isMokaMode()) return [];
   const now = Date.now();
 
   // Return cached servers if still valid
@@ -314,6 +320,8 @@ export async function fetchServers(seerrUrl, apiKey) {
  * @returns {Promise<Array>} Quality profiles
  */
 export async function fetchQualityProfiles(seerrUrl, apiKey) {
+  // Moka picks servers, profiles and tags itself
+  if (mokaApi.isMokaMode()) return [];
   const now = Date.now();
 
   // Return cached profiles if still valid
@@ -398,6 +406,7 @@ export async function sendRequest({
   userMappings = {},
   guestUserId = null,
 }) {
+  if (mokaApi.isMokaMode()) return mokaApi.requestAs({ tmdbId, mediaType, seasons, discordUserId });
   let mappedUserId = discordUserId ? findMappedSeerrUserId(discordUserId, userMappings) : null;
   // Seerr runs a request with an empty or non-numeric x-api-user as its admin (user 1)
   if (mappedUserId !== null && !isSeerrUserId(mappedUserId)) {

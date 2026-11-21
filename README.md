@@ -169,6 +169,30 @@ The bot comes online and the commands are ready. Everything else, such as the an
 
 You can paste API keys instead of signing in at the Jellyfin and Seerr steps if you prefer.
 
+## With Moka
+
+[Moka](https://github.com/openVESSL/Moka) is one server for the catalog, requests and the library. With Moka, Anchorr needs no Jellyfin or Seerr: Moka sets it up.
+
+1. Run Anchorr next to Moka with `MOKA_URL` pointing at Moka, for example in the same compose file:
+
+   ```yaml
+   anchorr:
+     image: nairdah/anchorr:latest
+     environment:
+       - MOKA_URL=http://moka:8484
+       - TZ=Europe/Berlin
+     ports:
+       - "8282:8282"
+     volumes:
+       - ./anchorr:/usr/src/app/config
+   ```
+
+2. In Moka, open **Connections > Discord bot**, turn it on, paste the bot token and save. Moka creates the bot's own account and a guest account, and hands them to Anchorr with the token.
+3. Use the invite button in Moka to add the bot to your Discord server.
+4. Sign in to Anchorr's dashboard with a Moka administrator account to pick the announcement channel, roles and messages.
+
+Members link their Discord account by their Discord ID under **Users** in Moka; they then request in their own name, with their own limits. Everyone else requests through the guest account. Shows can be requested season by season. Announcements and "now available" messages come from Moka as soon as a title is imported.
+
 ## Commands
 
 | Command | What it does |
@@ -206,6 +230,8 @@ Almost everything is set in the dashboard and saved in `config.json`. A few sett
 | `BIND_HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise | Address to listen on. |
 | `TRUST_PROXY` | off | Set to `true` behind a reverse proxy, so sign-in cookies are marked secure and rate limits see real client addresses. |
 | `ANCHORR_CONFIG_DIR` | `/usr/src/app/config` in Docker, `./config` otherwise | Where the configuration and state files (`config.json`, `pending-requests.json`, `activity.json`) are kept. |
+| `MOKA_URL` | none | Moka's address as Anchorr reaches it, e.g. `http://moka:8484`. Turns on Moka mode (see [With Moka](#with-moka)). |
+| `ANCHORR_PUBLIC_URL` | none | Anchorr's dashboard address, shown in Moka as a link. Optional. |
 | `JELLYFIN_POLLING_INTERVAL` | `60000` (1 min) | How often to check Jellyfin for new items, in milliseconds. |
 
 ## Security

@@ -470,6 +470,8 @@
     "unknown_series": "Unbekannte Serie",
     "season_fallback": "Staffel {n}",
     "library_fallback": "Bibliothek",
+    "moka_movies": "Filme",
+    "moka_shows": "Serien",
     "library_names_unavailable": "Bibliotheksnamen nicht verfügbar",
     "items_truncated": "älteste Einträge abgeschnitten",
     "section_movies": "Filme",

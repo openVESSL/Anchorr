@@ -32,14 +32,20 @@ export function AppSidebar() {
   const { setOpenMobile } = useSidebar()
   const setup = useSetupState().data
   const overview = useOverview().data
+  const moka = Boolean(setup?.mokaMode)
 
   const groups: { label?: string; items: Item[] }[] = [
     { items: [{ to: "/", label: t("Overview") }] },
     {
       label: t("Connections"),
+      // With Moka, Moka is the library and the requests; people are linked there too
       items: [
-        { to: "/jellyfin", label: "Jellyfin", done: setup?.jellyfin, down: Boolean(setup?.jellyfin && overview && !overview.jellyfin) },
-        { to: "/seerr", label: "Seerr", done: setup?.seerr, down: Boolean(setup?.seerr && overview && !overview.seerr) },
+        ...(moka
+          ? []
+          : [
+              { to: "/jellyfin", label: "Jellyfin", done: setup?.jellyfin, down: Boolean(setup?.jellyfin && overview && !overview.jellyfin) },
+              { to: "/seerr", label: "Seerr", done: setup?.seerr, down: Boolean(setup?.seerr && overview && !overview.seerr) },
+            ]),
         { to: "/discord", label: "Discord", done: setup?.discord && setup?.discordServer },
       ],
     },
@@ -48,7 +54,7 @@ export function AppSidebar() {
       items: [
         { to: "/notifications", label: t("Notifications") },
         { to: "/requests", label: t("Requests") },
-        { to: "/users", label: t("Users") },
+        ...(moka ? [] : [{ to: "/users", label: t("Users") }]),
         { to: "/embeds", label: t("Appearance") },
         { to: "/daily-pick", label: t("Daily pick") },
         { to: "/roundup", label: t("Weekly roundup") },

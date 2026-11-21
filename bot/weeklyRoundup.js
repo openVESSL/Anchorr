@@ -8,6 +8,7 @@ import logger from "../utils/logger.js";
 import { recordOrGet } from "./roundupFirstSeen.js";
 import { getInstalledAt } from "./roundupState.js";
 import { settings } from "../utils/settings.js";
+import { isMokaMode, moka } from "../api/moka.js";
 
 // Rolling window of new items to include in the digest.
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -18,7 +19,33 @@ const MAX_ENTRIES = 25;
 // Fetch cap before grouping.
 const FETCH_LIMIT = 200;
 
+const TMDB_THUMB = "https://image.tmdb.org/t/p/w342";
+
+/** The week's films and episodes from Moka, in the Jellyfin item shape the grouping reads. */
+async function fetchMokaWindowItems() {
+  const since = Math.floor((Date.now() - WINDOW_MS) / 1000);
+  const events = await moka("GET", "/anchorr/available", { params: { since } });
+  const items = [];
+  for (const { title: t, occurred_at } of events) {
+    const common = {
+      DateCreated: new Date(occurred_at * 1000).toISOString(),
+      MokaLink: t.link || null,
+      ThumbUrl: t.poster_path ? `${TMDB_THUMB}${t.poster_path}` : null,
+    };
+    if (t.kind === "movie") {
+      items.push({ ...common, Id: `moka-${t.id}`, Type: "Movie", Name: t.title, ProductionYear: t.year, ProviderIds: { Tmdb: String(t.tmdb_id ?? "") }, _configLibraryId: "moka-movies" });
+    } else {
+      for (const e of t.episodes || []) {
+        items.push({ ...common, Id: `moka-${e.id}`, Type: "Episode", Name: e.name, SeriesId: `moka-${t.id}`, SeriesName: t.title, ParentIndexNumber: e.season, IndexNumber: e.episode, _configLibraryId: "moka-shows" });
+      }
+    }
+  }
+  logger.info(`Weekly Roundup: Moka reported ${items.length} films and episodes since ${new Date(since * 1000).toISOString()}`);
+  return { items, rawCount: items.length, allowedLibraryCount: 2, truncated: false };
+}
+
 async function fetchWindowItems() {
+  if (isMokaMode()) return fetchMokaWindowItems();
   const apiKey = settings.JELLYFIN_API_KEY;
   const baseUrl = settings.JELLYFIN_BASE_URL;
   if (!apiKey || !baseUrl) {
@@ -170,6 +197,7 @@ function groupItems(items) {
           libraryId,
           seriesId: item.SeriesId,
           seriesName: item.SeriesName || t("roundup.unknown_series"),
+          link: item.MokaLink,
           // seasons: Map<seasonNum, Set<episodeKey>> — Set so a Sonarr quality
           // upgrade that re-imports the same episode multiple times in a week
           // counts once instead of inflating the season count.
@@ -272,14 +300,14 @@ function groupItems(items) {
 function renderMovie(item) {
   const title = item.Name || t("roundup.unknown_title");
   const year = item.ProductionYear ? ` (${item.ProductionYear})` : "";
-  const url = itemDeeplink(item.Id);
+  const url = item.MokaLink ?? itemDeeplink(item.Id);
   if (url) return `🎬 [**${escapeMd(title)}**${escapeMd(year)}](${url})`;
   return `🎬 **${escapeMd(title)}**${escapeMd(year)}`;
 }
 
 function renderSeries(item) {
   const title = item.Name || t("roundup.unknown_title");
-  const url = itemDeeplink(item.Id);
+  const url = item.MokaLink ?? itemDeeplink(item.Id);
   if (url) return `📺 [**${escapeMd(title)}**](${url})`;
   return `📺 **${escapeMd(title)}**`;
 }
@@ -288,7 +316,7 @@ function renderSeason(item) {
   const seriesName = item.SeriesName || t("roundup.unknown_series");
   const seasonLabel =
     item.Name || t("roundup.season_fallback", { n: item.IndexNumber ?? "?" });
-  const url = itemDeeplink(item.Id);
+  const url = item.MokaLink ?? itemDeeplink(item.Id);
   if (url) return `📺 [**${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}](${url})`;
   return `📺 **${escapeMd(seriesName)}** — ${escapeMd(seasonLabel)}`;
 }
@@ -319,7 +347,7 @@ function renderEpisodeGroup(group) {
       ? t("roundup.episodes_label_one")
       : t("roundup.episodes_label_many", { count: episodeTotal });
 
-  const url = group.seriesId ? itemDeeplink(group.seriesId) : null;
+  const url = group.link ?? (group.seriesId ? itemDeeplink(group.seriesId) : null);
   if (url) {
     return `📺 [**${escapeMd(group.seriesName)}**](${url}) — ${seasonLabel} (${episodesLabel})`;
   }
@@ -359,7 +387,8 @@ export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   // the scheduler records the failure normally. Reaching this with no value
   // at all (empty/undefined) is also misconfig: bail the same way.
   const baseUrl = settings.JELLYFIN_BASE_URL;
-  let baseUrlOk = false;
+  // Moka gives finished links; Jellyfin's address is not needed then
+  let baseUrlOk = isMokaMode();
   try {
     if (baseUrl) {
       const parsed = new URL(baseUrl);
@@ -530,7 +559,10 @@ async function buildRoundupEmbed(grouped, rawItems, truncated = false) {
     .setColor(color);
 
   const thumbnailItem = rawItems.find((i) => i.Id && i.ImageTags?.Primary);
-  if (thumbnailItem) {
+  const mokaThumb = rawItems.find((i) => i.ThumbUrl)?.ThumbUrl;
+  if (mokaThumb) {
+    embed.setThumbnail(mokaThumb);
+  } else if (thumbnailItem) {
     const thumbUrl = buildJellyfinUrl(
       `Items/${encodeURIComponent(thumbnailItem.Id)}/Images/Primary`
     );
@@ -618,6 +650,9 @@ function renderFieldGroup(name, entries) {
 }
 
 async function resolveLibraryNames(libraryIds) {
+  if (isMokaMode()) {
+    return { map: { "moka-movies": t("roundup.moka_movies"), "moka-shows": t("roundup.moka_shows") }, failed: false };
+  }
   const apiKey = settings.JELLYFIN_API_KEY;
   const baseUrl = settings.JELLYFIN_BASE_URL;
   let libs;

@@ -403,6 +403,8 @@
     "unknown_series": "Unknown Series",
     "season_fallback": "Season {n}",
     "library_fallback": "Library",
+    "moka_movies": "Films",
+    "moka_shows": "Shows",
     "library_names_unavailable": "library names unavailable",
     "items_truncated": "oldest items truncated",
     "section_movies": "Movies",

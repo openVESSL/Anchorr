@@ -19,6 +19,33 @@ import { cn } from "@/lib/utils"
 type Step = "jellyfin" | "seerr" | "discord" | "done"
 const STEPS: Step[] = ["jellyfin", "seerr", "discord", "done"]
 
+/** Moka sets Anchorr up: this screen waits until the bot is turned on there. */
+function WaitingForMoka() {
+  const { t } = useT()
+  const client = useQueryClient()
+  useEffect(() => {
+    const timer = setInterval(() => {
+      client.invalidateQueries({ queryKey: keys.auth })
+      client.invalidateQueries({ queryKey: keys.setup })
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [client])
+  return (
+    <div className="mx-auto flex min-h-svh max-w-xl flex-col justify-center px-4 py-10">
+      <div className="mb-6 flex items-center gap-3">
+        <Logo className="size-10" />
+        <h1 className="text-xl font-semibold">{t("Waiting for Moka")}</h1>
+      </div>
+      <Card>
+        <CardContent className="space-y-3 pt-6 text-sm">
+          <p>{t("This Anchorr is set up by Moka. In Moka, open Connections, turn on the Discord bot, paste your bot token and save.")}</p>
+          <p className="text-muted-foreground">{t("This page moves on by itself once Moka has connected.")}</p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export function SetupPage() {
   const { t } = useT()
   const auth = useAuth()
@@ -37,6 +64,7 @@ export function SetupPage() {
   }, [state.data, step])
 
   if (auth.isPending || state.isPending) return null
+  if (state.data?.mokaMode) return state.data.moka ? <Navigate to="/" replace /> : <WaitingForMoka />
   if (!auth.data?.needsSetup && !auth.data?.isAuthenticated) return <Navigate to="/login?next=/setup" replace />
 
   const refresh = () => {

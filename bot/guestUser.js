@@ -1,4 +1,5 @@
 // The Seerr guest account used for Discord users without a mapping.
+import { isMokaMode } from "../api/moka.js";
 import { ensureGuestUser } from "../api/seerr.js";
 import { updateConfig } from "../utils/configFile.js";
 import logger from "../utils/logger.js";
@@ -8,6 +9,8 @@ let pending = null;
 
 /** Makes sure the guest account exists and its id is saved. Never throws; null when unavailable. */
 export function prepareGuestUser() {
+  // Moka creates its guest account and hands over the id when it pairs
+  if (isMokaMode()) return Promise.resolve(settings.MOKA_GUEST_USER_ID ? Number(settings.MOKA_GUEST_USER_ID) : null);
   if (!settings.SEERR_URL || !settings.SEERR_API_KEY) return Promise.resolve(null);
   // One attempt at a time, even when several requests arrive together
   pending ??= (async () => {

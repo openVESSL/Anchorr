@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Moka as the backend.** With `MOKA_URL` set, Anchorr works with Moka in place of Jellyfin and Seerr, and Moka sets it up: turning on the Discord bot in Moka with just the bot token is enough. Search, requests (season by season for shows), the daily pick, announcements, "now available" messages, mentions, the weekly roundup and the dashboard's request overview all go through Moka. Members linked by their Discord ID in Moka request in their own name; others through Moka's guest account. The dashboard is signed in with a Moka administrator account.
+
 ### Changed
 
 - Anchorr is now licensed under the GNU General Public License v3.0 or later instead of the Unlicense. Versions up to and including 2.0.0 stay under the Unlicense.

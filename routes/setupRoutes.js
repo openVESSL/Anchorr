@@ -7,7 +7,7 @@ import { getApiKeyWithJellyfinLogin, getSeerrVersion, isSeerrInitialized } from 
 import { prepareGuestUser } from "../bot/guestUser.js";
 import { restartBot, startJellyfinFeed } from "../bot/botManager.js";
 import { botState } from "../bot/botState.js";
-import { inviteUrl, listBotGuilds, verifyBotToken } from "../api/discord.js";
+import { discordStatus, inviteUrl } from "../api/discord.js";
 import { isMaskedValue } from "../utils/configSanitize.js";
 import { authenticateToken, issueSession } from "../utils/auth.js";
 import { updateConfig } from "../utils/configFile.js";
@@ -15,6 +15,7 @@ import logger from "../utils/logger.js";
 import { normalizeSeerrUrl } from "../utils/seerrUrl.js";
 import { settings } from "../utils/settings.js";
 import { getUsers } from "../utils/userStore.js";
+import { isMokaMode, isMokaPaired } from "../api/moka.js";
 
 const router = Router();
 
@@ -27,7 +28,13 @@ const setupLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const isFirstRun = () => !settings.JELLYFIN_API_KEY && getUsers().length === 0;
+const isFirstRun = () => (isMokaMode() ? !isMokaPaired() : !settings.JELLYFIN_API_KEY) && getUsers().length === 0;
+
+// In Moka mode Moka sets everything up; these steps would let anyone claim the install
+function notInMokaMode(req, res, next) {
+  if (isMokaMode()) return res.status(404).json({ success: false, message: "Anchorr is connected through Moka" });
+  next();
+}
 
 // Until Jellyfin is linked, anyone who reaches the dashboard may try the Jellyfin step:
 // proving Jellyfin administrator access is what claims this Anchorr (audit S4).
@@ -51,6 +58,7 @@ const statusOf = (err) => err?.response?.status;
 router.get("/setup/state", (req, res) => {
   res.json({
     needsSetup: isFirstRun(),
+    ...(isMokaMode() && { mokaMode: true, moka: isMokaPaired() }),
     jellyfin: Boolean(settings.JELLYFIN_BASE_URL && settings.JELLYFIN_API_KEY),
     seerr: Boolean(settings.SEERR_URL && settings.SEERR_API_KEY),
     discord: Boolean(settings.DISCORD_TOKEN && settings.BOT_ID),
@@ -59,7 +67,7 @@ router.get("/setup/state", (req, res) => {
   });
 });
 
-router.post("/setup/jellyfin", setupLimiter, firstRunOrSignedIn, async (req, res) => {
+router.post("/setup/jellyfin", notInMokaMode, setupLimiter, firstRunOrSignedIn, async (req, res) => {
   const { username, password, apiKey } = req.body || {};
   const baseUrl = httpUrl(req.body?.url);
   if (!baseUrl) return res.status(400).json({ success: false, message: "Enter the Jellyfin address, starting with http:// or https://" });
@@ -120,7 +128,7 @@ router.post("/setup/jellyfin", setupLimiter, firstRunOrSignedIn, async (req, res
   res.json({ success: true, serverName: info.serverName, version: info.version, signedIn: claiming });
 });
 
-router.post("/setup/seerr", setupLimiter, authenticateToken, async (req, res) => {
+router.post("/setup/seerr", notInMokaMode, setupLimiter, authenticateToken, async (req, res) => {
   const { username, password } = req.body || {};
   const url = httpUrl(req.body?.url);
   if (!url) return res.status(400).json({ success: false, message: "Enter the Seerr address, starting with http:// or https://" });
@@ -160,18 +168,6 @@ router.post("/setup/seerr", setupLimiter, authenticateToken, async (req, res) =>
 });
 
 // ----- Discord -----
-
-// Discord rate-limits these lookups; the dashboard asks often (page loads, refocus)
-const DISCORD_CACHE_MS = 30_000;
-let discordCache = null;
-
-async function discordStatus(token, { fresh = false } = {}) {
-  if (!fresh && discordCache?.token === token && Date.now() - discordCache.at < DISCORD_CACHE_MS) return discordCache.status;
-  const bot = await verifyBotToken(token);
-  const status = { bot, guilds: await listBotGuilds(token) };
-  discordCache = { token, at: Date.now(), status };
-  return status;
-}
 
 /** Logs the real reason and answers with something the user can act on. */
 function discordFailure(res, err, action) {

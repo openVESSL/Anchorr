@@ -73,8 +73,9 @@ async function detectLibraryId(data) {
  * turned off. Test items always go to the default channel.
  */
 export async function chooseLibraryChannel(data, isTest) {
-  if (isTest) {
-    logger.info(`🧪 Test notification detected. Using default channel: ${settings.JELLYFIN_CHANNEL_ID}`);
+  // Items from Moka have no Jellyfin library; their kind picks the channel later
+  if (isTest || data.FromMoka) {
+    if (isTest) logger.info(`🧪 Test notification detected. Using default channel: ${settings.JELLYFIN_CHANNEL_ID}`);
     return { channelId: settings.JELLYFIN_CHANNEL_ID, isAnime: false };
   }
 

@@ -13,8 +13,62 @@ import * as metadata from "../api/metadata.js";
 import { botState } from "../bot/botState.js";
 import { getActivity } from "../utils/activity.js";
 import logger from "../utils/logger.js";
+import { isMokaMode, isMokaPaired, moka, mokaUrl } from "../api/moka.js";
 
 const router = Router();
+
+// ----- Moka mode: one server in place of Jellyfin and Seerr -----
+
+// Seerr's request status numbers, which the dashboard already understands
+const MOKA_STATUS = { pending: 1, approved: 2, declined: 3 };
+
+async function mokaRequests() {
+  return isMokaPaired() ? moka("GET", "/requests") : [];
+}
+
+async function mokaOverview() {
+  const [health, requests] = await Promise.allSettled([
+    http.get(`${mokaUrl()}/api/v1/health`, { timeout: TIMEOUTS.SEERR_API }),
+    mokaRequests(),
+  ]);
+  const list = requests.status === "fulfilled" ? requests.value : null;
+  const count = (f) => list.filter(f).length;
+  return {
+    moka:
+      health.status === "fulfilled"
+        ? { version: health.value.data?.version ?? null, url: String(settings.MOKA_PUBLIC_URL || mokaUrl()), paired: isMokaPaired() }
+        : null,
+    jellyfin: null,
+    seerr: null,
+    requestCounts: list && {
+      total: list.length,
+      movie: count((r) => r.kind === "movie"),
+      tv: count((r) => r.kind === "show"),
+      pending: count((r) => r.status === "pending"),
+      approved: count((r) => r.status === "approved"),
+      declined: count((r) => r.status === "declined"),
+      processing: count((r) => r.status === "approved" && r.title_state !== "available"),
+      available: count((r) => r.title_state === "available"),
+    },
+  };
+}
+
+function mokaRequestView(r) {
+  return {
+    id: r.id,
+    type: r.kind === "show" ? "tv" : "movie",
+    status: MOKA_STATUS[r.status] ?? null,
+    mediaStatus: r.title_state === "available" ? 5 : null,
+    is4k: false,
+    createdAt: new Date(r.created_at * 1000).toISOString(),
+    tmdbId: r.tmdb_id ?? null,
+    title: r.title,
+    year: r.year ? String(r.year) : null,
+    poster: r.poster_path ? `https://image.tmdb.org/t/p/w154${r.poster_path}` : null,
+    seasons: [],
+    requestedBy: { name: r.requested_by || null, avatar: null },
+  };
+}
 
 const seerrConfigured = () => Boolean(settings.SEERR_URL && settings.SEERR_API_KEY);
 
@@ -60,6 +114,7 @@ function discordInfo() {
 }
 
 router.get("/overview", authenticateToken, async (_req, res) => {
+  if (isMokaMode()) return res.json({ ...(await mokaOverview()), discord: discordInfo(), activity: getActivity(15) });
   const info = await serverInfo();
   let requestCounts = null;
   if (seerrConfigured()) {
@@ -90,6 +145,16 @@ function absoluteAvatar(avatar) {
 }
 
 router.get("/requests/recent", authenticateToken, async (req, res) => {
+  if (isMokaMode()) {
+    const take = Math.min(Math.max(parseInt(req.query.take, 10) || 10, 1), 25);
+    try {
+      const list = await mokaRequests();
+      return res.json({ results: list.slice(0, take).map(mokaRequestView), total: list.length });
+    } catch (err) {
+      logger.warn(`Could not load recent Moka requests: ${err.message}`);
+      return res.status(502).json({ error: "Could not reach Moka." });
+    }
+  }
   if (!seerrConfigured()) return res.status(400).json({ error: "Seerr is not set up." });
   const take = Math.min(Math.max(parseInt(req.query.take, 10) || 10, 1), 25);
   try {
@@ -130,6 +195,17 @@ router.post("/requests/:id/:action", authenticateToken, async (req, res) => {
   const { id, action } = req.params;
   if (!/^\d{1,10}$/.test(id) || !["approve", "decline"].includes(action)) {
     return res.status(400).json({ error: "Unknown request or action." });
+  }
+  if (isMokaMode()) {
+    try {
+      const data = await moka("POST", `/requests/${id}/${action}`);
+      logger.info(`Dashboard ${action === "approve" ? "approved" : "declined"} Moka request ${id}`);
+      return res.json({ success: true, status: MOKA_STATUS[data?.status] ?? null });
+    } catch (err) {
+      const status = err.response?.status;
+      logger.warn(`Moka ${action} for request ${id} failed: ${err.message}`);
+      return res.status(status === 404 ? 404 : 502).json({ error: status === 404 ? "Moka does not know this request." : "Could not reach Moka." });
+    }
   }
   if (!seerrConfigured()) return res.status(400).json({ error: "Seerr is not set up." });
   try {

@@ -2,7 +2,7 @@ import { Field, PageHeader, SaveBar, Section, SwitchRow, useSettingsForm, type S
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useT } from "@/lib/i18n"
-import { useRoles, useSeerrOptions, useStatus } from "@/lib/queries"
+import { useRoles, useSeerrOptions, useSetupState, useStatus } from "@/lib/queries"
 
 const KINDS = [
   { key: "MOVIE", label: "Movies", service: "radarr" },
@@ -13,6 +13,8 @@ const KINDS = [
 
 export function RequestsPage() {
   const { t } = useT()
+  // With Moka, approval and quality are set per user and profile in Moka
+  const moka = Boolean(useSetupState().data?.mokaMode)
   const form = useSettingsForm({
     SEERR_AUTO_APPROVE: "false",
     PRIVATE_MESSAGE_MODE: "false",
@@ -23,20 +25,25 @@ export function RequestsPage() {
 
   return (
     <>
-      <PageHeader title={t("Requests")} description={t("Who may request from Discord, and where requests go in Seerr.")} />
+      <PageHeader
+        title={t("Requests")}
+        description={moka ? t("Who may request from Discord. Approval, limits and quality are set in Moka.") : t("Who may request from Discord, and where requests go in Seerr.")}
+      />
 
       <Section title={t("Approval")}>
-        <SwitchRow
-          form={form}
-          name="SEERR_AUTO_APPROVE"
-          label={t("Auto-approve requests from members without a linked account")}
-          help={t('Sets the auto-approve permission of the Seerr user "Discord (Anchorr)". Linked members always follow their own Seerr permissions and quotas.')}
-        />
+        {!moka && (
+          <SwitchRow
+            form={form}
+            name="SEERR_AUTO_APPROVE"
+            label={t("Auto-approve requests from members without a linked account")}
+            help={t('Sets the auto-approve permission of the Seerr user "Discord (Anchorr)". Linked members always follow their own Seerr permissions and quotas.')}
+          />
+        )}
         <SwitchRow form={form} name="PRIVATE_MESSAGE_MODE" label={t("Private replies")} help={t("Search and request results are only visible to the member who used the command.")} />
       </Section>
 
       <RolesSection form={form} />
-      <DefaultsSection form={form} />
+      {!moka && <DefaultsSection form={form} />}
       <SaveBar form={form} />
     </>
   )

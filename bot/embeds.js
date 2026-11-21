@@ -10,6 +10,7 @@ import { minutesToHhMm } from "../utils/time.js";
 import { COLORS } from "../lib/constants.js";
 import { t } from "../utils/i18n.js";
 import { normalizeSeerrUrl } from "../utils/seerrUrl.js";
+import { isMokaMode } from "../api/moka.js";
 import { isDiscordLinkableUrl, isValidUrl } from "../utils/url.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
@@ -50,8 +51,12 @@ export function buildNotificationEmbed(
         : t("embeds.show_found");
 
   let seerrMediaUrl;
-  const currentSeerrUrl = normalizeSeerrUrl(settings.SEERR_URL || "");
-  if (tmdbId && currentSeerrUrl) {
+  const mokaPublic = isMokaMode() ? String(settings.MOKA_PUBLIC_URL || "").replace(/\/+$/, "") : "";
+  const currentSeerrUrl = isMokaMode() ? mokaPublic : normalizeSeerrUrl(settings.SEERR_URL || "");
+  if (tmdbId && currentSeerrUrl && isMokaMode()) {
+    // Moka's title pages: /movie/<tmdb> and /show/<tmdb>
+    seerrMediaUrl = `${currentSeerrUrl}/${mediaType === "movie" ? "movie" : "show"}/${tmdbId}`;
+  } else if (tmdbId && currentSeerrUrl) {
     const baseUrl = `${currentSeerrUrl}/${mediaType}/${tmdbId}`;
     seerrMediaUrl = status === "success" ? `${baseUrl}?manage=1` : baseUrl;
   }
