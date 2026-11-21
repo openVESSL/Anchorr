@@ -2,9 +2,10 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { toast } from "sonner"
 
-import { PageHeader, Section } from "@/components/settings"
+import { Field, PageHeader, SaveBar, Section, useSettingsForm } from "@/components/settings"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useT } from "@/lib/i18n"
 import { keys, useConfig, useLibraries, useOverview, useSetupState, useStatus } from "@/lib/queries"
 import { JellyfinStep } from "@/pages/setup"
@@ -18,6 +19,7 @@ export function JellyfinPage() {
   const libraries = useLibraries()
   const client = useQueryClient()
   const [editing, setEditing] = useState(false)
+  const form = useSettingsForm({ JELLYFIN_PUBLIC_URL: "" })
   const url = config?.JELLYFIN_BASE_URL as string | undefined
   const connected = Boolean(setup?.jellyfin && url)
 
@@ -40,6 +42,24 @@ export function JellyfinPage() {
           )}
         </Section>
       )}
+      {connected && (
+        <Section title={t("Links in Discord")}>
+          <Field
+            id="jellyfin-public-url"
+            label={t("Public address")}
+            help={t("Used only for links and images in Discord, for example https://jellyfin.example.com. Leave it empty to use the connection address.")}
+            error={form.errors.JELLYFIN_PUBLIC_URL}
+          >
+            <Input
+              id="jellyfin-public-url"
+              type="url"
+              placeholder={url}
+              value={String(form.values.JELLYFIN_PUBLIC_URL ?? "")}
+              onChange={(e) => form.set("JELLYFIN_PUBLIC_URL", e.target.value.trim())}
+            />
+          </Field>
+        </Section>
+      )}
       {(!connected || editing) && (
         <JellyfinStep
           onDone={async () => {
@@ -49,6 +69,7 @@ export function JellyfinPage() {
           }}
         />
       )}
+      {connected && <SaveBar form={form} />}
     </>
   )
 }

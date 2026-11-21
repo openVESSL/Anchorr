@@ -14,6 +14,7 @@ export const configSchema = Joi.object({
   SEERR_URL: Joi.string().uri().allow("").optional(),
   SEERR_API_KEY: Joi.string().allow("").optional(),
   JELLYFIN_BASE_URL: Joi.string().uri().allow("").optional(),
+  JELLYFIN_PUBLIC_URL: Joi.string().uri({ scheme: ["http", "https"] }).allow("").optional(),
   JELLYFIN_API_KEY: Joi.string().allow("").optional(),
   JELLYFIN_SERVER_ID: Joi.string().allow("").optional(),
   JELLYFIN_CHANNEL_ID: Joi.string().allow("").optional(),
