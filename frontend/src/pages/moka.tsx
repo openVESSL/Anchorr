@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { api, ApiError } from "@/lib/api"
 import { useT } from "@/lib/i18n"
 import { keys, useOverview } from "@/lib/queries"
+import { MokaLink } from "@/pages/experimental"
 import { ErrorAlert, StepCard, useSubmit } from "@/pages/setup"
 
 interface MokaState {
@@ -71,17 +72,25 @@ function MokaStep({ onDone }: { onDone: () => void }) {
   )
 }
 
-/** How Anchorr works with Moka, in three lines. */
+/** What Moka is, and how Anchorr works with it. */
 function HowItWorks() {
   const { t } = useT()
   return (
-    <Section title={t("How it works")}>
+    <>
+    <Section title={t("What Moka is")}>
+      <p className="text-muted-foreground text-sm">
+        {t("Moka is a self-hosted media server. It brings what usually takes several apps into one: a catalog of films and shows to browse and request, searching your indexers and downloading through your own download client, importing into your library, and playing in the browser or in apps made for Jellyfin. It is still in development.")}{" "}
+        <MokaLink />
+      </p>
+    </Section>
+    <Section title={t("How it works with Anchorr")}>
       <ul className="text-muted-foreground list-disc space-y-1.5 pl-5 text-sm">
-        <li>{t("Moka is one server for your catalog, requests and library.")}</li>
         <li>{t("Once Anchorr is connected to Moka, search and requests from Discord go to Moka, and Seerr is not used while Moka stays connected.")}</li>
         <li>{t("Jellyfin keeps announcing new titles if it is linked; without it, Moka announces them. Disconnect Moka to go back to Seerr.")}</li>
+        <li>{t("Members link their Discord account by their Discord ID on their Moka user and request in their own name, with their own limits. Everyone else requests as Moka's guest account.")}</li>
       </ul>
     </Section>
+    </>
   )
 }
 
@@ -142,9 +151,6 @@ export function MokaPage() {
             {data.announcesFrom === "jellyfin"
               ? t("New titles are announced from Jellyfin, with its watch links. Requests go to Moka.")
               : t("New titles are announced from Moka. Link Jellyfin too if people watch there.")}
-          </p>
-          <p className="text-muted-foreground text-sm">
-            {t("Members request in their own name once their Discord ID is set on their Moka user (Moka > Users). Everyone else requests as Moka's guest account.")}
           </p>
         </Section>
       )}

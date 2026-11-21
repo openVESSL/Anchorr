@@ -380,7 +380,6 @@
   "Who may request from Discord. Approval, limits and quality are set in Moka.": "Vem som får göra förfrågningar från Discord. Godkännande, gränser och kvalitet ställs in i Moka.",
   "Connect Moka": "Anslut Moka",
   "Disconnect": "Koppla från",
-  "Members request in their own name once their Discord ID is set on their Moka user (Moka > Users). Everyone else requests as Moka's guest account.": "Medlemmar gör förfrågningar i eget namn när deras Discord-ID är angivet på deras Moka-användare (Moka > Användare). Alla andra använder Mokas gästkonto.",
   "Moka address": "Moka-adress",
   "Moka connected": "Moka anslutet",
   "Moka disconnected": "Moka frånkopplat",
@@ -392,8 +391,6 @@
   "The address Anchorr uses to reach Moka, for example its LAN address.": "Adressen Anchorr använder för att nå Moka, till exempel dess LAN-adress.",
   "Use Moka for search and requests instead of Seerr. New titles are announced from Jellyfin when it is linked, otherwise from Moka.": "Använd Moka för sökning och förfrågningar i stället för Seerr. Nya titlar meddelas från Jellyfin när det är länkat, annars från Moka.",
   "Used for links in Discord. Leave it empty to keep the one set in Moka.": "Används för länkar i Discord. Lämna tomt för att behålla den som är inställd i Moka.",
-  "How it works": "Så fungerar det",
-  "Moka is one server for your catalog, requests and library.": "Moka är en server för katalog, förfrågningar och bibliotek.",
   "Once Anchorr is connected to Moka, search and requests from Discord go to Moka, and Seerr is not used while Moka stays connected.": "När Anchorr är anslutet till Moka går sökningar och förfrågningar från Discord till Moka, och Seerr används inte så länge Moka är anslutet.",
   "Jellyfin keeps announcing new titles if it is linked; without it, Moka announces them. Disconnect Moka to go back to Seerr.": "Jellyfin fortsätter att meddela nya titlar om det är länkat; annars gör Moka det. Koppla från Moka för att gå tillbaka till Seerr.",
   "Experimental. Use Moka for search and requests from Discord.": "Experimentellt. Använd Moka för sökning och förfrågningar från Discord.",
@@ -404,5 +401,10 @@
   "Features that are still being tried out. They are off until you turn them on.": "Funktioner som fortfarande prövas. De är avstängda tills du slår på dem.",
   "Use Moka": "Använd Moka",
   "Adds Moka to Connections, next to Jellyfin and Seerr. Nothing changes until you connect it there.": "Lägger till Moka under Anslutningar, bredvid Jellyfin och Seerr. Inget ändras förrän du ansluter det där.",
-  "Not used while Moka is connected": "Används inte medan Moka är anslutet"
+  "Not used while Moka is connected": "Används inte medan Moka är anslutet",
+  "Moka is a self-hosted media server: browse and request films and shows, download them through your own client, and keep and play them in one library.": "Moka är en egen mediaserver: bläddra bland och be om filmer och serier, ladda ner dem med din egen klient, och spara och spela upp dem i ett bibliotek.",
+  "What Moka is": "Vad Moka är",
+  "Moka is a self-hosted media server. It brings what usually takes several apps into one: a catalog of films and shows to browse and request, searching your indexers and downloading through your own download client, importing into your library, and playing in the browser or in apps made for Jellyfin. It is still in development.": "Moka är en egen mediaserver. Den samlar det som annars kräver flera appar: en katalog med filmer och serier att bläddra i och be om, sökning hos dina indexerare och nedladdning med din egen klient, import till ditt bibliotek och uppspelning i webbläsaren eller i appar gjorda för Jellyfin. Den är fortfarande under utveckling.",
+  "How it works with Anchorr": "Så fungerar det med Anchorr",
+  "Members link their Discord account by their Discord ID on their Moka user and request in their own name, with their own limits. Everyone else requests as Moka's guest account.": "Medlemmar länkar sitt Discord-konto med sitt Discord-ID på sin Moka-användare och gör förfrågningar i eget namn, med egna gränser. Alla andra använder Mokas gästkonto."
 }

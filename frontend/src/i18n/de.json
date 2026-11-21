@@ -380,7 +380,6 @@
   "Who may request from Discord. Approval, limits and quality are set in Moka.": "Wer über Discord anfragen darf. Freigabe, Limits und Qualität werden in Moka eingestellt.",
   "Connect Moka": "Moka verbinden",
   "Disconnect": "Trennen",
-  "Members request in their own name once their Discord ID is set on their Moka user (Moka > Users). Everyone else requests as Moka's guest account.": "Mitglieder fragen in ihrem eigenen Namen an, sobald ihre Discord-ID bei ihrem Moka-Benutzer eingetragen ist (Moka > Benutzer). Alle anderen fragen über das Gastkonto von Moka an.",
   "Moka address": "Moka-Adresse",
   "Moka connected": "Moka verbunden",
   "Moka disconnected": "Moka getrennt",
@@ -392,8 +391,6 @@
   "The address Anchorr uses to reach Moka, for example its LAN address.": "Die Adresse, über die Anchorr Moka erreicht, zum Beispiel seine LAN-Adresse.",
   "Use Moka for search and requests instead of Seerr. New titles are announced from Jellyfin when it is linked, otherwise from Moka.": "Moka statt Seerr für Suche und Anfragen verwenden. Neue Titel werden aus Jellyfin angekündigt, wenn es verbunden ist, sonst aus Moka.",
   "Used for links in Discord. Leave it empty to keep the one set in Moka.": "Wird für Links in Discord verwendet. Leer lassen, um die in Moka eingestellte zu behalten.",
-  "How it works": "So funktioniert es",
-  "Moka is one server for your catalog, requests and library.": "Moka ist ein Server für Katalog, Anfragen und Bibliothek.",
   "Once Anchorr is connected to Moka, search and requests from Discord go to Moka, and Seerr is not used while Moka stays connected.": "Sobald Anchorr mit Moka verbunden ist, gehen Suche und Anfragen aus Discord an Moka, und Seerr wird nicht genutzt, solange Moka verbunden bleibt.",
   "Jellyfin keeps announcing new titles if it is linked; without it, Moka announces them. Disconnect Moka to go back to Seerr.": "Jellyfin kündigt neue Titel weiter an, wenn es verbunden ist; sonst übernimmt Moka das. Trenne Moka, um zu Seerr zurückzukehren.",
   "Experimental. Use Moka for search and requests from Discord.": "Experimentell. Moka für Suche und Anfragen aus Discord verwenden.",
@@ -404,5 +401,10 @@
   "Features that are still being tried out. They are off until you turn them on.": "Funktionen, die noch erprobt werden. Sie bleiben aus, bis du sie einschaltest.",
   "Use Moka": "Moka verwenden",
   "Adds Moka to Connections, next to Jellyfin and Seerr. Nothing changes until you connect it there.": "Fügt Moka zu den Verbindungen hinzu, neben Jellyfin und Seerr. Es ändert sich nichts, bis du es dort verbindest.",
-  "Not used while Moka is connected": "Nicht genutzt, solange Moka verbunden ist"
+  "Not used while Moka is connected": "Nicht genutzt, solange Moka verbunden ist",
+  "Moka is a self-hosted media server: browse and request films and shows, download them through your own client, and keep and play them in one library.": "Moka ist ein selbst gehosteter Medienserver: Filme und Serien durchsuchen und anfragen, über deinen eigenen Client herunterladen und in einer Bibliothek aufbewahren und abspielen.",
+  "What Moka is": "Was Moka ist",
+  "Moka is a self-hosted media server. It brings what usually takes several apps into one: a catalog of films and shows to browse and request, searching your indexers and downloading through your own download client, importing into your library, and playing in the browser or in apps made for Jellyfin. It is still in development.": "Moka ist ein selbst gehosteter Medienserver. Er vereint, wofür sonst mehrere Apps nötig sind: einen Katalog mit Filmen und Serien zum Durchsuchen und Anfragen, die Suche in deinen Indexern und das Herunterladen über deinen eigenen Download-Client, den Import in deine Bibliothek und die Wiedergabe im Browser oder in Apps für Jellyfin. Moka ist noch in Entwicklung.",
+  "How it works with Anchorr": "So funktioniert es mit Anchorr",
+  "Members link their Discord account by their Discord ID on their Moka user and request in their own name, with their own limits. Everyone else requests as Moka's guest account.": "Mitglieder verknüpfen ihr Discord-Konto über ihre Discord-ID bei ihrem Moka-Benutzer und fragen in ihrem eigenen Namen an, mit ihren eigenen Limits. Alle anderen fragen über das Gastkonto von Moka an."
 }
