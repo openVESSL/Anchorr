@@ -34,7 +34,8 @@ Anchorr connects three things you already run: **Jellyfin**, **Seerr** and a **D
 - Episodes that arrive together are grouped into one message
 - Per-library channels, and libraries marked as anime use their own default quality profile
 - Quality upgrades from Sonarr and Radarr are not announced again
-- Optional direct message to whoever requested a title once it is available
+- Optional direct message to whoever requested a title once it is available, also for requests made in Seerr by linked members, and an optional mention of them in the announcement
+- Links in Discord can use a public Jellyfin address while Anchorr talks to Jellyfin on your network
 
 **Extras**
 
@@ -161,7 +162,7 @@ journalctl -u anchorr -f   # follow the logs
 Open the dashboard. On the first visit it starts a short setup:
 
 1. **Jellyfin.** Enter its address and sign in with a Jellyfin administrator account. Anchorr creates its own API key named "Anchorr" in Jellyfin. Your password is not stored. Signing in as a Jellyfin administrator is also what makes you the owner of this Anchorr.
-2. **Seerr.** Enter its address. Anchorr signs in to Seerr with the same Jellyfin account to read Seerr's API key, then creates the guest account used by members without a linked account.
+2. **Seerr.** Finish Seerr's own setup first (connected to the same Jellyfin). Then enter its address. Anchorr signs in to Seerr with the same Jellyfin account to read Seerr's API key, then creates the guest account used by members without a linked account.
 3. **Discord.** Create an application in the [Discord Developer Portal](https://discord.com/developers/applications). Under **Bot**, select **Reset Token**, copy the token and turn on **Server Members Intent**. Paste the token in Anchorr, use the invite button to add the bot to your server, and pick that server.
 
 The bot comes online and the commands are ready. Everything else, such as the announcement channel, linked users and the weekly roundup, can be set later from the sidebar.
