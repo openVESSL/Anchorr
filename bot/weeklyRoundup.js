@@ -8,7 +8,7 @@ import logger from "../utils/logger.js";
 import { recordOrGet } from "./roundupFirstSeen.js";
 import { getInstalledAt } from "./roundupState.js";
 import { settings } from "../utils/settings.js";
-import { isMokaMode, moka } from "../api/moka.js";
+import { announcesFromMoka, moka } from "../api/moka.js";
 
 // Rolling window of new items to include in the digest.
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -45,7 +45,7 @@ async function fetchMokaWindowItems() {
 }
 
 async function fetchWindowItems() {
-  if (isMokaMode()) return fetchMokaWindowItems();
+  if (announcesFromMoka()) return fetchMokaWindowItems();
   const apiKey = settings.JELLYFIN_API_KEY;
   const baseUrl = settings.JELLYFIN_BASE_URL;
   if (!apiKey || !baseUrl) {
@@ -388,7 +388,7 @@ export async function sendWeeklyRoundup(client, channelId, now, options = {}) {
   // at all (empty/undefined) is also misconfig: bail the same way.
   const baseUrl = settings.JELLYFIN_BASE_URL;
   // Moka gives finished links; Jellyfin's address is not needed then
-  let baseUrlOk = isMokaMode();
+  let baseUrlOk = announcesFromMoka();
   try {
     if (baseUrl) {
       const parsed = new URL(baseUrl);
@@ -650,7 +650,7 @@ function renderFieldGroup(name, entries) {
 }
 
 async function resolveLibraryNames(libraryIds) {
-  if (isMokaMode()) {
+  if (announcesFromMoka()) {
     return { map: { "moka-movies": t("roundup.moka_movies"), "moka-shows": t("roundup.moka_shows") }, failed: false };
   }
   const apiKey = settings.JELLYFIN_API_KEY;

@@ -12,13 +12,15 @@ import { api, ApiError } from "@/lib/api"
 import { useT } from "@/lib/i18n"
 import { keys, useAuth } from "@/lib/queries"
 
+type Method = "jellyfin" | "moka" | "local"
+
 export function LoginPage() {
   const { t } = useT()
   const auth = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const client = useQueryClient()
-  const [method, setMethod] = useState<"jellyfin" | "local" | null>(null)
+  const [method, setMethod] = useState<Method | null>(null)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -28,14 +30,31 @@ export function LoginPage() {
   if (auth.data?.needsSetup) return <Navigate to="/setup" replace />
   if (auth.data?.isAuthenticated) return <Navigate to={params.get("next") || "/"} replace />
 
-  const active = method ?? (auth.data?.jellyfinLogin ? "jellyfin" : "local")
+  // every way to sign in this install offers, the first one shown by default
+  const methods: Method[] = [
+    ...(auth.data?.jellyfinLogin ? (["jellyfin"] as const) : []),
+    ...(auth.data?.mokaLogin ? (["moka"] as const) : []),
+    ...(auth.data?.hasUsers || !(auth.data?.jellyfinLogin || auth.data?.mokaLogin) ? (["local"] as const) : []),
+  ]
+  const active = method ?? methods[0]
+  const others = methods.filter((m) => m !== active)
+  const descriptions: Record<Method, string> = {
+    jellyfin: t("Use your Jellyfin administrator account."),
+    moka: t("Use your Moka administrator account."),
+    local: t("Use your Anchorr account."),
+  }
+  const switchLabels: Record<Method, string> = {
+    jellyfin: t("Use a Jellyfin account instead"),
+    moka: t("Use a Moka account instead"),
+    local: t("Use the Anchorr account instead"),
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError("")
     try {
-      await api.post(active === "jellyfin" ? "/auth/jellyfin" : "/auth/login", { username, password })
+      await api.post({ jellyfin: "/auth/jellyfin", moka: "/auth/moka", local: "/auth/login" }[active], { username, password })
       await client.invalidateQueries({ queryKey: keys.auth })
       const next = params.get("next")
       navigate(next && next.startsWith("/") ? next : "/", { replace: true })
@@ -52,13 +71,7 @@ export function LoginPage() {
         <CardHeader className="justify-items-center text-center">
           <Logo className="mb-2 size-12" />
           <CardTitle className="text-xl">{t("Sign in to Anchorr")}</CardTitle>
-          <CardDescription>
-            {active === "jellyfin"
-              ? auth.data?.mokaMode
-                ? t("Use your Moka administrator account.")
-                : t("Use your Jellyfin administrator account.")
-              : t("Use your Anchorr account.")}
-          </CardDescription>
+          <CardDescription>{descriptions[active]}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
@@ -78,22 +91,19 @@ export function LoginPage() {
             <Button type="submit" className="w-full" disabled={busy}>
               {busy ? t("Signing in...") : t("Sign in")}
             </Button>
-            {auth.data?.jellyfinLogin && auth.data?.hasUsers && (
+            {others.map((m) => (
               <button
+                key={m}
                 type="button"
                 className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
                 onClick={() => {
-                  setMethod(active === "jellyfin" ? "local" : "jellyfin")
+                  setMethod(m)
                   setError("")
                 }}
               >
-                {active === "jellyfin"
-                  ? t("Use the Anchorr account instead")
-                  : auth.data?.mokaMode
-                    ? t("Use a Moka account instead")
-                    : t("Use a Jellyfin account instead")}
+                {switchLabels[m]}
               </button>
-            )}
+            ))}
           </form>
         </CardContent>
       </Card>

@@ -16,7 +16,7 @@ import * as mokaApi from "./moka.js";
 const language = () => settings.LANGUAGE || "en";
 
 export function isMetadataConfigured() {
-  if (mokaApi.isMokaMode()) return mokaApi.isMokaPaired();
+  if (mokaApi.isMokaMode()) return true;
   return Boolean(settings.SEERR_URL && settings.SEERR_API_KEY);
 }
 

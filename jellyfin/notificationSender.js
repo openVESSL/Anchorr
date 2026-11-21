@@ -4,7 +4,7 @@
  */
 import { getDetails, getExtras, getTitleRequests, isMetadataConfigured } from "../api/metadata.js";
 import { recordActivity } from "../utils/activity.js";
-import { getDiscordLinks } from "../api/moka.js";
+import { getDiscordLinks, isMokaMode, requestersFor } from "../api/moka.js";
 import { getUserMappings } from "../utils/configFile.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
@@ -51,9 +51,23 @@ async function mokaRequesters(data) {
   };
 }
 
+/** Jellyfin announces, Moka took the requests: its open requests for this title. */
+async function mokaRequestersByTmdb(data, tmdbId) {
+  const mediaType = mediaTypeOf(data.ItemType);
+  if (!tmdbId || !mediaType) return { requestIds: [], userIds: [] };
+  let found = [];
+  try {
+    found = (await requestersFor(tmdbId, mediaType)).filter((r) => !announcedRequests.has(r.key));
+  } catch (err) {
+    logger.warn(`Could not read the Moka requests for ${mediaType} ${tmdbId}: ${err.message}`);
+  }
+  return { requestIds: found.map((r) => r.key), userIds: found.map((r) => r.discordUserId).filter(Boolean) };
+}
+
 /** Linked members whose Seerr request (made anywhere, also in Seerr itself) this item fulfils. */
 async function seerrRequesters(data, tmdbId) {
   if (data.FromMoka) return mokaRequesters(data);
+  if (isMokaMode()) return mokaRequestersByTmdb(data, tmdbId);
   const mediaType = mediaTypeOf(data.ItemType);
   if (!tmdbId || !mediaType) return { requestIds: [], userIds: [] };
   const fresh = ((await getTitleRequests(parseInt(tmdbId, 10), mediaType)) || []).filter((r) => !announcedRequests.has(r.id));

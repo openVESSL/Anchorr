@@ -11,6 +11,7 @@ import { EmbedsPage } from "@/pages/embeds"
 import { JellyfinPage } from "@/pages/jellyfin"
 import { LoginPage } from "@/pages/login"
 import { LogsPage } from "@/pages/logs"
+import { MokaPage } from "@/pages/moka"
 import { NotificationsPage } from "@/pages/notifications"
 import { OverviewPage } from "@/pages/overview"
 import { RequestsPage } from "@/pages/requests"
@@ -31,6 +32,7 @@ export function App() {
           <Route path="discord" element={<DiscordPage />} />
           <Route path="jellyfin" element={<JellyfinPage />} />
           <Route path="seerr" element={<SeerrPage />} />
+          <Route path="moka" element={<MokaPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="requests" element={<RequestsPage />} />
           <Route path="users" element={<UsersPage />} />

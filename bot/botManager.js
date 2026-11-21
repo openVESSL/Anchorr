@@ -6,9 +6,9 @@ import {
 } from "discord.js";
 import { registerCommands } from "../discord/commands.js";
 import { botState, loadPendingRequests, pendingRequests, savePendingRequests } from "./botState.js";
-import { isMokaMode } from "../api/moka.js";
+import { announcesFromMoka } from "../api/moka.js";
 import { JellyfinFeed } from "../jellyfin/feed.js";
-import { catchUpFromMoka } from "../jellyfin/mokaFeed.js";
+import { startMokaFeed } from "../jellyfin/mokaFeed.js";
 import { handleJellyfinItem } from "../jellyfin/itemHandler.js";
 import { registerInteractions } from "./interactions.js";
 import { prepareGuestUser } from "./guestUser.js";
@@ -23,8 +23,11 @@ export function startJellyfinFeed(client = botState.discordClient) {
   botState.jellyfinFeed?.stop();
   botState.jellyfinFeed = null;
   if (!client || !botState.isBotRunning) return;
-  // Moka tells Anchorr itself when titles arrive; only what was missed is read back
-  if (isMokaMode()) return void catchUpFromMoka();
+  // Without Jellyfin, new titles come from Moka
+  if (announcesFromMoka()) {
+    botState.jellyfinFeed = startMokaFeed();
+    return;
+  }
   botState.jellyfinFeed = new JellyfinFeed({
     dispatch: (payload) => handleJellyfinItem(payload, client, pendingRequests, savePendingRequests),
   });

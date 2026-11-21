@@ -13,18 +13,16 @@ import * as metadata from "../api/metadata.js";
 import { botState } from "../bot/botState.js";
 import { getActivity } from "../utils/activity.js";
 import logger from "../utils/logger.js";
-import { isMokaMode, isMokaPaired, moka, mokaUrl } from "../api/moka.js";
+import { isMokaMode, moka, mokaUrl } from "../api/moka.js";
 
 const router = Router();
 
-// ----- Moka mode: one server in place of Jellyfin and Seerr -----
+// ----- Moka: once connected, requests go there instead of Seerr -----
 
 // Seerr's request status numbers, which the dashboard already understands
 const MOKA_STATUS = { pending: 1, approved: 2, declined: 3 };
 
-async function mokaRequests() {
-  return isMokaPaired() ? moka("GET", "/requests") : [];
-}
+const mokaRequests = () => moka("GET", "/requests");
 
 async function mokaOverview() {
   const [health, requests] = await Promise.allSettled([
@@ -34,12 +32,7 @@ async function mokaOverview() {
   const list = requests.status === "fulfilled" ? requests.value : null;
   const count = (f) => list.filter(f).length;
   return {
-    moka:
-      health.status === "fulfilled"
-        ? { version: health.value.data?.version ?? null, url: String(settings.MOKA_PUBLIC_URL || mokaUrl()), paired: isMokaPaired() }
-        : null,
-    jellyfin: null,
-    seerr: null,
+    moka: health.status === "fulfilled" ? { version: health.value.data?.version ?? null, url: String(settings.MOKA_PUBLIC_URL || mokaUrl()) } : null,
     requestCounts: list && {
       total: list.length,
       movie: count((r) => r.kind === "movie"),
@@ -114,10 +107,9 @@ function discordInfo() {
 }
 
 router.get("/overview", authenticateToken, async (_req, res) => {
-  if (isMokaMode()) return res.json({ ...(await mokaOverview()), discord: discordInfo(), activity: getActivity(15) });
-  const info = await serverInfo();
-  let requestCounts = null;
-  if (seerrConfigured()) {
+  const [info, mk] = await Promise.all([serverInfo(), isMokaMode() ? mokaOverview() : null]);
+  let requestCounts = mk ? mk.requestCounts : null;
+  if (!mk && seerrConfigured()) {
     try {
       requestCounts = (await seerr("GET", "/request/count")).data;
     } catch (err) {
@@ -131,6 +123,7 @@ router.get("/overview", authenticateToken, async (_req, res) => {
       url: settings.JELLYFIN_BASE_URL.replace(/\/+$/, ""),
     },
     seerr: info.seerr && { ...info.seerr, url: normalizeSeerrUrl(settings.SEERR_URL) },
+    ...(mk && { moka: mk.moka }),
     discord: discordInfo(),
     requestCounts,
     activity: getActivity(15),

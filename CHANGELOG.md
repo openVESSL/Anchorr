@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Moka as the backend.** With `MOKA_URL` set, Anchorr works with Moka in place of Jellyfin and Seerr, and Moka sets it up: turning on the Discord bot in Moka with just the bot token is enough. Search, requests (season by season for shows), the daily pick, announcements, "now available" messages, mentions, the weekly roundup and the dashboard's request overview all go through Moka. Members linked by their Discord ID in Moka request in their own name; others through Moka's guest account. The dashboard is signed in with a Moka administrator account.
+- **Moka as a connection.** Connections > Moka (or the first setup) connects Moka by signing in as a Moka administrator. Search, requests (season by season for shows), `/trending` and the daily pick then go through Moka instead of Seerr. New titles are announced from Jellyfin when it is linked, otherwise from Moka, with "now available" messages and mentions for the people who requested them. Members linked by their Discord ID in Moka request in their own name; others through Moka's guest account. Moka administrators can sign in to the dashboard, and Moka can set Anchorr up from its side when `MOKA_URL` names it.
 
 ### Changed
 

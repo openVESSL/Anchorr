@@ -1,15 +1,31 @@
-// What Moka calls: it hands over its key, guest account and the bot token, asks how the
-// bot is doing, turns it off, and says when titles arrive. Only in Moka mode (MOKA_URL).
+// Moka as a connection. From the dashboard: connect by signing in as a Moka admin, or
+// disconnect. From Moka itself (only the one named in MOKA_URL): hand over its key, guest
+// account and the bot token, ask how the bot is doing, turn it off, say when titles arrive.
 import crypto from "crypto";
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { discordStatus, inviteUrl } from "../api/discord.js";
-import { ACT_AS_USER, getDiscordLinks, isMokaMode, moka } from "../api/moka.js";
-import { restartBot, stopBot } from "../bot/botManager.js";
+import {
+  ACT_AS_USER,
+  announcesFromMoka,
+  envMokaUrl,
+  getDiscordLinks,
+  isMokaMode,
+  jellyfinLinked,
+  moka,
+  MOKA_ADMIN,
+  mokaSignIn,
+  mokaSignOut,
+  mokaUrl,
+} from "../api/moka.js";
+import { restartBot, startJellyfinFeed, stopBot } from "../bot/botManager.js";
 import { botState } from "../bot/botState.js";
 import { dispatchMokaEvent } from "../jellyfin/mokaFeed.js";
+import { authenticateToken, issueSession } from "../utils/auth.js";
 import { updateConfig } from "../utils/configFile.js";
+import http from "../utils/http.js";
 import logger from "../utils/logger.js";
+import { getUsers } from "../utils/userStore.js";
 import { settings } from "../utils/settings.js";
 
 const router = Router();
@@ -31,8 +47,9 @@ function sameKey(a, b) {
   return x.length > 0 && x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
-function onlyInMokaMode(req, res, next) {
-  if (!isMokaMode()) return res.status(404).json({ success: false, message: "Moka mode is off: MOKA_URL is not set." });
+// Moka may set Anchorr up from its side only when MOKA_URL names it
+function onlyFromEnvMoka(req, res, next) {
+  if (!envMokaUrl()) return res.status(404).json({ success: false, message: "Connect Moka from Anchorr's dashboard, or set MOKA_URL." });
   next();
 }
 
@@ -77,7 +94,7 @@ function discordError(res, err) {
   return res.status(502).json({ success: false, message: "Anchorr could not reach Discord" });
 }
 
-router.post("/moka/pair", onlyInMokaMode, pairLimiter, async (req, res) => {
+router.post("/moka/pair", onlyFromEnvMoka, pairLimiter, async (req, res) => {
   const { api_key, guest_user_id, public_url, discord_token, guild_id } = req.body || {};
   const key = String(api_key || "").trim();
   if (!key) return res.status(400).json({ success: false, message: "The Moka API key is missing." });
@@ -86,7 +103,7 @@ router.post("/moka/pair", onlyInMokaMode, pairLimiter, async (req, res) => {
   // Moka's admin can make one, so a stranger cannot pair this Anchorr with their own server.
   let me;
   try {
-    me = await moka("GET", "/me", { key });
+    me = await moka("GET", "/me", { key, base: envMokaUrl() });
   } catch (err) {
     const status = err?.response?.status;
     if (status === 401 || status === 403) return res.status(401).json({ success: false, message: "Moka did not accept this key." });
@@ -113,6 +130,7 @@ router.post("/moka/pair", onlyInMokaMode, pairLimiter, async (req, res) => {
   const guild = [guild_id, settings.GUILD_ID].find((id) => id && inGuild(String(id))) || (status.guilds.length === 1 ? status.guilds[0].id : "");
 
   const saved = updateConfig({
+    MOKA_URL: envMokaUrl(),
     MOKA_API_KEY: key,
     MOKA_GUEST_USER_ID: guest_user_id ? String(guest_user_id) : "",
     MOKA_PUBLIC_URL: publicUrl,
@@ -132,7 +150,7 @@ router.post("/moka/pair", onlyInMokaMode, pairLimiter, async (req, res) => {
   res.json(await botView());
 });
 
-router.get("/moka/status", onlyInMokaMode, fromMoka, async (req, res) => {
+router.get("/moka/status", fromMoka, async (req, res) => {
   try {
     res.json(await botView());
   } catch (err) {
@@ -140,17 +158,103 @@ router.get("/moka/status", onlyInMokaMode, fromMoka, async (req, res) => {
   }
 });
 
-router.delete("/moka/pair", onlyInMokaMode, fromMoka, async (req, res) => {
+router.delete("/moka/pair", fromMoka, async (req, res) => {
   await stopBot().catch((err) => logger.warn(`Moka: stopping the bot failed: ${err.message}`));
   updateConfig({ MOKA_API_KEY: "", DISCORD_TOKEN: "" });
   logger.info("Moka: the Discord bot was turned off in Moka");
   res.json({ success: true });
 });
 
-router.post("/moka/events", onlyInMokaMode, fromMoka, (req, res) => {
+router.post("/moka/events", fromMoka, (req, res) => {
   res.json({ success: true });
+  // With Jellyfin linked, Jellyfin announces (its watch links); Moka's event is not needed
+  if (!announcesFromMoka()) return;
   // announced after answering, so Moka is never held up by Discord
   dispatchMokaEvent(req.body).catch((err) => logger.error(`Moka event failed: ${err.message}`));
 });
+
+// ----- from the dashboard -----
+
+const isFirstRun = () => !settings.JELLYFIN_API_KEY && !isMokaMode() && getUsers().length === 0;
+// Like the Jellyfin step: proving Moka administrator access claims a fresh install
+const firstRunOrSignedIn = (req, res, next) => (isFirstRun() ? next() : authenticateToken(req, res, next));
+
+router.get("/moka", authenticateToken, (req, res) => {
+  res.json({
+    connected: isMokaMode(),
+    url: mokaUrl() || null,
+    publicUrl: settings.MOKA_PUBLIC_URL || null,
+    announcesFrom: announcesFromMoka() ? "moka" : jellyfinLinked() ? "jellyfin" : null,
+  });
+});
+
+router.post("/moka/connect", pairLimiter, firstRunOrSignedIn, async (req, res) => {
+  const { username, password } = req.body || {};
+  const base = httpUrlOrEmpty(req.body?.url);
+  if (!base) return res.status(400).json({ success: false, message: "Enter the Moka address, starting with http:// or https://" });
+  const publicUrl = httpUrlOrEmpty(req.body?.publicUrl);
+  if (publicUrl === null) return res.status(400).json({ success: false, message: "The public address must start with http:// or https://" });
+  if (!username || !password) return res.status(400).json({ success: false, message: "Enter your Moka administrator username and password" });
+
+  let session;
+  try {
+    session = await mokaSignIn(base, username, password);
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 401) return res.status(401).json({ success: false, message: "Moka rejected this username or password" });
+    if (status === 429) return res.status(429).json({ success: false, message: "Moka asks to wait before trying again" });
+    logger.warn(`Moka: not reachable at ${base}: ${err.message}`);
+    return res.status(502).json({ success: false, message: "Could not reach Moka at this address" });
+  }
+  let keys;
+  try {
+    if (!(Number(session.me?.permissions) & MOKA_ADMIN)) {
+      return res.status(403).json({ success: false, message: "Sign in with a Moka administrator account" });
+    }
+    keys = (
+      await http.post(`${base}/api/v1/anchorr/connect`, { public_url: publicUrl || "" }, { headers: { Cookie: session.cookie }, timeout: 20_000 })
+    ).data;
+  } catch (err) {
+    logger.error(`Moka: could not set up the bot's account: ${err.message}`);
+    return res.status(502).json({ success: false, message: "Moka did not set up the bot's account. Is it up to date?" });
+  } finally {
+    await mokaSignOut(base, session.cookie);
+  }
+
+  const claiming = isFirstRun();
+  const saved = updateConfig({
+    MOKA_URL: base,
+    MOKA_API_KEY: keys.api_key,
+    MOKA_GUEST_USER_ID: String(keys.guest_user_id),
+    MOKA_PUBLIC_URL: keys.public_url || publicUrl || "",
+  });
+  if (!saved) return res.status(500).json({ success: false, message: "Could not save the configuration. Check the config volume permissions." });
+  if (claiming) issueSession(req, res, { id: `moka:${session.me.id}`, username: session.me.username, method: "moka" });
+  logger.info(`Moka: connected to ${base}; requests now go to Moka`);
+  await getDiscordLinks({ fresh: true });
+  await applyMokaChange();
+  res.json({ success: true, signedIn: claiming, announcesFrom: announcesFromMoka() ? "moka" : "jellyfin" });
+});
+
+router.delete("/moka/connect", authenticateToken, async (req, res) => {
+  // empty values, not removed keys: MOKA_URL in the environment must not reconnect it
+  if (!updateConfig({ MOKA_URL: "", MOKA_API_KEY: "", MOKA_GUEST_USER_ID: "", MOKA_PUBLIC_URL: "" })) {
+    return res.status(500).json({ success: false, message: "Could not save the configuration. Check the config volume permissions." });
+  }
+  logger.info("Moka: disconnected; requests go to Seerr again");
+  await applyMokaChange();
+  res.json({ success: true });
+});
+
+/** The /request options and where new titles come from change with Moka: restart the bot. */
+async function applyMokaChange() {
+  if (!botState.isBotRunning) return;
+  try {
+    await restartBot();
+  } catch (err) {
+    logger.error(`Moka: the bot did not restart: ${err.message}`);
+    startJellyfinFeed();
+  }
+}
 
 export default router;

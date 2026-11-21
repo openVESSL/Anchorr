@@ -1,5 +1,6 @@
-// Moka mode: Moka pairs with Anchorr, the bot requests in Moka as the Discord member's
-// Moka user, and Moka's "available" events become the usual announcements and DMs.
+// Moka as a connection: connected from the dashboard (or by Moka itself when MOKA_URL names
+// it), the bot requests in Moka as the Discord member's Moka user, and Moka's "available"
+// events become the usual announcements and DMs when Jellyfin is not linked.
 import assert from "node:assert/strict";
 import test, { after, before, mock } from "node:test";
 
@@ -14,7 +15,8 @@ const MANAGE_REQUESTS = 2;
 
 let moka;
 let discordApi;
-let app;
+let app; // no MOKA_URL: connected from the dashboard
+let envApp; // MOKA_URL set: Moka may set it up from its side
 
 before(async () => {
   moka = await startFakeServer({
@@ -23,7 +25,14 @@ before(async () => {
       if (headers.authorization === "Bearer person-key") return { id: 6, username: "ana", permissions: 4 };
       return { status: 401, json: { message: "not signed in" } };
     },
+    "GET /api/v1/health": () => ({ json: { status: "ok", version: "0.1.0" } }),
     "GET /api/v1/anchorr/links": () => [{ user_id: 7, username: "ana", discord_id: "111111111111111111" }],
+    "POST /api/v1/anchorr/connect": ({ headers }) =>
+      headers.cookie === "moka_session=admin" ? { api_key: KEY, guest_user_id: 3, public_url: "https://moka.example.com" } : { status: 403, json: {} },
+    "GET /api/v1/requests": () => [
+      { id: 1, kind: "movie", tmdb_id: 603, title: "The Matrix", status: "pending", title_state: "requested", requested_by: "ana", created_at: 1 },
+      { id: 2, kind: "movie", tmdb_id: 604, title: "The Matrix Reloaded", status: "approved", title_state: "downloading", requested_by: "Ana", created_at: 2 },
+    ],
     "POST /api/v1/requests": ({ headers }) => ({ json: { id: 1, title_id: 9, status: "pending", requested_by: headers["x-moka-user"] } }),
     "GET /api/v1/catalog/search": () => ({ results: [{ tmdb_id: 603, title: "The Matrix", year: 1999, vote_average: 8.2 }] }),
     "GET /api/v1/catalog/shows/search": () => ({ results: [{ tmdb_id: 1399, title: "Thrones", year: 2011, vote_average: 8.4 }] }),
@@ -34,7 +43,7 @@ before(async () => {
     }),
     "POST /api/v1/auth/login": ({ body }) =>
       body.password === "right"
-        ? { json: { id: 1, username: body.username, permissions: body.username === "admin" ? 1 : 4 }, headers: { "set-cookie": "moka_session=s1; Path=/; HttpOnly" } }
+        ? { json: { id: 1, username: body.username, permissions: body.username === "admin" ? 1 : 4 }, headers: { "set-cookie": `moka_session=${body.username}; Path=/; HttpOnly` } }
         : { status: 401, json: { message: "wrong credentials" } },
     "POST /api/v1/auth/logout": () => ({}),
   });
@@ -43,65 +52,90 @@ before(async () => {
     "GET /applications/@me": () => ({ flags: 1 << 15 }),
     "GET /users/@me/guilds": () => [{ id: "g1", name: "Home" }],
   });
-  app = await startApp({ MOKA_URL: moka.url, DISCORD_API_URL: discordApi.url });
+  app = await startApp({ DISCORD_API_URL: discordApi.url });
+  envApp = await startApp({ MOKA_URL: moka.url, DISCORD_API_URL: discordApi.url });
 });
 after(async () => {
   app?.stop();
+  envApp?.stop();
   await moka?.close();
   await discordApi?.close();
 });
 
 const call = (method, url, body, headers = {}) => app.call(method, url, body, { auth: false, headers });
+const envCall = (method, url, body, headers = {}) => envApp.call(method, url, body, { auth: false, headers });
 const asMoka = { authorization: `Bearer ${KEY}` };
 
-// ----- pairing (Anchorr in a child process, tests in order) -----
+// ----- connecting from the dashboard (tests in order) -----
 
-test("before Moka pairs: setup waits for Moka and the Jellyfin and Seerr steps are closed", async () => {
+test("a fresh Anchorr is the same program: the usual setup, and Moka cannot set it up from its side", async () => {
   const state = (await call("GET", "/api/setup/state")).json;
-  assert.equal(state.mokaMode, true);
-  assert.equal(state.moka, false);
   assert.equal(state.needsSetup, true);
-  assert.equal((await call("POST", "/api/setup/jellyfin", { url: "http://jf.example.com", apiKey: "x" })).status, 404, "nobody claims the install through Jellyfin");
-  assert.equal((await call("POST", "/api/auth/jellyfin", { username: "admin", password: "right" })).status, 400, "no Moka sign-in before pairing");
+  assert.equal("moka" in state, false);
+  assert.equal((await call("POST", "/api/moka/pair", { api_key: KEY, discord_token: "good-token" })).status, 404);
 });
 
-test("pairing needs a key that works at MOKA_URL and acts for others", async () => {
+test("connecting Moka takes a Moka administrator, and claims a fresh install", async () => {
+  const body = { url: `${moka.url}/`, publicUrl: "", username: "admin", password: "wrong" };
+  assert.equal((await call("POST", "/api/moka/connect", body)).status, 401);
+  assert.equal((await call("POST", "/api/moka/connect", { ...body, username: "ana", password: "right" })).status, 403);
+  const ok = await call("POST", "/api/moka/connect", { ...body, password: "right" });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.signedIn, true);
+  assert.equal(ok.json.announcesFrom, "moka", "without Jellyfin, new titles come from Moka");
+  app.cookie = ok.token;
+
+  const state = (await call("GET", "/api/setup/state")).json;
+  assert.deepEqual([state.moka, state.needsSetup], [true, false]);
+  const config = (await app.call("GET", "/api/config")).json;
+  assert.equal("MOKA_API_KEY" in config, false, "Moka's key never reaches the dashboard");
+  assert.equal(config.MOKA_PUBLIC_URL, "https://moka.example.com");
+  assert.deepEqual((await app.call("GET", "/api/moka")).json, {
+    connected: true, url: moka.url, publicUrl: "https://moka.example.com", announcesFrom: "moka",
+  });
+  const counts = (await app.call("GET", "/api/overview")).json.requestCounts;
+  assert.deepEqual([counts.total, counts.pending, counts.processing], [2, 1, 1], "the Overview counts Moka's requests");
+});
+
+test("the dashboard also signs in Moka administrators once Moka is connected", async () => {
+  assert.equal((await call("GET", "/api/auth/check")).json.mokaLogin, true);
+  assert.equal((await call("POST", "/api/auth/moka", { username: "admin", password: "wrong" })).status, 401);
+  assert.equal((await call("POST", "/api/auth/moka", { username: "ana", password: "right" })).status, 403);
+  assert.equal((await call("POST", "/api/auth/moka", { username: "admin", password: "right" })).status, 200);
+});
+
+test("disconnecting Moka sends requests back to Seerr", async () => {
+  assert.equal((await app.call("DELETE", "/api/moka/connect")).status, 200);
+  assert.equal((await app.call("GET", "/api/moka")).json.connected, false);
+  assert.equal("moka" in (await call("GET", "/api/setup/state")).json, false);
+});
+
+// ----- Moka setting Anchorr up from its side (MOKA_URL set) -----
+
+test("Moka's pairing needs a key that works at MOKA_URL and acts for others", async () => {
   const body = { api_key: "stolen", guest_user_id: 3, discord_token: "good-token" };
-  assert.equal((await call("POST", "/api/moka/pair", body)).status, 401);
-  assert.equal((await call("POST", "/api/moka/pair", { ...body, api_key: "person-key" })).status, 403, "a person's key cannot pair");
-  assert.equal((await call("POST", "/api/moka/pair", { ...body, api_key: KEY, discord_token: "bad-token" })).status, 400);
+  assert.equal((await envCall("POST", "/api/moka/pair", body)).status, 401);
+  assert.equal((await envCall("POST", "/api/moka/pair", { ...body, api_key: "person-key" })).status, 403, "a person's key cannot pair");
+  assert.equal((await envCall("POST", "/api/moka/pair", { ...body, api_key: KEY, discord_token: "bad-token" })).status, 400);
 });
 
-test("pairing saves the key and token, picks the only Discord server, and reports the bot", async () => {
-  const res = await call("POST", "/api/moka/pair", { api_key: KEY, guest_user_id: 3, discord_token: "good-token", public_url: "https://moka.example.com/" });
+test("Moka's pairing saves the key and token, picks the only Discord server, and reports the bot", async () => {
+  const res = await envCall("POST", "/api/moka/pair", { api_key: KEY, guest_user_id: 3, discord_token: "good-token", public_url: "https://moka.example.com/" });
   assert.equal(res.status, 200);
   assert.equal(res.json.bot_name, "Popcorn");
   assert.equal(res.json.guild_id, "g1");
   assert.deepEqual(res.json.guilds, [{ id: "g1", name: "Home" }]);
   assert.match(res.json.invite_url, /client_id=bot-1/);
-
-  const state = (await call("GET", "/api/setup/state")).json;
-  assert.deepEqual([state.moka, state.needsSetup], [true, false]);
-  assert.equal((await call("GET", "/api/moka/status")).status, 401, "status needs Moka's key");
-  assert.equal((await call("GET", "/api/moka/status", undefined, asMoka)).json.bot_name, "Popcorn");
-  assert.equal((await call("POST", "/api/moka/events", { event: "available" })).status, 401, "events need Moka's key");
-  assert.equal((await call("POST", "/api/moka/events", { event: "available" }, asMoka)).status, 200);
-});
-
-test("the dashboard signs in Moka administrators only, and never shows Moka's key", async () => {
-  assert.equal((await call("POST", "/api/auth/jellyfin", { username: "admin", password: "wrong" })).status, 401);
-  assert.equal((await call("POST", "/api/auth/jellyfin", { username: "ana", password: "right" })).status, 403);
-  const ok = await call("POST", "/api/auth/jellyfin", { username: "admin", password: "right" });
-  assert.equal(ok.status, 200);
-  const config = (await app.call("GET", "/api/config", undefined, { headers: { cookie: ok.token } })).json;
-  assert.equal("MOKA_API_KEY" in config, false);
-  assert.equal(config.MOKA_PUBLIC_URL, "https://moka.example.com");
+  assert.equal((await envCall("GET", "/api/setup/state")).json.moka, true);
+  assert.equal((await envCall("GET", "/api/moka/status")).status, 401, "status needs Moka's key");
+  assert.equal((await envCall("GET", "/api/moka/status", undefined, asMoka)).json.bot_name, "Popcorn");
+  assert.equal((await envCall("POST", "/api/moka/events", { event: "available" })).status, 401, "events need Moka's key");
+  assert.equal((await envCall("POST", "/api/moka/events", { event: "available" }, asMoka)).status, 200);
 });
 
 test("turning the bot off in Moka forgets the key", async () => {
-  assert.equal((await call("DELETE", "/api/moka/pair", undefined, asMoka)).status, 200);
-  assert.equal((await call("GET", "/api/moka/status", undefined, asMoka)).status, 401);
-  assert.equal((await call("GET", "/api/setup/state")).json.moka, false);
+  assert.equal((await envCall("DELETE", "/api/moka/pair", undefined, asMoka)).status, 200);
+  assert.equal((await envCall("GET", "/api/moka/status", undefined, asMoka)).status, 401);
 });
 
 // ----- the bot's calls to Moka (in this process) -----
@@ -173,4 +207,26 @@ test("a Moka event becomes the usual announcement, with the requester mentioned 
     ["Episode", "Thrones", 1, 1, "1399"],
     ["Episode", "Thrones", 1, 2, "1399"],
   ]);
+});
+
+test("with Jellyfin linked too, Jellyfin announces and Moka's requesters still get their message", async (t) => {
+  mock.timers.enable({ apis: ["setInterval"] });
+  t.after(() => mock.timers.reset());
+  t.after(
+    applyConfig({
+      MOKA_URL: moka.url, MOKA_API_KEY: KEY, LANGUAGE: "en", JELLYFIN_CHANNEL_ID: "chan-default",
+      JELLYFIN_BASE_URL: "https://jf.example.com", JELLYFIN_API_KEY: "jf-key",
+      NOTIFY_ON_AVAILABLE: "true", NOTIFY_TAG_REQUESTERS: "false",
+    })
+  );
+  const { announcesFromMoka, getDiscordLinks } = await import("../api/moka.js");
+  const { handleJellyfinItem } = await import("../jellyfin/itemHandler.js");
+  assert.equal(announcesFromMoka(), false);
+  await getDiscordLinks({ fresh: true });
+  const discord = createFakeDiscord();
+  const item = { ItemType: "Movie", ItemId: "jf-604", ServerId: "srv", Name: "The Matrix Reloaded", Year: 2003, Provider_tmdb: "604", LibraryId: "lib1" };
+  await handleJellyfinItem(item, discord.client, new Map(), () => {});
+  assert.equal(discord.sent.length, 1);
+  assert.match(discord.sent[0].embeds[0].url, /^https:\/\/jf\.example\.com\/web\/index\.html/, "Jellyfin's watch link");
+  assert.deepEqual(discord.dms.map((d) => d.userId), ["111111111111111111"], "ana requested it in Moka (names match in any case)");
 });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { authenticateToken, checkAuth, login, loginWithJellyfin, logout, register } from "../utils/auth.js";
+import { authenticateToken, checkAuth, login, loginWithJellyfin, loginWithMoka, logout, register } from "../utils/auth.js";
 
 const router = Router();
 
@@ -20,6 +20,7 @@ const checkLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHe
 
 router.post("/auth/login", signInLimiter, login);
 router.post("/auth/jellyfin", signInLimiter, loginWithJellyfin);
+router.post("/auth/moka", signInLimiter, loginWithMoka);
 // The single local account is added from a signed-in session (audit S4)
 router.post("/auth/register", signInLimiter, authenticateToken, register);
 router.post("/auth/logout", logout);

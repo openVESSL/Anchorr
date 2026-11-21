@@ -14,7 +14,7 @@ const KINDS = [
 export function RequestsPage() {
   const { t } = useT()
   // With Moka, approval and quality are set per user and profile in Moka
-  const moka = Boolean(useSetupState().data?.mokaMode)
+  const moka = Boolean(useSetupState().data?.moka)
   const form = useSettingsForm({
     SEERR_AUTO_APPROVE: "false",
     PRIVATE_MESSAGE_MODE: "false",

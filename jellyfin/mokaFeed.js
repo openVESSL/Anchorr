@@ -1,8 +1,8 @@
 /**
- * New films and episodes from Moka. Moka posts an event when titles arrive; each one is
- * turned into the same payload the Jellyfin feed produces and goes through the same
- * handler, so dedup, episode batching and channel routing are shared. After the bot was
- * offline, the events since then are read back from Moka.
+ * New films and episodes from Moka, when Jellyfin is not linked. Anchorr asks Moka every
+ * minute for what arrived since the last check (and Moka may also post each event right
+ * away when it set Anchorr up itself). Each one becomes the same payload the Jellyfin feed
+ * produces and goes through the same handler, so dedup, batching and routing are shared.
  */
 import { moka } from "../api/moka.js";
 import { botState, pendingRequests, savePendingRequests } from "../bot/botState.js";
@@ -13,6 +13,8 @@ import { handleJellyfinItem } from "./itemHandler.js";
 
 const NEVER_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const CURSOR_KEY = "since";
+
+const POLL_INTERVAL_MS = Number(process.env.JELLYFIN_POLLING_INTERVAL) || 60_000;
 
 const state = new PersistentMap("moka-feed", NEVER_TTL_MS);
 
@@ -97,4 +99,24 @@ export async function catchUpFromMoka() {
   } catch (err) {
     logger.warn(`Moka: could not read what arrived while the bot was offline: ${err.message}`);
   }
+}
+
+let polling = false;
+
+/** Checks Moka now and every minute; `stop()` ends it. */
+export function startMokaFeed() {
+  const poll = async () => {
+    if (polling) return;
+    polling = true;
+    try {
+      await catchUpFromMoka();
+    } finally {
+      polling = false;
+    }
+  };
+  poll();
+  const timer = setInterval(poll, POLL_INTERVAL_MS);
+  timer.unref?.();
+  logger.info(`📡 Watching Moka for new titles (checked every ${Math.round(POLL_INTERVAL_MS / 1000)} s)`);
+  return { stop: () => clearInterval(timer), ws: null };
 }

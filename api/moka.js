@@ -1,31 +1,38 @@
 /**
- * Moka as the backend: one server for the catalog, requests and the library, in place of
- * Jellyfin and Seerr. MOKA_URL in the environment turns it on; Moka then hands Anchorr
- * its API key, the guest account and the bot token (routes/mokaRoutes.js).
+ * Moka as a connection, next to Jellyfin, Seerr and Discord. Once connected (from the
+ * Moka page of the dashboard, or by Moka itself when MOKA_URL is in the environment), the
+ * catalog and requests go through Moka instead of Seerr. New titles are announced from
+ * Jellyfin when it is linked (people watch there), otherwise from Moka.
  *
  * Catalog results come back in the snake_case TMDB shape the embeds already read, so the
- * bot code does not care which backend answered.
+ * bot code does not care which server answered.
  */
 import http from "../utils/http.js";
 import logger from "../utils/logger.js";
 import { TIMEOUTS } from "../lib/constants.js";
 import { settings } from "../utils/settings.js";
 
-export const isMokaMode = () => Boolean(process.env.MOKA_URL);
-export const mokaUrl = () => String(process.env.MOKA_URL || "").replace(/\/+$/, "");
-/** Moka has handed over its key: the bot can work. */
-export const isMokaPaired = () => isMokaMode() && Boolean(settings.MOKA_API_KEY);
+const trimUrl = (url) => String(url || "").replace(/\/+$/, "");
+/** Moka's address as Anchorr reaches it (saved when connecting; MOKA_URL in the environment otherwise). */
+export const mokaUrl = () => trimUrl(settings.MOKA_URL);
+/** Moka is connected: the catalog and requests go through it. */
+export const isMokaMode = () => Boolean(mokaUrl() && settings.MOKA_API_KEY);
+export const jellyfinLinked = () => Boolean(settings.JELLYFIN_BASE_URL && settings.JELLYFIN_API_KEY);
+/** New titles come from Moka only without Jellyfin: with it, Jellyfin's watch links win. */
+export const announcesFromMoka = () => isMokaMode() && !jellyfinLinked();
+/** The Moka allowed to set Anchorr up from its side: only one named in the environment. */
+export const envMokaUrl = () => trimUrl(process.env.MOKA_URL);
 
 /** Moka's `act as user` permission bit. */
 export const ACT_AS_USER = 64;
 
 /** One call to Moka's API with the bot's key, optionally acting for a Moka user. */
-export async function moka(method, path, { key = settings.MOKA_API_KEY, asUser = null, params, data } = {}) {
+export async function moka(method, path, { key = settings.MOKA_API_KEY, asUser = null, params, data, base = mokaUrl() } = {}) {
   const headers = { Authorization: `Bearer ${key}` };
   if (asUser !== null && asUser !== undefined) headers["X-Moka-User"] = String(asUser);
   const res = await http.request({
     method,
-    url: `${mokaUrl()}/api/v1${path}`,
+    url: `${base}/api/v1${path}`,
     params,
     data,
     headers,
@@ -149,4 +156,35 @@ export async function requestAs({ tmdbId, mediaType, seasons = [], discordUserId
 export async function mediaStatus(tmdbId, mediaType) {
   const details = await getDetails(tmdbId, mediaType);
   return { exists: true, available: details.local?.state === "available" };
+}
+
+// ----- signing in to Moka (connecting, dashboard sign-in) -----
+
+/**
+ * Signs in to Moka and returns the account and the session cookie. The caller ends the
+ * session with `mokaSignOut`; the password is never kept.
+ */
+export async function mokaSignIn(base, username, password) {
+  const res = await http.post(`${base}/api/v1/auth/login`, { username, password }, { timeout: TIMEOUTS.SEERR_API });
+  const cookie = res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+  return { me: res.data, cookie };
+}
+
+export async function mokaSignOut(base, cookie) {
+  if (!cookie) return;
+  await http.post(`${base}/api/v1/auth/logout`, undefined, { headers: { Cookie: cookie }, timeout: TIMEOUTS.SEERR_API }).catch(() => {});
+}
+
+export const MOKA_ADMIN = 1;
+
+// ----- requesters, when Jellyfin announces and Moka took the requests -----
+
+/** Linked members with an open Moka request for this film or show (by TMDB id). */
+export async function requestersFor(tmdbId, mediaType) {
+  const kind = mediaType === "movie" ? "movie" : "show";
+  const [requests, people] = await Promise.all([moka("GET", "/requests"), getDiscordLinks()]);
+  const discordByName = new Map(people.map((p) => [String(p.seerrDisplayName).toLowerCase(), p.discordUserId]));
+  return requests
+    .filter((r) => r.kind === kind && String(r.tmdb_id) === String(tmdbId) && (r.status === "pending" || r.status === "approved"))
+    .map((r) => ({ key: `moka:${kind}:${tmdbId}:${String(r.requested_by).toLowerCase()}`, discordUserId: discordByName.get(String(r.requested_by).toLowerCase()) }));
 }
