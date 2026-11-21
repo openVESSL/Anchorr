@@ -175,7 +175,7 @@ You can paste API keys instead of signing in at the Jellyfin and Seerr steps if 
 
 - While Moka is connected, search, requests (season by season for shows), `/trending` and the daily pick go through Moka, and Seerr is not used. Disconnect Moka, or turn it off again, to go back to Seerr.
 - New titles are announced from Jellyfin when it is linked, with its watch links. Without Jellyfin, Moka announces them.
-- Members link their Discord account by their Discord ID under **Users** in Moka and then request in their own name, with their own limits. Everyone else requests through Moka's guest account.
+- Members link their Discord account by their Discord ID and then request in their own name. Everyone else requests through Moka's guest account. While Moka is connected, Anchorr's **Users** page shows Moka's people: their Discord ID, whether they may request (and get auto-approved) films and shows, their own limits and whether the bot messages them, all saved in Moka.
 
 ## Commands
 
