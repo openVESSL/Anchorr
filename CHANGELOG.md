@@ -100,6 +100,7 @@ The previous dashboard is still available at `/legacy` during the 2.0 series.
 - The public health check no longer reveals the version or bot name.
 - The Jellyfin API key is sent in a header instead of the WebSocket URL.
 - The dashboard loads nothing from other origins and allows no inline scripts.
+- Docker images built from a working copy no longer pick up local files such as `logs/`, `config/` or `.env`, and the dashboard and dependencies are always the ones built inside the image.
 - In the Docker image the application files are read-only for the app user; the config directory is created with private permissions on native installs.
 
 ### Removed
