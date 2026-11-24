@@ -35,7 +35,7 @@ export function scheduleDailyRandomPick(client) {
 
   if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > MAX_INTERVAL_MINUTES) {
     logger.warn(
-      `Daily Random Pick interval must be a whole number of minutes between 1 and ${MAX_INTERVAL_MINUTES}, got "${settings.DAILY_RANDOM_PICK_INTERVAL}". Skipping.`
+      `Daily Random Pick interval must be a whole number of minutes between 1 and ${MAX_INTERVAL_MINUTES}, got ${JSON.stringify(settings.DAILY_RANDOM_PICK_INTERVAL)}. Skipping.`
     );
     return;
   }

@@ -94,7 +94,7 @@ test("an interval a timer cannot hold is refused instead of firing every millise
   const timers = t.mock.method(globalThis, "setInterval");
   const warnings = t.mock.method(logger, "warn", () => {});
 
-  // about a month, not a number, and zero
+  // about a month, not a number, zero, exponent notation and a fraction
   for (const interval of ["43200", "abc", "0", "1e3", "1.5"]) {
     configure(t, { DAILY_RANDOM_PICK_ENABLED: "true", DAILY_RANDOM_PICK_INTERVAL: interval });
     scheduleDailyRandomPick(discord.client);

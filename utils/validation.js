@@ -93,11 +93,12 @@ export const configSchema = Joi.object({
   DAILY_RANDOM_PICK_CHANNEL_ID: Joi.string().allow("").optional(),
   DAILY_RANDOM_PICK_INTERVAL: Joi.any()
     .custom((value, helpers) => {
-      if (value === "") return value;
-      const minutes = dailyPickIntervalMinutes(value);
+      // "" and null mean "not set": the scheduler then uses its default
+      if (value === "" || value === null) return value;
+      const minutes = typeof value === "string" || typeof value === "number" ? dailyPickIntervalMinutes(value) : NaN;
       return minutes >= 1 && minutes <= DAILY_PICK_MAX_INTERVAL_MINUTES
         ? value
-        : helpers.message(`must be a whole number of minutes between 1 and ${DAILY_PICK_MAX_INTERVAL_MINUTES}`);
+        : helpers.message(`{{#label}} must be a whole number of minutes between 1 and ${DAILY_PICK_MAX_INTERVAL_MINUTES}`);
     })
     .optional(),
   ...Object.fromEntries(
