@@ -151,6 +151,12 @@ test("invalid values are rejected per field (contract used by inline dashboard e
   assert.ok(Array.isArray(res.json.errors));
   assert.equal(res.json.errors[0].field, "SEERR_URL");
   assert.equal(typeof res.json.errors[0].message, "string");
+
+
+  const pick = await api("POST", "/api/save-config", { DAILY_RANDOM_PICK_INTERVAL: "43200" });
+  assert.equal(pick.status, 400);
+  assert.equal(pick.json.errors[0].field, "DAILY_RANDOM_PICK_INTERVAL");
+
 });
 
 test("the old Jellyfin Webhook plugin is acknowledged, ignored and reported to the dashboard", async () => {
