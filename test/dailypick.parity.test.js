@@ -9,7 +9,6 @@ import { startFakeServer } from "./helpers/http.js";
 
 const { scheduleDailyRandomPick, sendDailyRandomPick } = await import("../bot/dailyPick.js");
 const { default: logger } = await import("../utils/logger.js");
-
 const { default: cache } = await import("../utils/cache.js");
 
 let trending = [];
@@ -96,13 +95,24 @@ test("an interval a timer cannot hold is refused instead of firing every millise
   const warnings = t.mock.method(logger, "warn", () => {});
 
   // about a month, not a number, and zero
-  for (const interval of ["43200", "abc", "0"]) {
+  for (const interval of ["43200", "abc", "0", "1e3", "1.5"]) {
     configure(t, { DAILY_RANDOM_PICK_ENABLED: "true", DAILY_RANDOM_PICK_INTERVAL: interval });
     scheduleDailyRandomPick(discord.client);
   }
 
   assert.equal(timers.mock.callCount(), 0, "no timer is started");
-  assert.equal(warnings.mock.calls.filter((c) => /between 1 and/.test(c.arguments[0])).length, 3);
+  assert.equal(warnings.mock.calls.filter((c) => /between 1 and/.test(c.arguments[0])).length, 5);
   assert.equal(discord.sent.length, 0, "nothing is posted");
 });
 
+test("the longest allowed interval still schedules the pick", (t) => {
+  const discord = createFakeDiscord();
+  const timers = t.mock.method(globalThis, "setInterval", () => 1);
+  t.mock.method(globalThis, "clearInterval", () => {});
+
+  configure(t, { DAILY_RANDOM_PICK_ENABLED: "true", DAILY_RANDOM_PICK_INTERVAL: "35790" });
+  scheduleDailyRandomPick(discord.client);
+
+  assert.equal(timers.mock.callCount(), 1);
+  assert.equal(timers.mock.calls[0].arguments[1], 35790 * 60000);
+});

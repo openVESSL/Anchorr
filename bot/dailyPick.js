@@ -10,10 +10,7 @@ import { isValidUrl } from "../utils/url.js";
 import { t } from "../utils/i18n.js";
 import logger from "../utils/logger.js";
 import { settings } from "../utils/settings.js";
-import { DAILY_PICK_MAX_INTERVAL_MINUTES as MAX_INTERVAL_MINUTES } from "../utils/validation.js";
-
-
-
+import { DAILY_PICK_MAX_INTERVAL_MINUTES as MAX_INTERVAL_MINUTES, dailyPickIntervalMinutes } from "../utils/validation.js";
 
 let dailyRandomPickTimer = null;
 
@@ -29,7 +26,7 @@ export function scheduleDailyRandomPick(client) {
   if (!enabled) return;
 
   const channelId = settings.DAILY_RANDOM_PICK_CHANNEL_ID;
-  const intervalMinutes = parseInt(settings.DAILY_RANDOM_PICK_INTERVAL || "1440");
+  const intervalMinutes = dailyPickIntervalMinutes(settings.DAILY_RANDOM_PICK_INTERVAL || "1440");
 
   if (!channelId) {
     logger.warn("Daily Random Pick is enabled but no channel is configured. Skipping.");
