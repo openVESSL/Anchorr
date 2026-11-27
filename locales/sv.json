@@ -446,7 +446,8 @@
     "available_author": "✅ Din förfrågan är nu tillgänglig!",
     "available_description": "{title} finns nu på Jellyfin!",
     "available_fallback_title": "Innehållet du bad om",
-    "requested_by": "Efterfrågad av {users}"
+    "requested_by": "Efterfrågad av {users}",
+    "more_items": "…och {count} till"
   },
   "embeds": {
     "movie_found": "🎬 Film hittad:",

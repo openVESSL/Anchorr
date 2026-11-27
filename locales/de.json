@@ -520,7 +520,8 @@
     "available_author": "✅ Deine Anfrage ist jetzt verfügbar!",
     "available_description": "{title} ist jetzt auf Jellyfin verfügbar!",
     "available_fallback_title": "Dein angefragter Inhalt",
-    "requested_by": "Angefragt von {users}"
+    "requested_by": "Angefragt von {users}",
+    "more_items": "…und {count} weitere"
   },
   "embeds": {
     "movie_found": "🎬 Film gefunden:",
