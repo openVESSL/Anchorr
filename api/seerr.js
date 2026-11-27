@@ -475,8 +475,10 @@ function seerrCall(method, seerrUrl, apiKey, path, data) {
 export async function ensureGuestUser({ seerrUrl, apiKey, guestUserId = null, autoApprove = false }) {
   if (guestUserId) {
     try {
-      await seerrCall("get", seerrUrl, apiKey, `/user/${parseInt(guestUserId, 10)}`);
-      return Number(guestUserId);
+      const { data: user } = await seerrCall("get", seerrUrl, apiKey, `/user/${parseInt(guestUserId, 10)}`);
+      // After a Seerr reinstall the saved id can belong to a real person
+      if (user?.email === GUEST_EMAIL) return Number(guestUserId);
+      logger.warn(`[SEERR] Seerr user ${guestUserId} is not the guest account (Seerr was reset?), looking for the guest again`);
     } catch (err) {
       if (err?.response?.status !== 404) throw err;
       logger.warn(`[SEERR] Guest user ${guestUserId} no longer exists in Seerr, creating a new one`);
@@ -508,6 +510,7 @@ export async function ensureGuestUser({ seerrUrl, apiKey, guestUserId = null, au
 export async function setGuestAutoApprove({ seerrUrl, apiKey, guestUserId, autoApprove }) {
   const id = parseInt(guestUserId, 10);
   const { data: user } = await seerrCall("get", seerrUrl, apiKey, `/user/${id}`);
+  if (user?.email !== GUEST_EMAIL) throw new Error(`Seerr user ${id} is not the guest account, its permissions were left alone`);
   const current = Number(user.permissions) || 0;
   const next = autoApprove ? current | PERMISSION_AUTO_APPROVE : current & ~PERMISSION_AUTO_APPROVE;
   if (next !== current) await seerrCall("put", seerrUrl, apiKey, `/user/${id}`, { permissions: next });

@@ -149,6 +149,20 @@ test("guest: an existing id is kept, a deleted one is replaced, a leftover accou
   assert.equal(await ensureGuestUser({ seerrUrl: server.url, apiKey: "k", guestUserId: "101" }), 100);
 });
 
+test("guest: a saved id that now belongs to a real person is never used", async (t) => {
+  // Seerr was reinstalled: id 100 is a person, the old guest account is gone
+  const users = [{ id: 100, email: "alice@example.com", permissions: 2 }];
+  const server = await fakeUsers(users);
+  t.after(() => server.close());
+
+  assert.equal(await ensureGuestUser({ seerrUrl: server.url, apiKey: "k", guestUserId: "100" }), 101, "a new guest is created");
+  assert.equal(users[1].email, "discord@anchorr.invalid");
+
+  await assert.rejects(setGuestAutoApprove({ seerrUrl: server.url, apiKey: "k", guestUserId: 100, autoApprove: true }), /not the guest account/);
+  assert.equal(users[0].permissions, 2, "the person's permissions are left alone");
+  assert.equal(server.requests.filter((r) => r.method === "PUT").length, 0);
+});
+
 test("guest: the auto-approve switch flips only that permission bit", async (t) => {
   const users = [{ id: 100, email: "discord@anchorr.invalid", permissions: 32 | 1024 }]; // REQUEST + REQUEST_4K
   const server = await fakeUsers(users);

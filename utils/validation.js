@@ -72,7 +72,7 @@ export const configSchema = Joi.object({
     .allow("")
     .optional(),
   // Seerr account used for Discord users without a mapping (created automatically)
-  SEERR_GUEST_USER_ID: Joi.alternatives(Joi.string().pattern(/^\d*$/), Joi.number().integer().min(1)).optional(),
+  SEERR_GUEST_USER_ID: Joi.alternatives(Joi.string().pattern(/^\d*$/).allow(""), Joi.number().integer().min(1)).optional(),
   // Written by the 1.x upgrade and the checklist's Done button
   UPGRADE_FROM_V1: Joi.object({
     at: Joi.string().isoDate().required(),

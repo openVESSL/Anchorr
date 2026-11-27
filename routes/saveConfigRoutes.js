@@ -11,6 +11,7 @@ import { authenticateToken } from "../utils/auth.js";
 import { CONFIG_PATH, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { SENSITIVE_FIELDS, isMaskedValue } from "../utils/configSanitize.js";
 import logger from "../utils/logger.js";
+import { normalizeSeerrUrl } from "../utils/seerrUrl.js";
 import { settings } from "../utils/settings.js";
 import { DASHBOARD_PROTECTED_KEYS, saveConfigSchema, validateBody } from "../utils/validation.js";
 
@@ -97,6 +98,12 @@ router.post(
           finalConfig[field] = existingConfig[field] || "";
         }
       }
+
+      // A guest id belongs to one Seerr; the next request looks the guest up again
+      const seerrChanged =
+        normalizeSeerrUrl(finalConfig.SEERR_URL || "") !== normalizeSeerrUrl(existingConfig.SEERR_URL || "") ||
+        (finalConfig.SEERR_API_KEY || "") !== (existingConfig.SEERR_API_KEY || "");
+      if (seerrChanged) finalConfig.SEERR_GUEST_USER_ID = "";
 
       // Use centralized writeConfig with robust error handling
       if (!writeConfig(finalConfig)) {

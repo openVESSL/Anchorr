@@ -117,6 +117,24 @@ test("Seerr checks never send the stored key to another server", async () => {
   await api("POST", "/api/save-config", { SEERR_API_KEY: "" });
 });
 
+test("a new Seerr address or key forgets the saved guest account", async () => {
+  const guest = async () => (await api("GET", "/api/config")).json.SEERR_GUEST_USER_ID;
+  await api("POST", "/api/save-config", { SEERR_URL: "http://seerr.example.com", SEERR_API_KEY: "seerr-secret-1234" });
+  await api("POST", "/api/save-config", { SEERR_GUEST_USER_ID: "77" });
+  await api("POST", "/api/save-config", { SEERR_URL: "http://seerr.example.com/api/v1/", SEERR_API_KEY: "••••••••1234", LANGUAGE: "en" });
+  assert.equal(await guest(), "77", "same Seerr, other spelling: kept");
+
+  await api("POST", "/api/save-config", { SEERR_URL: "http://other-seerr.example.com" });
+  assert.equal(await guest(), "", "other Seerr address: forgotten");
+
+  await api("POST", "/api/save-config", { SEERR_GUEST_USER_ID: "77" });
+  await api("POST", "/api/save-config", { SEERR_API_KEY: "seerr-secret-5678" });
+  assert.equal(await guest(), "", "other Seerr key: forgotten");
+  const backup = (await api("GET", "/api/config/backup")).json;
+  assert.equal((await api("POST", "/api/config/restore", backup)).status, 200, "a backup without a guest id still restores");
+  await api("POST", "/api/save-config", { SEERR_API_KEY: "" });
+});
+
 test("save keeps every dashboard field but drops unknown and protected keys (audit S5)", async () => {
   const res = await api("POST", "/api/save-config", {
     EMBED_COLOR_MOVIE: "#ff0000",
