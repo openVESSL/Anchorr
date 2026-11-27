@@ -186,6 +186,40 @@ test("guest: a request checks the saved id against Seerr first", async (t) => {
   assert.equal(await getGuestUserId(), 101, "the new guest is kept");
 });
 
+test("guest: a lookup still running for the old Seerr is not reused after a change, and does not save its id", async (t) => {
+  t.after(forgetSavedGuest);
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  const oldSeerr = await startFakeServer({
+    "GET /api/v1/user/100": async () => {
+      await held;
+      return { id: 100, email: "discord@anchorr.invalid" };
+    },
+  });
+  const newUsers = [{ id: 100, email: "alice@example.com", permissions: 2 }]; // id 100 is a person on the new Seerr
+  const newSeerr = await fakeUsers(newUsers);
+  t.after(() => Promise.all([oldSeerr.close(), newSeerr.close()]));
+  t.after(applyConfig({ SEERR_URL: oldSeerr.url, SEERR_API_KEY: "k", SEERR_GUEST_USER_ID: "100" }));
+
+  const oldLookup = getGuestUserId();
+  const restoreUrl = applyConfig({ SEERR_URL: newSeerr.url });
+  t.after(restoreUrl);
+  assert.equal(await getGuestUserId(), 101, "the new Seerr is asked, not the old lookup");
+
+  release();
+  assert.equal(await oldLookup, 100);
+  assert.equal(readConfig()?.SEERR_GUEST_USER_ID, "101", "the old Seerr's id is not saved");
+});
+
+test("guest: the check asks the Seerr the request goes to", async () => {
+  let asked;
+  await sendRequest({
+    seerrUrl: seerr.url, apiKey: "seerr-key", tmdbId: "1", mediaType: "movie", discordUserId: "d-stranger", userMappings: MAPPINGS,
+    guestUserId: async (target) => ((asked = target), 77),
+  });
+  assert.deepEqual(asked, { seerrUrl: seerr.url, apiKey: "seerr-key" });
+});
+
 test("guest: when Seerr fails the check, the member hears about Seerr, not about linking", async (t) => {
   const server = await startFakeServer({ "GET /api/v1/user/100": () => ({ status: 500, json: {} }) });
   t.after(() => server.close());

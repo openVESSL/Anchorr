@@ -388,7 +388,7 @@ function findMappedSeerrUserId(discordUserId, userMappings) {
  * Create a media request on behalf of a Discord user. It always runs as a Seerr user
  * (x-api-user): the mapped account, or the guest account for unmapped users, so Seerr
  * applies that user's permissions, quota and auto-approval. Never as the API key owner.
- * @param {number|string|Function} [params.guestUserId] guest account id, or an async resolver
+ * @param {number|string|Function} [params.guestUserId] guest account id, or an async resolver ({ seerrUrl, apiKey })
  * @throws {NoSeerrUserError} when the user is not mapped and there is no guest account
  */
 export async function sendRequest({
@@ -413,8 +413,8 @@ export async function sendRequest({
     logger.warn(`[SEERR] Ignoring the link of Discord user ${discordUserId}: "${mappedUserId}" is not a Seerr user id`);
     mappedUserId = null;
   }
-  // guestUserId may be a resolver, only called when the user has no mapping
-  const guest = mappedUserId === null && typeof guestUserId === "function" ? await guestUserId() : guestUserId;
+  // guestUserId may be a resolver, only called when the user has no mapping; it asks the Seerr this request goes to
+  const guest = mappedUserId === null && typeof guestUserId === "function" ? await guestUserId({ seerrUrl, apiKey }) : guestUserId;
   const seerrUserId = mappedUserId ?? (isSeerrUserId(guest) ? guest : null);
   if (seerrUserId === null) throw new NoSeerrUserError(discordUserId);
 
