@@ -43,6 +43,7 @@ router.post(
     const DAILY_PICK_KEYS = ["DAILY_RANDOM_PICK_ENABLED", "DAILY_RANDOM_PICK_CHANNEL_ID", "DAILY_RANDOM_PICK_INTERVAL"];
     const oldDailyPick = DAILY_PICK_KEYS.map((k) => settings[k]).join("|");
     const oldMoka = isMokaMode();
+    let seerrChanged = false;
 
     // Normalize SEERR_URL to remove /api/v1 suffix if present
     if (
@@ -100,8 +101,8 @@ router.post(
         }
       }
 
-      // A guest id belongs to one Seerr; the next request looks the guest up again
-      const seerrChanged =
+      // A guest id belongs to one Seerr; it is looked up again after saving
+      seerrChanged =
         normalizeSeerrUrl(finalConfig.SEERR_URL || "") !== normalizeSeerrUrl(existingConfig.SEERR_URL || "") ||
         (finalConfig.SEERR_API_KEY || "") !== (existingConfig.SEERR_API_KEY || "");
       if (seerrChanged) finalConfig.SEERR_GUEST_USER_ID = "";
@@ -126,6 +127,8 @@ router.post(
     }
 
     loadSettings(); // Reload config into the settings store
+    // Look the guest up on the new Seerr now, so the Seerr page shows it right away
+    if (seerrChanged && !isMokaMode()) prepareGuestUser();
 
     // With Moka, the switch sets Moka's guest account; linked people keep their own rights there
     if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE && isMokaMode() && settings.MOKA_GUEST_USER_ID) {

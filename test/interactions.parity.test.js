@@ -427,14 +427,14 @@ test("denied users get a private message; denied autocomplete returns nothing", 
 
 // ----- Discord users without a mapping (audit S1) -----
 
-test("unmapped user, guest account cannot be created: told to link, nothing requested as admin", async () => {
+test("unmapped user, guest account cannot be created: told Seerr failed, nothing requested as admin", async () => {
   guestCreationFails = true;
   const before = posts().length;
   const calls = await dispatch(createInteraction({ type: "command", commandName: "request", options: { title: "603|movie" }, userId: "user-2" }));
   guestCreationFails = false;
 
   assert.equal(posts().length, before);
-  assert.deepEqual(calls.at(-1), { method: "followUp", content: translate("seerr_request_errors.not_linked"), flags: 64 });
+  assert.deepEqual(calls.at(-1), { method: "followUp", content: translate("seerr_request_errors.server_error"), flags: 64 });
 });
 
 test("unmapped user requests through the guest account, which is created once and remembered", async () => {

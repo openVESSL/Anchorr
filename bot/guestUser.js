@@ -7,8 +7,8 @@ import { settings } from "../utils/settings.js";
 
 let pending = null;
 
-/** Makes sure the guest account exists and its id is saved. Never throws; null when unavailable. */
-export function prepareGuestUser() {
+/** Finds or creates the guest account and saves its id; throws when Seerr fails. */
+function resolveGuestUser() {
   // Moka creates its guest account and hands over the id when it pairs
   if (isMokaMode()) return Promise.resolve(settings.MOKA_GUEST_USER_ID ? Number(settings.MOKA_GUEST_USER_ID) : null);
   if (!settings.SEERR_URL || !settings.SEERR_API_KEY) return Promise.resolve(null);
@@ -25,11 +25,6 @@ export function prepareGuestUser() {
         updateConfig({ SEERR_GUEST_USER_ID: String(id) });
       }
       return Number(id);
-    } catch (err) {
-      logger.error(
-        `Could not prepare the Seerr guest account; Discord users without a linked account cannot request until it exists: ${err.message}`
-      );
-      return null;
     } finally {
       pending = null;
     }
@@ -37,7 +32,18 @@ export function prepareGuestUser() {
   return pending;
 }
 
+/** Makes sure the guest account exists and its id is saved. Never throws; null when unavailable. */
+export function prepareGuestUser() {
+  return resolveGuestUser().catch((err) => {
+    logger.error(
+      `Could not prepare the Seerr guest account; Discord users without a linked account cannot request until it exists: ${err.message}`
+    );
+    return null;
+  });
+}
+
 /** Guest id for a request, checked against Seerr each time: after a Seerr reset the saved id can be a real person. */
 export function getGuestUserId() {
-  return prepareGuestUser();
+  // Seerr errors reach the member as "Seerr unreachable", not as "not linked"
+  return resolveGuestUser();
 }
