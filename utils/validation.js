@@ -5,6 +5,15 @@
 
 import Joi from "joi";
 
+// setInterval cannot wait longer than 2^31 - 1 ms (about 24.8 days)
+export const DAILY_PICK_MAX_INTERVAL_MINUTES = Math.floor(2 ** 31 / 60000) - 1;
+
+/** The daily pick interval in whole minutes, or NaN when the value is not a plain number. */
+export function dailyPickIntervalMinutes(value) {
+  const text = String(value ?? "").trim();
+  return /^\d+$/.test(text) ? Number(text) : NaN;
+}
+
 // --- CONFIG VALIDATION ---
 export const configSchema = Joi.object({
   LANGUAGE: Joi.string().allow("").optional(), // Allow any language code from locales folder
@@ -82,7 +91,16 @@ export const configSchema = Joi.object({
   UPGRADE_DISMISSED_AT: Joi.string().isoDate().optional(),
   DAILY_RANDOM_PICK_ENABLED: Joi.string().valid("true", "false").optional(),
   DAILY_RANDOM_PICK_CHANNEL_ID: Joi.string().allow("").optional(),
-  DAILY_RANDOM_PICK_INTERVAL: Joi.alternatives(Joi.string().allow(""), Joi.number().integer().min(1)).optional(),
+  DAILY_RANDOM_PICK_INTERVAL: Joi.any()
+    .custom((value, helpers) => {
+      // "" and null mean "not set": the scheduler then uses its default
+      if (value === "" || value === null) return value;
+      const minutes = typeof value === "string" || typeof value === "number" ? dailyPickIntervalMinutes(value) : NaN;
+      return minutes >= 1 && minutes <= DAILY_PICK_MAX_INTERVAL_MINUTES
+        ? value
+        : helpers.message(`{{#label}} must be a whole number of minutes between 1 and ${DAILY_PICK_MAX_INTERVAL_MINUTES}`);
+    })
+    .optional(),
   ...Object.fromEntries(
     ["MOVIE", "TV", "ANIME", "ANIME_MOVIE"].flatMap((kind) => [
       [`DEFAULT_QUALITY_PROFILE_${kind}`, Joi.string().allow("").optional()],

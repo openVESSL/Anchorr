@@ -86,6 +86,14 @@ test("dashboard sees masked secrets and never the internal secrets or password h
   assert.deepEqual(client.USERS, [{ id: 1, username: "admin" }]);
 });
 
+test("daily pick interval: whole minutes from 1 to 35790, or unset; the error names the field", () => {
+  const error = (value) => configSchema.validate({ DAILY_RANDOM_PICK_INTERVAL: value }).error;
+  for (const ok of ["", null, "1", "1440", " 60 ", "35790", 1440]) assert.equal(error(ok), undefined, JSON.stringify(ok));
+  for (const bad of ["0", "35791", "1e3", "1.5", "abc", 43200, 1.5, true, ["60"], {}]) {
+    assert.match(error(bad)?.message ?? "", /"DAILY_RANDOM_PICK_INTERVAL" must be a whole number of minutes between 1 and 35790/, JSON.stringify(bad));
+  }
+});
+
 test("schema accepts both library formats and rejects a malformed URL", () => {
   const ok = (value) => !configSchema.validate(value, { allowUnknown: true }).error;
   assert.equal(ok({ JELLYFIN_NOTIFICATION_LIBRARIES: { lib: { channel: "c", isAnime: true } } }), true);
