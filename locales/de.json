@@ -515,6 +515,7 @@
     "episodes_added": "Hinzugefügte Folgen",
     "too_many_seasons": "{count} Staffeln (zu viele für eine Liste)",
     "too_many_episodes": "{count} Folgen (zu viele für eine Liste)",
+    "more_items": "…und {count} weitere",
     "unknown_series": "Unbekannte Serie",
     "unknown_episode": "Unbekannte Folge",
     "available_author": "✅ Deine Anfrage ist jetzt verfügbar!",

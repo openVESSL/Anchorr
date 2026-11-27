@@ -379,6 +379,7 @@
     "episodes_added": "Épisodes ajoutés",
     "too_many_seasons": "{count} saisons (trop nombreuses pour être listées)",
     "too_many_episodes": "{count} épisodes (trop nombreux pour être listés)",
+    "more_items": "…et {count} de plus",
     "unknown_series": "Série inconnue",
     "unknown_episode": "Épisode inconnu",
     "available_author": "✅ Votre demande est maintenant disponible !",

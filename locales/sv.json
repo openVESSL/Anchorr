@@ -441,6 +441,7 @@
     "episodes_added": "Tillagda avsnitt",
     "too_many_seasons": "{count} säsonger (för många för att listas)",
     "too_many_episodes": "{count} avsnitt (för många för att listas)",
+    "more_items": "…och {count} till",
     "unknown_series": "Okänd serie",
     "unknown_episode": "Okänt avsnitt",
     "available_author": "✅ Din förfrågan är nu tillgänglig!",

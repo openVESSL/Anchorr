@@ -18,12 +18,29 @@ const shown = (key) => settings[key] !== "false";
 
 // Discord refuses an embed whose texts are longer than these
 const FIELD_MAX = 1024;
-const TITLE_MAX = 256;
+const TITLE_MAX = 256; // also field names and the author line
+const DESCRIPTION_MAX = 4096;
 
 /** Cuts text to Discord's limit, ending with "…" when something was cut. */
 function clip(text, max) {
   const value = String(text ?? "");
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+  if (value.length <= max) return value;
+  let end = max - 1;
+  // never keep half of an emoji (a UTF-16 surrogate pair)
+  const last = value.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return `${value.slice(0, end)}…`;
+}
+
+/** Whole lines while they fit, then how many were left out. */
+function joinLines(lines, max) {
+  const all = lines.join("\n");
+  if (all.length <= max) return all;
+  for (let kept = lines.length - 1; kept > 0; kept--) {
+    const text = [...lines.slice(0, kept), t("notifications.more_items", { count: lines.length - kept })].join("\n");
+    if (text.length <= max) return text;
+  }
+  return t("notifications.more_items", { count: lines.length });
 }
 
 /** Removes Jellyfin/TMDB tags such as [tvdbid-123], [imdbid-123] and a trailing (?). */
@@ -112,9 +129,8 @@ function addBatchList(embed, data, { episodeCount, episodeDetails, seasonCount, 
         .map((s) => {
           const n = s.SeasonNumber || s.IndexNumber || "?";
           return `**${t("notifications.season_name", { number: n })}**: ${s.Name || t("notifications.season_name", { number: n })}`;
-        })
-        .join("\n");
-      embed.addFields({ name, value: clip(list, FIELD_MAX), inline: false });
+        });
+      embed.addFields({ name, value: joinLines(list, FIELD_MAX), inline: false });
     } else if (seasonCount > MAX_LISTED) {
       embed.addFields({ name, value: t("notifications.too_many_seasons", { count: seasonCount }), inline: false });
     }
@@ -128,9 +144,8 @@ function addBatchList(embed, data, { episodeCount, episodeDetails, seasonCount, 
           const s = String(ep.SeasonNumber || 1).padStart(2, "0");
           const e = String(ep.EpisodeNumber || 0).padStart(2, "0");
           return `**S${s}E${e}**: ${ep.Name || t("notifications.unknown_episode")}`;
-        })
-        .join("\n");
-      embed.addFields({ name, value: clip(list, FIELD_MAX), inline: false });
+        });
+      embed.addFields({ name, value: joinLines(list, FIELD_MAX), inline: false });
     } else if (episodeCount > MAX_LISTED) {
       embed.addFields({ name, value: t("notifications.too_many_episodes", { count: episodeCount }), inline: false });
     }
@@ -160,7 +175,7 @@ export function buildItemNotification(data, { details, omdb, imdbId, batch }) {
     if (shown("EMBED_SHOW_OVERVIEW_EPISODES") && overview) embed.addFields({ name: t("notifications.episode_summary"), value: overview });
   } else if (ItemType !== "Season") {
     const fields = [];
-    if (shown("EMBED_SHOW_OVERVIEW_MOVIES")) fields.push({ name: summaryHeading(ItemType, omdb), value: overview });
+    if (shown("EMBED_SHOW_OVERVIEW_MOVIES")) fields.push({ name: clip(summaryHeading(ItemType, omdb), TITLE_MAX), value: overview });
     if (shown("EMBED_SHOW_GENRE")) fields.push({ name: t("embeds.genre"), value: genreList, inline: true });
     if (shown("EMBED_SHOW_RUNTIME")) fields.push({ name: t("embeds.runtime"), value: runtime, inline: true });
     if (shown("EMBED_SHOW_RATING")) fields.push({ name: t("embeds.rating"), value: rating, inline: true });
@@ -219,7 +234,9 @@ export function buildAvailableDm(data, post) {
   if (linkable) embed.setURL(url);
   embed
     .setColor(settings.EMBED_COLOR_SUCCESS || "#a6e3a1")
-    .setDescription(t("notifications.available_description", { title: data.Name || data.SeriesName || t("notifications.available_fallback_title") }))
+    .setDescription(
+      clip(t("notifications.available_description", { title: data.Name || data.SeriesName || t("notifications.available_fallback_title") }), DESCRIPTION_MAX)
+    )
     .addFields(
       { name: t("embeds.genre"), value: post.genreList, inline: true },
       { name: t("embeds.runtime"), value: post.runtime, inline: true },

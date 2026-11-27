@@ -24,7 +24,30 @@ test("long overviews, titles and episode lists are cut to Discord's limits", (t)
   const batch = { episodeCount: 10, episodeDetails: { episodes } };
   const show = { ItemType: "Episode", ItemId: "e1", ServerId: "srv", SeriesId: "s1", SeriesName: "Show", Year: 2020 };
   const list = buildItemNotification(show, { details: null, omdb: null, imdbId: null, batch }).embed.toJSON().fields.at(-1);
-  assert.equal(list.value.length, 1024);
+  assert.ok(list.value.length <= 1024);
+  const lines = list.value.split("\n");
+  const hidden = 10 - (lines.length - 1);
+  assert.equal(lines.at(-1), `…and ${hidden} more`, "the list says how many episodes it leaves out");
+  assert.ok(lines.slice(0, -1).every((line) => line.endsWith("e".repeat(200))), "only whole lines are listed");
+});
+
+test("a long director list is cut in the field name instead of failing the post", (t) => {
+  t.after(applyConfig({ JELLYFIN_BASE_URL: "https://jf.example.com", LANGUAGE: "en" }));
+  const directors = Array.from({ length: 26 }, (_, i) => `Director Number ${i + 1}`).join(", ");
+  const movie = { ItemType: "Movie", ItemId: "m3", ServerId: "srv", Name: "The ABCs of Death", Year: 2012, Overview: "x", Genres: ["Horror"] };
+  const json = buildItemNotification(movie, { details: null, omdb: { Director: directors }, imdbId: null, batch: {} }).embed.toJSON();
+  const heading = json.fields[0].name;
+  assert.equal(heading.length, 256);
+  assert.ok(heading.startsWith("Directed by Director Number 1,"));
+});
+
+test("an emoji at the cut is never split in half", (t) => {
+  t.after(applyConfig({ JELLYFIN_BASE_URL: "https://jf.example.com", LANGUAGE: "en" }));
+  const overview = "a".repeat(1022) + "😀" + "b".repeat(10);
+  const movie = { ItemType: "Movie", ItemId: "m4", ServerId: "srv", Name: "Smile", Year: 2022, Overview: overview, Genres: ["Horror"] };
+  const value = buildItemNotification(movie, { details: null, omdb: null, imdbId: null, batch: {} }).embed.toJSON().fields[0].value;
+  assert.ok(value.isWellFormed(), "no lone half of a surrogate pair");
+  assert.equal(value, "a".repeat(1022) + "…");
 });
 
 test("short texts stay exactly as they are", (t) => {
