@@ -6,6 +6,7 @@ import { isMokaMode, updateMokaUser } from "../api/moka.js";
 import { setGuestAutoApprove } from "../api/seerr.js";
 import { restartBot, startBot } from "../bot/botManager.js";
 import { scheduleDailyRandomPick } from "../bot/dailyPick.js";
+import { prepareGuestUser } from "../bot/guestUser.js";
 import { botState } from "../bot/botState.js";
 import { authenticateToken } from "../utils/auth.js";
 import { CONFIG_PATH, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
@@ -134,13 +135,20 @@ router.post(
       );
     }
     // The auto-approve switch only governs the guest account; mapped users keep their own Seerr permissions
-    else if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE && settings.SEERR_GUEST_USER_ID) {
-      setGuestAutoApprove({
-        seerrUrl: settings.SEERR_URL,
-        apiKey: settings.SEERR_API_KEY,
-        guestUserId: settings.SEERR_GUEST_USER_ID,
-        autoApprove: settings.SEERR_AUTO_APPROVE === "true",
-      }).catch((err) => logger.warn(`Could not update the guest account's auto-approve permission: ${err.message}`));
+    else if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE) {
+      // prepareGuestUser checks the saved id first, so a real person's permissions are never changed
+      prepareGuestUser()
+        .then(
+          (guestUserId) =>
+            guestUserId !== null &&
+            setGuestAutoApprove({
+              seerrUrl: settings.SEERR_URL,
+              apiKey: settings.SEERR_API_KEY,
+              guestUserId,
+              autoApprove: settings.SEERR_AUTO_APPROVE === "true",
+            })
+        )
+        .catch((err) => logger.warn(`Could not update the guest account's auto-approve permission: ${err.message}`));
     }
 
     // Check if Discord credentials are complete and changed

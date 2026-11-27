@@ -69,7 +69,7 @@ before(async () => {
     "GET /api/v1/service/radarr/0": () => ({ profiles: [{ id: 4, name: "HD-1080p" }], tags: [{ id: 3, label: "kids" }] }),
     "GET /api/v1/service/sonarr/1": () => ({ profiles: [{ id: 6, name: "WEB-720p" }], tags: [{ id: 7, label: "anime" }] }),
     "POST /api/v1/user": () => (guestCreationFails ? { status: 500, json: { message: "nope" } } : { status: 201, json: { id: 500 } }),
-    "GET /api/v1/user/500": () => ({ id: 500, permissions: 32 }),
+    "GET /api/v1/user/500": () => ({ id: 500, email: "discord@anchorr.invalid", permissions: 32 }),
     "POST /api/v1/request": ({ body }) =>
       body.mediaId === 605 ? { status: 403, json: { message: "Movie Quota exceeded" } } : { status: 201, json: { id: 99 } },
   });

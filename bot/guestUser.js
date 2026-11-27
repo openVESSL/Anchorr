@@ -37,7 +37,7 @@ export function prepareGuestUser() {
   return pending;
 }
 
-/** Guest id for a request: the saved one, or a fresh attempt if Seerr was down at startup. */
-export async function getGuestUserId() {
-  return settings.SEERR_GUEST_USER_ID ? Number(settings.SEERR_GUEST_USER_ID) : prepareGuestUser();
+/** Guest id for a request, checked against Seerr each time: after a Seerr reset the saved id can be a real person. */
+export function getGuestUserId() {
+  return prepareGuestUser();
 }

@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import test, { after, before } from "node:test";
 
 import { NoSeerrUserError, ensureGuestUser, sendRequest, setGuestAutoApprove } from "../api/seerr.js";
+import { getGuestUserId } from "../bot/guestUser.js";
+import { applyConfig } from "./helpers/config.js";
 import { startFakeServer } from "./helpers/http.js";
 
 let seerr;
@@ -161,6 +163,16 @@ test("guest: a saved id that now belongs to a real person is never used", async 
   await assert.rejects(setGuestAutoApprove({ seerrUrl: server.url, apiKey: "k", guestUserId: 100, autoApprove: true }), /not the guest account/);
   assert.equal(users[0].permissions, 2, "the person's permissions are left alone");
   assert.equal(server.requests.filter((r) => r.method === "PUT").length, 0);
+});
+
+test("guest: a request checks the saved id against Seerr first", async (t) => {
+  const users = [{ id: 100, email: "alice@example.com", permissions: 2 }];
+  const server = await fakeUsers(users);
+  t.after(() => server.close());
+  t.after(applyConfig({ SEERR_URL: server.url, SEERR_API_KEY: "k", SEERR_GUEST_USER_ID: "100" }));
+
+  assert.equal(await getGuestUserId(), 101, "the person's id is not used for the request");
+  assert.equal(await getGuestUserId(), 101, "the new guest is kept");
 });
 
 test("guest: the auto-approve switch flips only that permission bit", async (t) => {
