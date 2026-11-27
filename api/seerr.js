@@ -388,7 +388,7 @@ function findMappedSeerrUserId(discordUserId, userMappings) {
  * Create a media request on behalf of a Discord user. It always runs as a Seerr user
  * (x-api-user): the mapped account, or the guest account for unmapped users, so Seerr
  * applies that user's permissions, quota and auto-approval. Never as the API key owner.
- * @param {number|string|Function} [params.guestUserId] guest account id, or an async resolver
+ * @param {number|string|Function} [params.guestUserId] guest account id, or an async resolver ({ seerrUrl, apiKey })
  * @throws {NoSeerrUserError} when the user is not mapped and there is no guest account
  */
 export async function sendRequest({
@@ -413,8 +413,8 @@ export async function sendRequest({
     logger.warn(`[SEERR] Ignoring the link of Discord user ${discordUserId}: "${mappedUserId}" is not a Seerr user id`);
     mappedUserId = null;
   }
-  // guestUserId may be a resolver, only called when the user has no mapping
-  const guest = mappedUserId === null && typeof guestUserId === "function" ? await guestUserId() : guestUserId;
+  // guestUserId may be a resolver, only called when the user has no mapping; it asks the Seerr this request goes to
+  const guest = mappedUserId === null && typeof guestUserId === "function" ? await guestUserId({ seerrUrl, apiKey }) : guestUserId;
   const seerrUserId = mappedUserId ?? (isSeerrUserId(guest) ? guest : null);
   if (seerrUserId === null) throw new NoSeerrUserError(discordUserId);
 
@@ -475,8 +475,10 @@ function seerrCall(method, seerrUrl, apiKey, path, data) {
 export async function ensureGuestUser({ seerrUrl, apiKey, guestUserId = null, autoApprove = false }) {
   if (guestUserId) {
     try {
-      await seerrCall("get", seerrUrl, apiKey, `/user/${parseInt(guestUserId, 10)}`);
-      return Number(guestUserId);
+      const { data: user } = await seerrCall("get", seerrUrl, apiKey, `/user/${parseInt(guestUserId, 10)}`);
+      // After a Seerr reinstall the saved id can belong to a real person
+      if (user?.email === GUEST_EMAIL) return Number(guestUserId);
+      logger.warn(`[SEERR] Seerr user ${guestUserId} is not the guest account (Seerr was reset?), looking for the guest again`);
     } catch (err) {
       if (err?.response?.status !== 404) throw err;
       logger.warn(`[SEERR] Guest user ${guestUserId} no longer exists in Seerr, creating a new one`);
@@ -508,6 +510,7 @@ export async function ensureGuestUser({ seerrUrl, apiKey, guestUserId = null, au
 export async function setGuestAutoApprove({ seerrUrl, apiKey, guestUserId, autoApprove }) {
   const id = parseInt(guestUserId, 10);
   const { data: user } = await seerrCall("get", seerrUrl, apiKey, `/user/${id}`);
+  if (user?.email !== GUEST_EMAIL) throw new Error(`Seerr user ${id} is not the guest account, its permissions were left alone`);
   const current = Number(user.permissions) || 0;
   const next = autoApprove ? current | PERMISSION_AUTO_APPROVE : current & ~PERMISSION_AUTO_APPROVE;
   if (next !== current) await seerrCall("put", seerrUrl, apiKey, `/user/${id}`, { permissions: next });

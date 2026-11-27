@@ -117,6 +117,61 @@ test("Seerr checks never send the stored key to another server", async () => {
   await api("POST", "/api/save-config", { SEERR_API_KEY: "" });
 });
 
+// Puts a guest id into config.json the way a restored backup would; save-config cannot set it
+async function restoreWithGuest(values) {
+  const backup = (await api("GET", "/api/config/backup")).json;
+  assert.equal((await api("POST", "/api/config/restore", { ...backup, ...values })).status, 200);
+}
+
+test("a new Seerr address or key forgets the saved guest account, and the dashboard cannot set it", async () => {
+  const guest = async () => (await api("GET", "/api/config")).json.SEERR_GUEST_USER_ID;
+  await api("POST", "/api/save-config", { SEERR_URL: "http://seerr.example.com", SEERR_API_KEY: "seerr-secret-1234" });
+  await restoreWithGuest({ SEERR_GUEST_USER_ID: "77" });
+  await api("POST", "/api/save-config", { SEERR_GUEST_USER_ID: "1" });
+  assert.equal(await guest(), "77", "the dashboard cannot point the guest at another Seerr user");
+  await api("POST", "/api/save-config", { SEERR_URL: "http://seerr.example.com/api/v1/", SEERR_API_KEY: "••••••••1234", LANGUAGE: "en" });
+  assert.equal(await guest(), "77", "same Seerr, other spelling: kept");
+
+  await api("POST", "/api/save-config", { SEERR_URL: "http://other-seerr.example.com" });
+  assert.equal(await guest(), "", "other Seerr address: forgotten");
+
+  await restoreWithGuest({ SEERR_GUEST_USER_ID: "77" });
+  await api("POST", "/api/save-config", { SEERR_API_KEY: "seerr-secret-5678" });
+  assert.equal(await guest(), "", "other Seerr key: forgotten");
+  const backup = (await api("GET", "/api/config/backup")).json;
+  assert.equal((await api("POST", "/api/config/restore", backup)).status, 200, "a backup without a guest id still restores");
+  await api("POST", "/api/save-config", { SEERR_API_KEY: "" });
+});
+
+test("the auto-approve switch never changes a real person who now holds the saved guest id", async () => {
+  // Seerr was reset: id 100 is a person now, the guest account is gone
+  const users = [{ id: 100, email: "alice@example.com", permissions: 2 }];
+  const seerr = await startFakeServer({
+    "GET /api/v1/user/100": () => users[0],
+    "GET /api/v1/user/101": () => users[1] ?? { status: 404, json: {} },
+    "POST /api/v1/user": ({ body }) => {
+      const user = { id: 101, ...body };
+      users.push(user);
+      return { status: 201, json: user };
+    },
+    "PUT /api/v1/user/100": ({ body }) => Object.assign(users[0], body),
+    "PUT /api/v1/user/101": ({ body }) => Object.assign(users[1], body),
+  });
+  try {
+    await restoreWithGuest({ SEERR_URL: seerr.url, SEERR_API_KEY: "seerr-key", SEERR_GUEST_USER_ID: "100", SEERR_AUTO_APPROVE: "false" });
+    assert.equal((await api("POST", "/api/save-config", { SEERR_AUTO_APPROVE: "true" })).status, 200);
+
+    for (let i = 0; i < 50 && !users[1]; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.equal(users[1]?.email, "discord@anchorr.invalid", "the guest account is created again");
+    assert.equal(users[1].permissions, 32 | 128, "with auto-approve");
+    assert.equal(users[0].permissions, 2, "the person's permissions are left alone");
+    assert.equal((await api("GET", "/api/config")).json.SEERR_GUEST_USER_ID, "101");
+  } finally {
+    await api("POST", "/api/save-config", { SEERR_URL: "", SEERR_API_KEY: "", SEERR_AUTO_APPROVE: "false" });
+    await seerr.close();
+  }
+});
+
 test("save keeps every dashboard field but drops unknown and protected keys (audit S5)", async () => {
   const res = await api("POST", "/api/save-config", {
     EMBED_COLOR_MOVIE: "#ff0000",

@@ -72,7 +72,7 @@ export const configSchema = Joi.object({
     .allow("")
     .optional(),
   // Seerr account used for Discord users without a mapping (created automatically)
-  SEERR_GUEST_USER_ID: Joi.alternatives(Joi.string().pattern(/^\d*$/), Joi.number().integer().min(1)).optional(),
+  SEERR_GUEST_USER_ID: Joi.alternatives(Joi.string().pattern(/^\d*$/).allow(""), Joi.number().integer().min(1)).optional(),
   // Written by the 1.x upgrade and the checklist's Done button
   UPGRADE_FROM_V1: Joi.object({
     at: Joi.string().isoDate().required(),
@@ -114,6 +114,7 @@ export const DASHBOARD_PROTECTED_KEYS = [
   "USER_MAPPING_METADATA",
   "WEEKLY_ROUNDUP_LAST_POSTED_AT",
   "CONFIG_VERSION",
+  "SEERR_GUEST_USER_ID",
   "UPGRADE_FROM_V1",
   "UPGRADE_DISMISSED_AT",
 ];

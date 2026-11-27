@@ -4,6 +4,9 @@ import assert from "node:assert/strict";
 import test, { after, before } from "node:test";
 
 import { NoSeerrUserError, ensureGuestUser, sendRequest, setGuestAutoApprove } from "../api/seerr.js";
+import { getGuestUserId } from "../bot/guestUser.js";
+import { readConfig, writeConfig } from "../utils/configFile.js";
+import { applyConfig } from "./helpers/config.js";
 import { startFakeServer } from "./helpers/http.js";
 
 let seerr;
@@ -147,6 +150,85 @@ test("guest: an existing id is kept, a deleted one is replaced, a leftover accou
 
   // id 101 does not exist; creating hits the leftover account's email, which is reused
   assert.equal(await ensureGuestUser({ seerrUrl: server.url, apiKey: "k", guestUserId: "101" }), 100);
+});
+
+test("guest: a saved id that now belongs to a real person is never used", async (t) => {
+  // Seerr was reinstalled: id 100 is a person, the old guest account is gone
+  const users = [{ id: 100, email: "alice@example.com", permissions: 2 }];
+  const server = await fakeUsers(users);
+  t.after(() => server.close());
+
+  assert.equal(await ensureGuestUser({ seerrUrl: server.url, apiKey: "k", guestUserId: "100" }), 101, "a new guest is created");
+  assert.equal(users[1].email, "discord@anchorr.invalid");
+
+  await assert.rejects(setGuestAutoApprove({ seerrUrl: server.url, apiKey: "k", guestUserId: 100, autoApprove: true }), /not the guest account/);
+  assert.equal(users[0].permissions, 2, "the person's permissions are left alone");
+  assert.equal(server.requests.filter((r) => r.method === "PUT").length, 0);
+});
+
+// getGuestUserId saves the id it finds; later tests must not see it
+function forgetSavedGuest() {
+  const config = readConfig();
+  if (config && "SEERR_GUEST_USER_ID" in config) {
+    delete config.SEERR_GUEST_USER_ID;
+    writeConfig(config);
+  }
+}
+
+test("guest: a request checks the saved id against Seerr first", async (t) => {
+  t.after(forgetSavedGuest);
+  const users = [{ id: 100, email: "alice@example.com", permissions: 2 }];
+  const server = await fakeUsers(users);
+  t.after(() => server.close());
+  t.after(applyConfig({ SEERR_URL: server.url, SEERR_API_KEY: "k", SEERR_GUEST_USER_ID: "100" }));
+
+  assert.equal(await getGuestUserId(), 101, "the person's id is not used for the request");
+  assert.equal(await getGuestUserId(), 101, "the new guest is kept");
+});
+
+test("guest: a lookup still running for the old Seerr is not reused after a change, and does not save its id", async (t) => {
+  t.after(forgetSavedGuest);
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  const oldSeerr = await startFakeServer({
+    "GET /api/v1/user/100": async () => {
+      await held;
+      return { id: 100, email: "discord@anchorr.invalid" };
+    },
+  });
+  const newUsers = [{ id: 100, email: "alice@example.com", permissions: 2 }]; // id 100 is a person on the new Seerr
+  const newSeerr = await fakeUsers(newUsers);
+  t.after(() => Promise.all([oldSeerr.close(), newSeerr.close()]));
+  t.after(applyConfig({ SEERR_URL: oldSeerr.url, SEERR_API_KEY: "k", SEERR_GUEST_USER_ID: "100" }));
+
+  const oldLookup = getGuestUserId();
+  const restoreUrl = applyConfig({ SEERR_URL: newSeerr.url });
+  t.after(restoreUrl);
+  assert.equal(await getGuestUserId(), 101, "the new Seerr is asked, not the old lookup");
+
+  release();
+  assert.equal(await oldLookup, 100);
+  assert.equal(readConfig()?.SEERR_GUEST_USER_ID, "101", "the old Seerr's id is not saved");
+});
+
+test("guest: the check asks the Seerr the request goes to", async () => {
+  let asked;
+  await sendRequest({
+    seerrUrl: seerr.url, apiKey: "seerr-key", tmdbId: "1", mediaType: "movie", discordUserId: "d-stranger", userMappings: MAPPINGS,
+    guestUserId: async (target) => ((asked = target), 77),
+  });
+  assert.deepEqual(asked, { seerrUrl: seerr.url, apiKey: "seerr-key" });
+});
+
+test("guest: when Seerr fails the check, the member hears about Seerr, not about linking", async (t) => {
+  const server = await startFakeServer({ "GET /api/v1/user/100": () => ({ status: 500, json: {} }) });
+  t.after(() => server.close());
+  t.after(applyConfig({ SEERR_URL: server.url, SEERR_API_KEY: "k", SEERR_GUEST_USER_ID: "100" }));
+
+  await assert.rejects(
+    sendRequest({ seerrUrl: server.url, apiKey: "k", tmdbId: "1", mediaType: "movie", discordUserId: "d-stranger", userMappings: MAPPINGS, guestUserId: getGuestUserId }),
+    (err) => !(err instanceof NoSeerrUserError) && err.response?.status === 500
+  );
 });
 
 test("guest: the auto-approve switch flips only that permission bit", async (t) => {

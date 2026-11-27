@@ -6,11 +6,13 @@ import { isMokaMode, updateMokaUser } from "../api/moka.js";
 import { setGuestAutoApprove } from "../api/seerr.js";
 import { restartBot, startBot } from "../bot/botManager.js";
 import { scheduleDailyRandomPick } from "../bot/dailyPick.js";
+import { prepareGuestUser } from "../bot/guestUser.js";
 import { botState } from "../bot/botState.js";
 import { authenticateToken } from "../utils/auth.js";
 import { CONFIG_PATH, loadSettings, readConfig, writeConfig } from "../utils/configFile.js";
 import { SENSITIVE_FIELDS, isMaskedValue } from "../utils/configSanitize.js";
 import logger from "../utils/logger.js";
+import { normalizeSeerrUrl } from "../utils/seerrUrl.js";
 import { settings } from "../utils/settings.js";
 import { DASHBOARD_PROTECTED_KEYS, saveConfigSchema, validateBody } from "../utils/validation.js";
 
@@ -41,6 +43,7 @@ router.post(
     const DAILY_PICK_KEYS = ["DAILY_RANDOM_PICK_ENABLED", "DAILY_RANDOM_PICK_CHANNEL_ID", "DAILY_RANDOM_PICK_INTERVAL"];
     const oldDailyPick = DAILY_PICK_KEYS.map((k) => settings[k]).join("|");
     const oldMoka = isMokaMode();
+    let seerrChanged = false;
 
     // Normalize SEERR_URL to remove /api/v1 suffix if present
     if (
@@ -98,6 +101,12 @@ router.post(
         }
       }
 
+      // A guest id belongs to one Seerr; it is looked up again after saving
+      seerrChanged =
+        normalizeSeerrUrl(finalConfig.SEERR_URL || "") !== normalizeSeerrUrl(existingConfig.SEERR_URL || "") ||
+        (finalConfig.SEERR_API_KEY || "") !== (existingConfig.SEERR_API_KEY || "");
+      if (seerrChanged) finalConfig.SEERR_GUEST_USER_ID = "";
+
       // Use centralized writeConfig with robust error handling
       if (!writeConfig(finalConfig)) {
         return res.status(500).json({
@@ -118,6 +127,8 @@ router.post(
     }
 
     loadSettings(); // Reload config into the settings store
+    // Look the guest up on the new Seerr now, so the Seerr page shows it right away
+    if (seerrChanged && !isMokaMode()) prepareGuestUser();
 
     // With Moka, the switch sets Moka's guest account; linked people keep their own rights there
     if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE && isMokaMode() && settings.MOKA_GUEST_USER_ID) {
@@ -127,13 +138,20 @@ router.post(
       );
     }
     // The auto-approve switch only governs the guest account; mapped users keep their own Seerr permissions
-    else if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE && settings.SEERR_GUEST_USER_ID) {
-      setGuestAutoApprove({
-        seerrUrl: settings.SEERR_URL,
-        apiKey: settings.SEERR_API_KEY,
-        guestUserId: settings.SEERR_GUEST_USER_ID,
-        autoApprove: settings.SEERR_AUTO_APPROVE === "true",
-      }).catch((err) => logger.warn(`Could not update the guest account's auto-approve permission: ${err.message}`));
+    else if (oldAutoApprove !== settings.SEERR_AUTO_APPROVE) {
+      // prepareGuestUser checks the saved id first, so a real person's permissions are never changed
+      prepareGuestUser()
+        .then(
+          (guestUserId) =>
+            guestUserId !== null &&
+            setGuestAutoApprove({
+              seerrUrl: settings.SEERR_URL,
+              apiKey: settings.SEERR_API_KEY,
+              guestUserId,
+              autoApprove: settings.SEERR_AUTO_APPROVE === "true",
+            })
+        )
+        .catch((err) => logger.warn(`Could not update the guest account's auto-approve permission: ${err.message}`));
     }
 
     // Check if Discord credentials are complete and changed
