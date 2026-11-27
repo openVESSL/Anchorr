@@ -379,13 +379,13 @@
     "episodes_added": "Épisodes ajoutés",
     "too_many_seasons": "{count} saisons (trop nombreuses pour être listées)",
     "too_many_episodes": "{count} épisodes (trop nombreux pour être listés)",
-    "more_items": "…et {count} de plus",
     "unknown_series": "Série inconnue",
     "unknown_episode": "Épisode inconnu",
     "available_author": "✅ Votre demande est maintenant disponible !",
     "available_description": "{title} est maintenant disponible sur Jellyfin !",
     "available_fallback_title": "Le contenu demandé",
-    "requested_by": "Demandé par {users}"
+    "requested_by": "Demandé par {users}",
+    "more_items": "…et {count} de plus"
   },
   "embeds": {
     "movie_found": "🎬 Film trouvé :",

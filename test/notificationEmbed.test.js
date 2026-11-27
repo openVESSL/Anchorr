@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { applyConfig } from "./helpers/config.js";
 
-const { buildItemNotification } = await import("../jellyfin/notificationEmbed.js");
+const { buildAvailableDm, buildItemNotification } = await import("../jellyfin/notificationEmbed.js");
 
 test("long overviews, titles and episode lists are cut to Discord's limits", (t) => {
   t.after(applyConfig({ JELLYFIN_BASE_URL: "https://jf.example.com", LANGUAGE: "en" }));
@@ -48,6 +48,35 @@ test("an emoji at the cut is never split in half", (t) => {
   const value = buildItemNotification(movie, { details: null, omdb: null, imdbId: null, batch: {} }).embed.toJSON().fields[0].value;
   assert.ok(value.isWellFormed(), "no lone half of a surrogate pair");
   assert.equal(value, "a".repeat(1022) + "…");
+});
+
+test("a single huge episode name is cut, so the list still names the first episode", (t) => {
+  t.after(applyConfig({ JELLYFIN_BASE_URL: "https://jf.example.com", LANGUAGE: "en" }));
+  const episodes = [
+    { SeasonNumber: 1, EpisodeNumber: 1, Name: "x".repeat(2000) },
+    { SeasonNumber: 1, EpisodeNumber: 2, Name: "Second" },
+  ];
+  const show = { ItemType: "Episode", ItemId: "e2", ServerId: "srv", SeriesId: "s2", SeriesName: "Show", Year: 2020 };
+  const batch = { episodeCount: 2, episodeDetails: { episodes } };
+  const list = buildItemNotification(show, { details: null, omdb: null, imdbId: null, batch }).embed.toJSON().fields.at(-1);
+  const [first, more] = list.value.split("\n");
+  assert.ok(list.value.length <= 1024);
+  assert.ok(first.startsWith("**S01E01**: xxx") && first.endsWith("…"));
+  assert.equal(more, "…and 1 more");
+});
+
+test("season lists and the available DM stay within Discord's limits", (t) => {
+  t.after(applyConfig({ JELLYFIN_BASE_URL: "https://jf.example.com", LANGUAGE: "en" }));
+  const seasons = Array.from({ length: 10 }, (_, i) => ({ SeasonNumber: i + 1, Name: "s".repeat(300) }));
+  const show = { ItemType: "Season", ItemId: "se1", ServerId: "srv", SeriesId: "s3", SeriesName: "Show", Year: 2020, Name: "n".repeat(5000) };
+  const post = buildItemNotification(show, { details: null, omdb: null, imdbId: null, batch: { seasonCount: 10, seasonDetails: { seasons } } });
+  const list = post.embed.toJSON().fields.at(-1);
+  assert.ok(list.value.length <= 1024);
+  assert.match(list.value.split("\n").at(-1), /^…and \d+ more$/);
+
+  const dm = buildAvailableDm(show, post).embeds[0].toJSON();
+  assert.equal(dm.description.length, 4096);
+  assert.ok(dm.description.endsWith("…"));
 });
 
 test("short texts stay exactly as they are", (t) => {

@@ -34,6 +34,9 @@ function clip(text, max) {
 
 /** Whole lines while they fit, then how many were left out. */
 function joinLines(lines, max) {
+  // room for one line next to the "more" line, so a huge name never empties the list
+  const room = max - t("notifications.more_items", { count: lines.length }).length - 1;
+  lines = lines.map((line) => clip(line, room));
   const all = lines.join("\n");
   if (all.length <= max) return all;
   for (let kept = lines.length - 1; kept > 0; kept--) {
