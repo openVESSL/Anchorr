@@ -16,6 +16,16 @@ const TMDB_IMAGES = "https://image.tmdb.org/t/p";
 const MAX_LISTED = 10;
 const shown = (key) => settings[key] !== "false";
 
+// Discord refuses an embed whose texts are longer than these
+const FIELD_MAX = 1024;
+const TITLE_MAX = 256;
+
+/** Cuts text to Discord's limit, ending with "…" when something was cut. */
+function clip(text, max) {
+  const value = String(text ?? "");
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
 /** Removes Jellyfin/TMDB tags such as [tvdbid-123], [imdbid-123] and a trailing (?). */
 export function cleanTitle(title) {
   if (!title) return title;
@@ -104,7 +114,7 @@ function addBatchList(embed, data, { episodeCount, episodeDetails, seasonCount, 
           return `**${t("notifications.season_name", { number: n })}**: ${s.Name || t("notifications.season_name", { number: n })}`;
         })
         .join("\n");
-      embed.addFields({ name, value: list, inline: false });
+      embed.addFields({ name, value: clip(list, FIELD_MAX), inline: false });
     } else if (seasonCount > MAX_LISTED) {
       embed.addFields({ name, value: t("notifications.too_many_seasons", { count: seasonCount }), inline: false });
     }
@@ -120,7 +130,7 @@ function addBatchList(embed, data, { episodeCount, episodeDetails, seasonCount, 
           return `**S${s}E${e}**: ${ep.Name || t("notifications.unknown_episode")}`;
         })
         .join("\n");
-      embed.addFields({ name, value: list, inline: false });
+      embed.addFields({ name, value: clip(list, FIELD_MAX), inline: false });
     } else if (episodeCount > MAX_LISTED) {
       embed.addFields({ name, value: t("notifications.too_many_episodes", { count: episodeCount }), inline: false });
     }
@@ -136,9 +146,11 @@ export function buildItemNotification(data, { details, omdb, imdbId, batch }) {
   const single = !(batch.episodeCount > 1);
   const runtime = runtimeOf(data, details, omdb) ?? t("embeds.unknown");
   const rating = omdb?.imdbRating ? `${omdb.imdbRating}/10` : t("embeds.not_available");
-  const genreList = Array.isArray(data.Genres) ? data.Genres.join(", ") : data.Genres || omdb?.Genre || t("embeds.unknown");
-  const overview = data.Overview?.trim() || omdb?.Plot || t("embeds.no_description");
-  const { author, title } = headingOf(data, batch);
+  const genreList = clip(Array.isArray(data.Genres) ? data.Genres.join(", ") : data.Genres || omdb?.Genre || t("embeds.unknown"), FIELD_MAX);
+  const overview = clip(data.Overview?.trim() || omdb?.Plot || t("embeds.no_description"), FIELD_MAX);
+  const heading = headingOf(data, batch);
+  const author = clip(heading.author, TITLE_MAX);
+  const title = clip(heading.title, TITLE_MAX);
 
   const embed = new EmbedBuilder().setAuthor({ name: author }).setTitle(title);
   if (isDiscordLinkableUrl(watchUrl(data))) embed.setURL(watchUrl(data));
